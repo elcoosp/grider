@@ -1,5 +1,5 @@
 use image::*;
-use imageproc::drawing::draw_line_segment_mut;
+use imageproc::{contrast::adaptive_threshold, drawing::draw_line_segment_mut};
 
 /// Represents the kind of a line (row or column).
 ///
@@ -107,16 +107,22 @@ fn is_column_empty(img: &GrayImage, x: u32, height: u32) -> bool {
 
 /// Processes lines (rows or columns) and groups them by their [`LineKind`].
 ///
-/// This function is generic over [`LineTrait`] and can process both [`Row`]s and [`Column`]s.
+/// This function merges adjacent lines of the same kind and ignores lines smaller than a minimum size.
 ///
 /// # Arguments
 /// * `img` - The grayscale image to process.
 /// * `length` - The length of the lines (height for rows, width for columns).
 /// * `is_empty` - A function to check if a line is empty.
+/// * `min_size` - The minimum size (height/width) for a line to be included.
 ///
 /// # Returns
 /// A vector of lines grouped by their [`LineKind`].
-fn process_lines<T>(img: &GrayImage, length: u32, is_empty: impl Fn(u32) -> bool) -> Vec<T>
+fn process_lines<T>(
+    img: &GrayImage,
+    length: u32,
+    is_empty: impl Fn(u32) -> bool,
+    min_size: u32,
+) -> Vec<T>
 where
     T: LineTrait,
 {
@@ -138,21 +144,26 @@ where
         if new_kind == current_kind {
             current_length += 1;
         } else {
-            lines.push(T::new(current_start, current_length, current_kind));
+            // Only add the line if it meets the minimum size requirement
+            if current_length >= min_size {
+                lines.push(T::new(current_start, current_length, current_kind));
+            }
             current_start = i;
             current_kind = new_kind;
             current_length = 1;
         }
     }
-    // Push the last line
-    lines.push(T::new(current_start, current_length, current_kind));
+    // Push the last line if it meets the minimum size requirement
+    if current_length >= min_size {
+        lines.push(T::new(current_start, current_length, current_kind));
+    }
     lines
 }
 
 /// Processes the image and generates the [`Grid`].
 ///
-/// This function converts the image to grayscale, binarizes it, and processes it to generate
-/// the [`Grid`] of [`Row`]s and [`Column`]s.
+/// This function converts the image to grayscale, applies adaptive thresholding,
+/// and processes it to generate the [`Grid`] of [`Row`]s and [`Column`]s.
 ///
 /// # Arguments
 /// * `image` - The input image to process.
@@ -161,31 +172,56 @@ where
 /// A [`Grid`] representing the rows and columns of the image.
 fn process_image(image: DynamicImage) -> Grid {
     // Convert the image to grayscale
-    let img = image.into_luma8();
-    let (width, height) = img.dimensions();
+    let img = image.to_luma8();
 
-    // Binarize the image using a threshold of 128
-    let binarized_img = ImageBuffer::from_vec(
-        width,
+    // Apply adaptive thresholding
+    let binarized_img = adaptive_threshold(&img, 12); // 5x5 neighborhood
+
+    // Process rows and columns with a minimum size threshold
+    let (width, height) = binarized_img.dimensions();
+    let min_size = 12; // Minimum height/width for a row/column to be included
+    let rows = process_lines(
+        &binarized_img,
         height,
-        img.into_iter()
-            .map(|p| if p >= &128 { 255u8 } else { 0u8 })
-            .collect(),
-    )
-    .unwrap();
-
-    // Process rows
-    let rows = process_lines(&binarized_img, height, |y| {
-        is_row_empty(&binarized_img, y, width)
-    });
-
-    // Process columns
-    let columns = process_lines(&binarized_img, width, |x| {
-        is_column_empty(&binarized_img, x, height)
-    });
+        |y| is_row_empty(&binarized_img, y, width),
+        min_size,
+    );
+    let columns = process_lines(
+        &binarized_img,
+        width,
+        |x| is_column_empty(&binarized_img, x, height),
+        min_size,
+    );
 
     // Create the Grid
     Grid { rows, columns }
+}
+
+/// Calculates the local threshold for a pixel based on its neighborhood.
+///
+/// # Arguments
+/// * `img` - The grayscale image.
+/// * `x` - The x-coordinate of the pixel.
+/// * `y` - The y-coordinate of the pixel.
+/// * `radius` - The radius of the neighborhood (e.g., 5 for a 5x5 neighborhood).
+///
+/// # Returns
+/// The local threshold value.
+fn calculate_local_threshold(img: &GrayImage, x: u32, y: u32, radius: u32) -> u8 {
+    let mut sum = 0;
+    let mut count = 0;
+
+    for i in x.saturating_sub(radius)..=x.saturating_add(radius) {
+        for j in y.saturating_sub(radius)..=y.saturating_add(radius) {
+            if i < img.width() && j < img.height() {
+                sum += img.get_pixel(i, j).0[0] as u32;
+                count += 1;
+            }
+        }
+    }
+
+    // Use the mean of the neighborhood as the threshold
+    (sum / count) as u8
 }
 
 /// Debug module for visualizing the grid on the image.
