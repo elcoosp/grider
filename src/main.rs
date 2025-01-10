@@ -1,30 +1,79 @@
 use anyhow::{Context, Result};
-use grider::{debug::save_image_with_grid, Grid};
+use grider::{Grid, GridConfig};
+use image::GenericImageView;
 
 fn main() -> Result<()> {
     // Replace with the path to your image file
-    let image_path = "tests/13.png";
+    let image_path = "tests/large.png";
 
-    // Open the image file
+    // Open and process the image
     let img = image::open(image_path).context("Failed to open image")?;
 
-    // Process the image
-    let grid: Grid = (&img).try_into().unwrap();
+    // Validate image dimensions
+    let (width, height) = img.dimensions();
+    if width == 0 || height == 0 {
+        anyhow::bail!("Invalid image dimensions: {}x{}", width, height);
+    }
+    // Use debug features under feature flag
+    #[cfg(feature = "debug")]
+    {
+        // Load configuration from environment or config file
+        let config = GridConfig::default();
+        // Process the image with configuration
+        let grid = Grid::try_from_image_with_config(&img, config)?;
 
-    // Save the image with grid lines for debugging
-    save_image_with_grid(&img, &grid, "output_with_grid.png");
+        let output_path = format!("{image_path}_output_with_grid.png");
+        grider::debug::save_image_with_grid(&img, &grid, &output_path);
+    }
 
     Ok(())
 }
 
-/// Unit tests for the grid generation logic.
 #[cfg(test)]
 mod tests {
+    use super::*;
     use grider::*;
     use image::*;
     use insta::assert_yaml_snapshot;
-    use pretty_assertions::assert_eq;
-    use proptest::{prelude::*, proptest};
+    use proptest::prelude::*;
+    use test_case::test_case;
+    #[test]
+    fn test_try_from_image_with_config() {
+        let img = GrayImage::from_fn(100, 100, |x, y| {
+            if (x + y) % 2 == 0 {
+                Luma([255])
+            } else {
+                Luma([0])
+            }
+        });
+        let dynamic_img = DynamicImage::ImageLuma8(img);
+
+        let config = GridConfig {
+            threshold_block_size: 8,
+            merge_threshold_ratio: 0.7,
+            enable_parallel: true,
+        };
+
+        let result = Grid::try_from_image_with_config(&dynamic_img, config);
+        assert!(result.is_ok());
+    }
+
+    #[test_case(0, 100)]
+    #[test_case(100, 0)]
+    fn test_invalid_dimensions(width: u32, height: u32) {
+        let img = GrayImage::new(width, height);
+        let dynamic_img = DynamicImage::ImageLuma8(img);
+        let config = GridConfig::default();
+
+        let result = Grid::try_from_image_with_config(&dynamic_img, config);
+        assert!(matches!(
+            result,
+            Err(GridError::InvalidDimensions { width: w, height: h })
+            if w == width && h == height
+        ));
+    }
+
+    #[cfg(feature = "debug")]
     #[test]
     fn test_save_image_with_grid() {
         // Create a 10x10 grayscale image with a gradient from black to white
@@ -45,7 +94,7 @@ mod tests {
 
         // Save the image with grid lines
         let output_path = "test_output_with_grid.png";
-        debug::save_image_with_grid(&dynamic_img, &grid, output_path);
+        grider::debug::save_image_with_grid(&dynamic_img, &grid, output_path);
 
         // Check that the file was created
         assert!(std::path::Path::new(output_path).exists());
@@ -158,40 +207,6 @@ mod tests {
     }
 
     #[test]
-    fn test_process_lines() {
-        // Create a 10x10 grayscale image with alternating empty and full rows
-        let mut img = GrayImage::new(10, 10);
-        for y in 0..10 {
-            let pixel_value = if y % 2 == 0 { 255 } else { 0 }; // Even rows are empty, odd rows are full
-            for x in 0..10 {
-                img.put_pixel(x, y, Luma([pixel_value]));
-            }
-        }
-
-        // Process rows
-        let rows: SmallVecLine<Row> = process_lines(&img, 10, |y| is_row_empty(&img, y, 10));
-
-        // Expected result:
-        // - Even rows are empty (LineKind::Empty)
-        // - Odd rows are full (LineKind::Full)
-        assert_eq!(
-            rows,
-            SmallVecLine::from_vec(vec![
-                Row::new(LineInfo::new(0, 1, LineKind::Empty)),
-                Row::new(LineInfo::new(1, 1, LineKind::Full)),
-                Row::new(LineInfo::new(2, 1, LineKind::Empty)),
-                Row::new(LineInfo::new(3, 1, LineKind::Full)),
-                Row::new(LineInfo::new(4, 1, LineKind::Empty)),
-                Row::new(LineInfo::new(5, 1, LineKind::Full)),
-                Row::new(LineInfo::new(6, 1, LineKind::Empty)),
-                Row::new(LineInfo::new(7, 1, LineKind::Full)),
-                Row::new(LineInfo::new(8, 1, LineKind::Empty)),
-                Row::new(LineInfo::new(9, 1, LineKind::Full)),
-            ])
-        );
-    }
-
-    #[test]
     fn test_is_row_empty() {
         let img =
             GrayImage::from_raw(3, 3, vec![255, 255, 255, 255, 0, 255, 255, 255, 255]).unwrap();
@@ -221,25 +236,7 @@ mod tests {
                 assert!(is_column_empty(&img, x, height));
             }
         }
-        #[test]
-        fn test_process_lines_proptest(width in 1..100u32, height in 1..100u32) {
-            // Create a grayscale image with random pixel values
-            let img = GrayImage::from_fn(width, height, |_, _| Luma([rand::random::<u8>()]));
 
-            // Process rows
-            let rows: SmallVecLine<Row> = process_lines(&img, height, |y| is_row_empty(&img, y, width));
-
-            // Verify that the sum of row heights equals the image height
-            let total_row_height: u32 = rows.iter().map(|row| row.height).sum();
-            assert_eq!(total_row_height, height);
-
-            // Process columns
-            let columns: SmallVecLine<Column> = process_lines(&img, width, |x| is_column_empty(&img, x, height));
-
-            // Verify that the sum of column widths equals the image width
-            let total_column_width: u32 = columns.iter().map(|col| col.width).sum();
-            assert_eq!(total_column_width, width);
-        }
         #[test]
         fn test_merge_small_lines_proptest(
             lines in prop::collection::vec((0..100u32, 1..100u32, prop::sample::select(&[LineKind::Empty, LineKind::Full])), 1..100),
@@ -313,31 +310,6 @@ mod tests {
     }
 
     #[test]
-    fn test_process_lines_small_image() {
-        let img =
-            GrayImage::from_raw(3, 3, vec![255, 255, 255, 255, 0, 255, 255, 255, 255]).unwrap();
-        let rows: SmallVecLine<Row> = process_lines(&img, 3, |y| is_row_empty(&img, y, 3));
-
-        // Assert YAML snapshot with a custom name
-        assert_yaml_snapshot!("process_lines_small_image", rows);
-    }
-
-    #[test]
-    fn test_process_lines_large_image() {
-        let img = GrayImage::from_fn(10, 10, |_x, y| {
-            if y < 5 {
-                Luma([255u8]) // First 5 rows are empty
-            } else {
-                Luma([0u8]) // Last 5 rows are full
-            }
-        });
-        let rows: SmallVecLine<Row> = process_lines(&img, 10, |y| is_row_empty(&img, y, 10));
-
-        // Assert YAML snapshot with a custom name
-        assert_yaml_snapshot!("process_lines_large_image", rows);
-    }
-
-    #[test]
     fn test_process_image() {
         let img = GrayImage::from_fn(10, 10, |_x, y| {
             if y < 5 {
@@ -383,22 +355,148 @@ mod tests {
     }
 
     #[test]
-    fn test_process_lines_inline_snapshot() {
+    fn test_grid_processing_small_image() {
         let img =
             GrayImage::from_raw(3, 3, vec![255, 255, 255, 255, 0, 255, 255, 255, 255]).unwrap();
-        let rows: SmallVecLine<Row> = process_lines(&img, 3, |y| is_row_empty(&img, y, 3));
+        let dynamic_img = DynamicImage::ImageLuma8(img);
 
-        // Assert inline YAML snapshot
-        assert_yaml_snapshot!(rows, @r###"
-        - y: 0
-          height: 1
-          kind: Empty
-        - y: 1
-          height: 1
-          kind: Full
-        - y: 2
-          height: 1
-          kind: Empty
-        "###);
+        let config = GridConfig {
+            threshold_block_size: 3, // Small block size for small image
+            merge_threshold_ratio: 0.5,
+            enable_parallel: false, // Sequential processing for small images
+        };
+
+        let grid = Grid::try_from_image_with_config(&dynamic_img, config).unwrap();
+        assert_yaml_snapshot!("grid_processing_small_image", grid);
+    }
+
+    #[test]
+    fn test_grid_processing_large_image() {
+        let img = GrayImage::from_fn(10, 10, |_x, y| {
+            if y < 5 {
+                Luma([255u8]) // First 5 rows are empty
+            } else {
+                Luma([0u8]) // Last 5 rows are full
+            }
+        });
+        let dynamic_img = DynamicImage::ImageLuma8(img);
+
+        let config = GridConfig::default();
+        let grid = Grid::try_from_image_with_config(&dynamic_img, config).unwrap();
+        assert_yaml_snapshot!("grid_processing_large_image", grid);
+    }
+
+    proptest! {
+        #[test]
+        fn test_grid_processing_proptest(width in 1..100u32, height in 1..100u32) {
+            // Create a grayscale image with random pixel values
+            let img = GrayImage::from_fn(width, height, |_, _| Luma([rand::random::<u8>()]));
+            let dynamic_img = DynamicImage::ImageLuma8(img);
+
+            let config = GridConfig::default();
+            let grid = Grid::try_from_image_with_config(&dynamic_img, config).unwrap();
+
+            // Verify that the sum of row heights equals the image height
+            let total_row_height: u32 = grid.rows.iter().map(|row| row.height).sum();
+            prop_assert_eq!(total_row_height, height);
+
+            // Verify that the sum of column widths equals the image width
+            let total_column_width: u32 = grid.columns.iter().map(|col| col.width).sum();
+            prop_assert_eq!(total_column_width, width);
+        }
+
+        #[test]
+        fn test_grid_processing_with_different_configs(
+            width in 1..100u32,
+            height in 1..100u32,
+            threshold_block_size in 3..20u32,
+            merge_threshold_ratio in 0.1..1.0f32
+        ) {
+            let img = GrayImage::from_fn(width, height, |_, _| Luma([rand::random::<u8>()]));
+            let dynamic_img = DynamicImage::ImageLuma8(img);
+
+            let config = GridConfig {
+                threshold_block_size,
+                merge_threshold_ratio,
+                enable_parallel: true,
+            };
+
+            let grid = Grid::try_from_image_with_config(&dynamic_img, config).unwrap();
+
+            // Basic validity checks
+            prop_assert!(!grid.rows.is_empty());
+            prop_assert!(!grid.columns.is_empty());
+
+            // Check total dimensions
+            let total_row_height: u32 = grid.rows.iter().map(|row| row.height).sum();
+            let total_column_width: u32 = grid.columns.iter().map(|col| col.width).sum();
+            prop_assert_eq!(total_row_height, height);
+            prop_assert_eq!(total_column_width, width);
+        }
+    }
+
+    #[test]
+    fn test_grid_with_custom_config() {
+        let img = GrayImage::from_fn(20, 20, |x, y| {
+            if (x < 10 && y < 10) || (x >= 10 && y >= 10) {
+                Luma([0])
+            } else {
+                Luma([255])
+            }
+        });
+        let dynamic_img = DynamicImage::ImageLuma8(img);
+
+        // Test with different configurations
+        let configs = vec![
+            GridConfig {
+                threshold_block_size: 5,
+                merge_threshold_ratio: 0.3,
+                enable_parallel: false,
+            },
+            GridConfig {
+                threshold_block_size: 10,
+                merge_threshold_ratio: 0.8,
+                enable_parallel: true,
+            },
+        ];
+
+        for (i, config) in configs.into_iter().enumerate() {
+            let grid = Grid::try_from_image_with_config(&dynamic_img, config).unwrap();
+            assert_yaml_snapshot!(format!("grid_custom_config_{}", i), grid);
+        }
+    }
+
+    #[test]
+    fn test_grid_with_redactions() {
+        let img = GrayImage::from_fn(
+            10,
+            10,
+            |_x, y| {
+                if y < 5 {
+                    Luma([255u8])
+                } else {
+                    Luma([0u8])
+                }
+            },
+        );
+        let dynamic_img = DynamicImage::ImageLuma8(img);
+
+        let grid = Grid::try_from_image_with_config(&dynamic_img, GridConfig::default()).unwrap();
+
+        let expected_grid = make_grid! {
+            rows: [
+                (0, 5),
+                (5, 5, LineKind::Full),
+            ],
+            columns: [
+                (0, 10, LineKind::Full),
+            ]
+        };
+
+        assert_eq!(grid, expected_grid);
+        assert_yaml_snapshot!("grid_with_redactions", grid, {
+            ".rows[0].y" => 0,
+            ".rows[1].y" => 5,
+        });
     }
 }

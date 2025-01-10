@@ -15,15 +15,16 @@ anyhow = "1.0.95"
 proptest = "1.6.0"
 rand = "0.8.5"
 thiserror = "2.0.10"
+test-case = "3.3.1"
 [dev-dependencies]
 criterion = "0.5"
 
 [[bench]]
-name = "process_lines_benchmark"
+name = "grid"
 harness = false
 
 [features]
-
+debug = []
 default = ["serde"]
 serde = [
     "dep:serde",

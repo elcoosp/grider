@@ -1,0 +1,25 @@
+---
+source: src/main.rs
+expression: grid
+snapshot_kind: text
+---
+rows:
+  - y: 0
+    height: 1
+    kind: Empty
+  - y: 1
+    height: 1
+    kind: Full
+  - y: 2
+    height: 1
+    kind: Empty
+columns:
+  - x: 0
+    width: 1
+    kind: Empty
+  - x: 1
+    width: 1
+    kind: Full
+  - x: 2
+    width: 1
+    kind: Empty
