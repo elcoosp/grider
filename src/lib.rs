@@ -42,14 +42,22 @@ pub struct GridConfig {
 
 impl Default for GridConfig {
     fn default() -> Self {
+        Self::new(12, 0.8, true)
+    }
+}
+impl GridConfig {
+    pub fn new(
+        threshold_block_size: u32,
+        merge_threshold_ratio: f32,
+        enable_parallel: bool,
+    ) -> Self {
         Self {
-            threshold_block_size: DEFAULT_THRESHOLD_BLOCK_SIZE,
-            merge_threshold_ratio: DEFAULT_MERGE_THRESHOLD_RATIO,
-            enable_parallel: true,
+            threshold_block_size: threshold_block_size.max(3), // Minimum block size
+            merge_threshold_ratio,
+            enable_parallel,
         }
     }
 }
-
 /// Represents the kind of a line (row or column).
 #[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -164,7 +172,7 @@ impl Grid {
                     height,
                     width,
                     merge_threshold_ratio,
-                    is_row_empty,
+                    Self::is_row_empty,
                 )
             },
             || {
@@ -173,7 +181,7 @@ impl Grid {
                     width,
                     height,
                     merge_threshold_ratio,
-                    is_column_empty,
+                    Self::is_column_empty,
                 )
             },
         );
@@ -198,27 +206,34 @@ impl Grid {
             height,
             width,
             merge_threshold_ratio,
-            is_row_empty,
+            Self::is_row_empty,
         )?;
         let columns = Self::process_dimension::<Column>(
             img,
             width,
             height,
             merge_threshold_ratio,
-            is_column_empty,
+            Self::is_column_empty,
         )?;
 
         Ok((rows, columns))
     }
 
     /// Generic function to process a dimension (rows or columns).
-    fn process_dimension<T: LineTrait + Send>(
+    pub fn process_dimension<T: LineTrait + Send>(
         img: &GrayImage,
         primary_dim: u32,
         secondary_dim: u32,
         merge_threshold_ratio: f32,
         is_empty_fn: impl Fn(&GrayImage, u32, u32) -> bool + Sync,
     ) -> Result<SmallVecLine<T>, GridError> {
+        if primary_dim == 0 || secondary_dim == 0 {
+            return Err(GridError::InvalidDimensions {
+                width: secondary_dim,
+                height: primary_dim,
+            });
+        }
+
         // Collect initial lines
         let lines = Self::collect_lines(img, primary_dim, secondary_dim, &is_empty_fn)
             .map_err(|e| GridError::LineDetectionError(e.to_string()))?;
@@ -228,7 +243,7 @@ impl Grid {
         let merge_threshold = (average_size as f32 * merge_threshold_ratio) as u32;
 
         // Merge small lines and convert to final type
-        let merged = merge_small_lines(lines, merge_threshold);
+        let merged = Self::merge_small_lines(lines, merge_threshold);
 
         Ok(merged.into_iter().map(T::new).collect())
     }
@@ -280,6 +295,107 @@ impl Grid {
         let total: u32 = lines.iter().map(|l| l.length).sum();
         total / lines.len() as u32
     }
+
+    /// Merges lines smaller than the threshold.
+    ///
+    /// # Arguments
+    /// * `lines` - A vector of [`LineInfo`] representing the lines.
+    /// * `threshold` - The threshold for merging lines.
+    ///
+    /// # Returns
+    /// A vector of merged [`LineInfo`].
+    pub fn merge_small_lines(lines: Vec<LineInfo>, threshold: u32) -> SmallVecLine<LineInfo> {
+        if lines.is_empty() {
+            return SmallVecLine::new();
+        }
+        let mut merged_lines = SmallVecLine::new();
+        let mut current_start = lines[0].start;
+        let mut current_length = lines[0].length;
+        let mut current_kind = lines[0].kind.clone();
+
+        for line in lines.into_iter().skip(1) {
+            if current_length < threshold || line.length < threshold {
+                // Merge with the previous line if either is smaller than the threshold
+                current_length += line.length;
+            } else {
+                // Push the merged line
+                merged_lines.push(LineInfo::new(current_start, current_length, current_kind));
+                current_start = line.start;
+                current_length = line.length;
+                current_kind = line.kind;
+            }
+        }
+
+        // Push the last merged line
+        merged_lines.push(LineInfo::new(current_start, current_length, current_kind));
+        merged_lines
+    }
+
+    /// Checks if a row is empty (all pixels are white).
+    ///
+    /// # Arguments
+    /// * `img` - The grayscale image to check.
+    /// * `y` - The y-coordinate of the row.
+    /// * `width` - The width of the image.
+    ///
+    /// # Returns
+    /// `true` if the row is empty (fully white), otherwise `false`.
+    pub fn is_row_empty(img: &GrayImage, y: u32, width: u32) -> bool {
+        (0..width).all(|x| img.get_pixel(x, y).channels()[0] == 255)
+    }
+
+    /// Checks if a column is empty (all pixels are white).
+    ///
+    /// # Arguments
+    /// * `img` - The grayscale image to check.
+    /// * `x` - The x-coordinate of the column.
+    /// * `height` - The height of the image.
+    ///
+    /// # Returns
+    /// `true` if the column is empty (fully white), otherwise `false`.
+    pub fn is_column_empty(img: &GrayImage, x: u32, height: u32) -> bool {
+        (0..height).all(|y| img.get_pixel(x, y).channels()[0] == 255)
+    }
+
+    /// Collects all lines without grouping.
+    ///
+    /// # Arguments
+    /// * `length` - The length of the lines (height for rows, width for columns).
+    /// * `is_empty` - A function to check if a line is empty.
+    ///
+    /// # Returns
+    /// A vector of [`LineInfo`] representing the lines.
+    pub fn collect_all_lines(length: u32, is_empty: &impl Fn(u32) -> bool) -> Vec<LineInfo> {
+        let mut lines = Vec::new();
+        let mut current_start = 0;
+        let mut current_kind = if is_empty(0) {
+            LineKind::Empty
+        } else {
+            LineKind::Full
+        };
+        let mut current_length = 1;
+
+        for i in 1..length {
+            let new_kind = if is_empty(i) {
+                LineKind::Empty
+            } else {
+                LineKind::Full
+            };
+
+            if new_kind == current_kind {
+                current_length += 1;
+            } else {
+                lines.push(LineInfo::new(current_start, current_length, current_kind));
+                current_start = i;
+                current_kind = new_kind;
+                current_length = 1;
+            }
+        }
+
+        // Push the last line
+        lines.push(LineInfo::new(current_start, current_length, current_kind));
+        lines
+    }
 }
 pub trait LineTrait {
     fn new(line: LineInfo) -> Self;
@@ -303,104 +419,6 @@ impl LineTrait for Column {
             kind: line.kind,
         }
     }
-}
-
-/// Checks if a row is empty (all pixels are white).
-///
-/// # Arguments
-/// * `img` - The grayscale image to check.
-/// * `y` - The y-coordinate of the row.
-/// * `width` - The width of the image.
-///
-/// # Returns
-/// `true` if the row is empty (fully white), otherwise `false`.
-pub fn is_row_empty(img: &GrayImage, y: u32, width: u32) -> bool {
-    (0..width).all(|x| img.get_pixel(x, y).channels()[0] == 255)
-}
-
-/// Checks if a column is empty (all pixels are white).
-///
-/// # Arguments
-/// * `img` - The grayscale image to check.
-/// * `x` - The x-coordinate of the column.
-/// * `height` - The height of the image.
-///
-/// # Returns
-/// `true` if the column is empty (fully white), otherwise `false`.
-pub fn is_column_empty(img: &GrayImage, x: u32, height: u32) -> bool {
-    (0..height).all(|y| img.get_pixel(x, y).channels()[0] == 255)
-}
-
-/// Collects all lines without grouping.
-///
-/// # Arguments
-/// * `length` - The length of the lines (height for rows, width for columns).
-/// * `is_empty` - A function to check if a line is empty.
-///
-/// # Returns
-/// A vector of [`LineInfo`] representing the lines.
-pub fn collect_all_lines(length: u32, is_empty: &impl Fn(u32) -> bool) -> Vec<LineInfo> {
-    let mut lines = Vec::new();
-    let mut current_start = 0;
-    let mut current_kind = if is_empty(0) {
-        LineKind::Empty
-    } else {
-        LineKind::Full
-    };
-    let mut current_length = 1;
-
-    for i in 1..length {
-        let new_kind = if is_empty(i) {
-            LineKind::Empty
-        } else {
-            LineKind::Full
-        };
-
-        if new_kind == current_kind {
-            current_length += 1;
-        } else {
-            lines.push(LineInfo::new(current_start, current_length, current_kind));
-            current_start = i;
-            current_kind = new_kind;
-            current_length = 1;
-        }
-    }
-
-    // Push the last line
-    lines.push(LineInfo::new(current_start, current_length, current_kind));
-    lines
-}
-
-/// Merges lines smaller than the threshold.
-///
-/// # Arguments
-/// * `lines` - A vector of [`LineInfo`] representing the lines.
-/// * `threshold` - The threshold for merging lines.
-///
-/// # Returns
-/// A vector of merged [`LineInfo`].
-pub fn merge_small_lines(lines: Vec<LineInfo>, threshold: u32) -> SmallVecLine<LineInfo> {
-    let mut merged_lines = SmallVecLine::new();
-    let mut current_start = lines[0].start;
-    let mut current_length = lines[0].length;
-    let mut current_kind = lines[0].kind.clone();
-
-    for line in lines.into_iter().skip(1) {
-        if current_length < threshold || line.length < threshold {
-            // Merge with the previous line if either is smaller than the threshold
-            current_length += line.length;
-        } else {
-            // Push the merged line
-            merged_lines.push(LineInfo::new(current_start, current_length, current_kind));
-            current_start = line.start;
-            current_length = line.length;
-            current_kind = line.kind;
-        }
-    }
-
-    // Push the last merged line
-    merged_lines.push(LineInfo::new(current_start, current_length, current_kind));
-    merged_lines
 }
 
 impl TryFrom<DynamicImage> for Grid {

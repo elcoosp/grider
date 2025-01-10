@@ -106,38 +106,10 @@ fn bench_configs(c: &mut Criterion) {
     let img = create_test_image(1000, 1000, "checkerboard");
 
     let configs = vec![
-        (
-            "small_block_sequential",
-            GridConfig {
-                threshold_block_size: 4,
-                merge_threshold_ratio: 0.5,
-                enable_parallel: false,
-            },
-        ),
-        (
-            "small_block_parallel",
-            GridConfig {
-                threshold_block_size: 4,
-                merge_threshold_ratio: 0.5,
-                enable_parallel: true,
-            },
-        ),
-        (
-            "large_block_sequential",
-            GridConfig {
-                threshold_block_size: 24,
-                merge_threshold_ratio: 0.8,
-                enable_parallel: false,
-            },
-        ),
-        (
-            "large_block_parallel",
-            GridConfig {
-                threshold_block_size: 24,
-                merge_threshold_ratio: 0.8,
-                enable_parallel: true,
-            },
-        ),
+        ("small_block_sequential", GridConfig::new(4, 0.5, false)),
+        ("small_block_parallel", GridConfig::new(4, 0.5, true)),
+        ("large_block_sequential", GridConfig::new(24, 0.8, false)),
+        ("large_block_parallel", GridConfig::new(24, 0.8, true)),
     ];
 
     for (name, config) in configs {
