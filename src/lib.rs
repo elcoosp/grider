@@ -18,13 +18,14 @@ pub type SmallVecLine<T> = SmallVec<[T; 6]>;
 pub enum LineKind {
     Empty,
     Full,
+    Partial(u8), // Partially filled line (e.g., 50% filled)
 }
 
 /// Represents information about a line (row or column) in the grid.
 ///
 /// A line is defined by its starting coordinate (`start`), length (`length`), and [`LineKind`].
+/// This struct is used to group consecutive rows or columns based on their [`LineKind`].
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct LineInfo {
     /// The starting coordinate of the line (x for columns, y for rows).
     pub start: u32,
@@ -33,7 +34,6 @@ pub struct LineInfo {
     /// The kind of the line, either [`LineKind::Empty`] or [`LineKind::Full`].
     pub kind: LineKind,
 }
-
 /// Represents a row in the grid.
 ///
 /// A row is defined by its starting y-coordinate (`y`), height (`height`), and [`LineKind`].
@@ -169,14 +169,14 @@ where
     T: LineTrait + Send,
 {
     // Step 1: Collect all lines without grouping (in parallel)
-    let all_lines = collect_lines(length, &is_empty);
+    let all_lines = collect_all_lines(length, &is_empty);
 
     // Step 2: Calculate the average size of all lines
     let average_size = calculate_average_line_size(&all_lines);
 
     // Step 3: Merge lines smaller than the threshold
     let threshold = (average_size * 8) / 10; // 80% of the average size
-    let merged_lines = merge_lines(all_lines, threshold);
+    let merged_lines = merge_small_lines(all_lines, threshold);
 
     // Step 4: Convert merged lines into the appropriate type
     merged_lines.into_iter().map(|line| T::new(line)).collect()
@@ -190,7 +190,7 @@ where
 ///
 /// # Returns
 /// A vector of [`LineInfo`] representing the lines.
-pub fn collect_lines(length: u32, is_empty: &impl Fn(u32) -> bool) -> Vec<LineInfo> {
+pub fn collect_all_lines(length: u32, is_empty: &impl Fn(u32) -> bool) -> Vec<LineInfo> {
     let mut lines = Vec::new();
     let mut current_start = 0;
     let mut current_kind = if is_empty(0) {
@@ -254,7 +254,7 @@ fn calculate_average_line_size(lines: &[LineInfo]) -> u32 {
 ///
 /// # Returns
 /// A vector of merged [`LineInfo`].
-fn merge_lines(lines: Vec<LineInfo>, threshold: u32) -> SmallVecLine<LineInfo> {
+fn merge_small_lines(lines: Vec<LineInfo>, threshold: u32) -> SmallVecLine<LineInfo> {
     let mut merged_lines = SmallVecLine::new(); // Use SmallVec8 with a small stack-allocated buffer
     let mut current_start = lines[0].start;
     let mut current_length = lines[0].length;
