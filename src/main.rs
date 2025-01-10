@@ -142,7 +142,7 @@ mod tests {
         let config = GridConfig::new(12, 0.8, true);
         assert_eq!(config.threshold_block_size, 12);
         assert_eq!(config.merge_threshold_ratio, 0.8);
-        assert_eq!(config.enable_parallel, true);
+        assert!(config.enable_parallel);
 
         // Test minimum block size
         let config = GridConfig::new(2, 0.8, true);
@@ -959,7 +959,7 @@ mod tests {
 }
 
     #[cfg(test)]
-    mod tests {
+    mod test_suite {
         use super::*;
 
         // Test line info creation with the new macro

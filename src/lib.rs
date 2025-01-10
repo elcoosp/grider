@@ -630,7 +630,7 @@ impl Grid {
 /// let line_info = LineInfo::new(0, 100, LineKind::Full);
 ///
 /// // Instantiate a Row from the LineInfo
-/// let row = Row::new(line_info);
+/// let row = Row::new(line_info.clone());
 ///
 /// // Similarly, instantiate a Column
 /// let column = Column::new(line_info);
@@ -693,7 +693,7 @@ impl TryFrom<&DynamicImage> for Grid {
     type Error = GridError;
 
     fn try_from(image: &DynamicImage) -> Result<Self, Self::Error> {
-        Grid::try_from_image_with_config(&image, GridConfig::default())
+        Grid::try_from_image_with_config(image, GridConfig::default())
     }
 }
 
