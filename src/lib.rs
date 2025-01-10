@@ -210,7 +210,7 @@ impl From<&Cell<'_>> for Rect {
 }
 /// Represents the grid of rows and columns extracted from an image.
 ///
-/// # Example
+/// # Example 1
 /// ```
 /// use grider::{Grid, GridConfig};
 /// use image::open;
@@ -218,6 +218,28 @@ impl From<&Cell<'_>> for Rect {
 /// let img = open("tests/large.png").unwrap();
 /// let config = GridConfig::default();
 /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+/// ```
+/// # Example 2
+///
+/// ```
+/// use grider::{Grid, GridConfig};
+/// use image::open;
+///
+/// let img = open("tests/large.png").unwrap();
+/// let config = GridConfig::default();
+/// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+///
+/// // Automatically filter out the smallest rows
+/// let filtered_grid = grid.filter_smallest_rows();
+///
+/// // Automatically filter out the biggest rows
+/// let filtered_grid = grid.filter_biggest_rows();
+///
+/// // Automatically filter out the smallest columns
+/// let filtered_grid = grid.filter_smallest_columns();
+///
+/// // Automatically filter out the biggest columns
+/// let filtered_grid = grid.filter_biggest_columns();
 /// ```
 #[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -234,28 +256,6 @@ impl Grid {
     /// * `predicate` - A closure that determines whether a line should be included.
     ///
     /// # Returns
-    /// # Example
-    ///
-    /// ```
-    /// use grider::{Grid, GridConfig};
-    /// use image::open;
-    ///
-    /// let img = open("tests/large.png").unwrap();
-    /// let config = GridConfig::default();
-    /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
-    ///
-    /// // Automatically filter out the smallest rows
-    /// let filtered_grid = grid.filter_smallest_rows();
-    ///
-    /// // Automatically filter out the biggest rows
-    /// let filtered_grid = grid.filter_biggest_rows();
-    ///
-    /// // Automatically filter out the smallest columns
-    /// let filtered_grid = grid.filter_smallest_columns();
-    ///
-    /// // Automatically filter out the biggest columns
-    /// let filtered_grid = grid.filter_biggest_columns();
-    /// ```
     /// A new vector containing only the lines that satisfy the predicate.
     fn filter_lines<T, F>(lines: &[T], predicate: F) -> SmallVecLine<T>
     where
