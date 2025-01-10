@@ -33,6 +33,15 @@ pub struct LineInfo {
     /// The kind of the line, either [`LineKind::Empty`] or [`LineKind::Full`].
     pub kind: LineKind,
 }
+impl LineInfo {
+    pub fn new(start: u32, length: u32, kind: LineKind) -> Self {
+        LineInfo {
+            start,
+            length,
+            kind,
+        }
+    }
+}
 /// Represents a row in the grid.
 ///
 /// A row is defined by its starting y-coordinate (`y`), height (`height`), and [`LineKind`].
@@ -297,49 +306,19 @@ pub fn process_image(image: DynamicImage) -> Grid {
 #[macro_export]
 macro_rules! make_line {
     // For Rows
-    (Row, $y:expr, $height:expr, $kind:expr) => {
-        Row {
-            y: $y,
-            height: $height,
-            kind: $kind,
-        }
-    };
     (Row, ($y:expr, $height:expr, $kind:expr)) => {
-        Row {
-            y: $y,
-            height: $height,
-            kind: $kind,
-        }
+        Row::new(LineInfo::new($y, $height, $kind))
     };
     (Row, ($y:expr, $height:expr)) => {
-        Row {
-            y: $y,
-            height: $height,
-            kind: LineKind::Empty, // Default to Empty
-        }
+        Row::new(LineInfo::new($y, $height, LineKind::Empty)) // Default to Empty
     };
 
     // For Columns
-    (Column, $x:expr, $width:expr, $kind:expr) => {
-        Column {
-            x: $x,
-            width: $width,
-            kind: $kind,
-        }
-    };
     (Column, ($x:expr, $width:expr, $kind:expr)) => {
-        Column {
-            x: $x,
-            width: $width,
-            kind: $kind,
-        }
+        Column::new(LineInfo::new($x, $width, $kind))
     };
     (Column, ($x:expr, $width:expr)) => {
-        Column {
-            x: $x,
-            width: $width,
-            kind: LineKind::Empty, // Default to Empty
-        }
+        Column::new(LineInfo::new($x, $width, LineKind::Empty)) // Default to Empty
     };
 }
 
