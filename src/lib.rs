@@ -149,17 +149,7 @@ where
     T: LineTrait + Send,
 {
     // Step 1: Collect all lines without grouping (in parallel)
-    let all_lines: Vec<(u32, u32, LineKind)> = (0..length)
-        .into_iter()
-        .map(|i| {
-            let kind = if is_empty(i) {
-                LineKind::Empty
-            } else {
-                LineKind::Full
-            };
-            (i, 1, kind)
-        })
-        .collect();
+    let all_lines = collect_lines(length, &is_empty);
 
     // Step 2: Calculate the average size of all lines
     let average_size = calculate_average_line_size(&all_lines);
@@ -178,18 +168,42 @@ where
 
 /// Collects all lines without grouping.
 ///
-/// This function is replaced by the parallelized version in `process_lines`.
-fn collect_lines(length: u32, is_empty: &impl Fn(u32) -> bool) -> Vec<(u32, u32, LineKind)> {
-    (0..length)
-        .map(|i| {
-            let kind = if is_empty(i) {
-                LineKind::Empty
-            } else {
-                LineKind::Full
-            };
-            (i, 1, kind)
-        })
-        .collect()
+/// # Arguments
+/// * `length` - The length of the lines (height for rows, width for columns).
+/// * `is_empty` - A function to check if a line is empty.
+///
+/// # Returns
+/// A vector of tuples representing the lines: (start, length, kind).
+pub fn collect_lines(length: u32, is_empty: &impl Fn(u32) -> bool) -> Vec<(u32, u32, LineKind)> {
+    let mut lines = Vec::new();
+    let mut current_start = 0;
+    let mut current_kind = if is_empty(0) {
+        LineKind::Empty
+    } else {
+        LineKind::Full
+    };
+    let mut current_length = 1;
+
+    for i in 1..length {
+        let new_kind = if is_empty(i) {
+            LineKind::Empty
+        } else {
+            LineKind::Full
+        };
+
+        if new_kind == current_kind {
+            current_length += 1;
+        } else {
+            lines.push((current_start, current_length, current_kind.clone()));
+            current_start = i;
+            current_kind = new_kind;
+            current_length = 1;
+        }
+    }
+
+    // Push the last line
+    lines.push((current_start, current_length, current_kind));
+    lines
 }
 
 /// Calculates the average size of all lines.
@@ -236,7 +250,7 @@ fn merge_lines(lines: Vec<(u32, u32, LineKind)>, threshold: u32) -> Vec<(u32, u3
     }
 
     // Push the last merged line
-    merged_lines.push((current_start, current_length, current_kind));
+    merged_lines.push((current_start, current_length, current_kind.clone()));
     merged_lines
 }
 /// Processes the image and generates the [`Grid`].
