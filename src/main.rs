@@ -1,8 +1,15 @@
 use anyhow::{Context, Result};
+use grider::make_grid;
 use grider::{Grid, GridConfig};
 use image::GenericImageView;
-
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 fn main() -> Result<()> {
+    // Initialize tracing subscriber
+
+    tracing_subscriber::registry()
+        .with(EnvFilter::from_default_env())
+        .init();
+
     // Replace with the path to your image file
     let image_path = "tests/large.png";
 
@@ -14,14 +21,15 @@ fn main() -> Result<()> {
     if width == 0 || height == 0 {
         anyhow::bail!("Invalid image dimensions: {}x{}", width, height);
     }
+
+    // Process the image with configuration
+    let config = GridConfig::new(12, 0.8, true);
+    let grid = Grid::try_from_image_with_config(&img, config)?;
+
     // Use debug features under feature flag
     #[cfg(feature = "debug")]
     {
-        // Load configuration from environment or config file
-        let config = GridConfig::new(12, 0.8, true);
-        // Process the image with configuration
-        let grid = Grid::try_from_image_with_config(&img, config)?;
-
+        // Save the image with grid lines for debugging
         let output_path = format!("{image_path}_output_with_grid.png");
         grider::debug::save_image_with_grid(&img, &grid, &output_path);
     }

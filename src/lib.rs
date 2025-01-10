@@ -5,6 +5,7 @@ use image::*;
 use imageproc::{contrast::adaptive_threshold, drawing::draw_line_segment_mut};
 use smallvec::SmallVec;
 use thiserror::Error;
+use tracing::*;
 
 // Determined through benchmarking typical use cases
 const DEFAULT_SMALLVEC_SIZE: usize = 32;
@@ -40,11 +41,6 @@ pub struct GridConfig {
     pub enable_parallel: bool,
 }
 
-impl Default for GridConfig {
-    fn default() -> Self {
-        Self::new(12, 0.8, true)
-    }
-}
 impl GridConfig {
     pub fn new(
         threshold_block_size: u32,
@@ -58,6 +54,17 @@ impl GridConfig {
         }
     }
 }
+
+impl Default for GridConfig {
+    fn default() -> Self {
+        GridConfig::new(
+            DEFAULT_THRESHOLD_BLOCK_SIZE,
+            DEFAULT_MERGE_THRESHOLD_RATIO,
+            true,
+        )
+    }
+}
+
 /// Represents the kind of a line (row or column).
 #[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -106,6 +113,7 @@ pub struct Grid {
     pub rows: SmallVecLine<Row>,
     pub columns: SmallVecLine<Column>,
 }
+
 impl Grid {
     /// Creates a new Grid from an image with custom configuration.
     ///
@@ -135,9 +143,14 @@ impl Grid {
         image: &DynamicImage,
         config: GridConfig,
     ) -> Result<Self, GridError> {
+        trace!("Processing image with config: {:?}", config);
         // Validate image dimensions
         let (width, height) = image.dimensions();
         if width == 0 || height == 0 {
+            error!(
+                "Invalid image dimensions: width={}, height={}",
+                width, height
+            );
             return Err(GridError::InvalidDimensions { width, height });
         }
 
@@ -162,6 +175,7 @@ impl Grid {
         img: &GrayImage,
         merge_threshold_ratio: f32,
     ) -> Result<(SmallVecLine<Row>, SmallVecLine<Column>), GridError> {
+        trace!("Processing lines in parallel");
         let (width, height) = img.dimensions();
 
         // Process rows and columns in parallel
@@ -198,6 +212,7 @@ impl Grid {
         img: &GrayImage,
         merge_threshold_ratio: f32,
     ) -> Result<(SmallVecLine<Row>, SmallVecLine<Column>), GridError> {
+        trace!("Processing lines sequentially");
         let (width, height) = img.dimensions();
 
         // Process rows first, then columns
@@ -227,6 +242,10 @@ impl Grid {
         merge_threshold_ratio: f32,
         is_empty_fn: impl Fn(&GrayImage, u32, u32) -> bool + Sync,
     ) -> Result<SmallVecLine<T>, GridError> {
+        debug!(
+            "Processing dimension with primary_dim={}, secondary_dim={}",
+            primary_dim, secondary_dim
+        );
         if primary_dim == 0 || secondary_dim == 0 {
             return Err(GridError::InvalidDimensions {
                 width: secondary_dim,
@@ -255,6 +274,7 @@ impl Grid {
         secondary_dim: u32,
         is_empty_fn: &impl Fn(&GrayImage, u32, u32) -> bool,
     ) -> Result<Vec<LineInfo>, GridError> {
+        trace!("Collecting lines");
         let mut lines = Vec::new();
         let mut current_start = 0;
         let mut current_kind = if is_empty_fn(img, 0, secondary_dim) {
@@ -289,6 +309,7 @@ impl Grid {
 
     /// Calculate average size of lines for threshold determination.
     fn calculate_average_line_size(lines: &[LineInfo]) -> u32 {
+        trace!("Calculating average line size");
         if lines.is_empty() {
             return 0;
         }
@@ -305,6 +326,7 @@ impl Grid {
     /// # Returns
     /// A vector of merged [`LineInfo`].
     pub fn merge_small_lines(lines: Vec<LineInfo>, threshold: u32) -> SmallVecLine<LineInfo> {
+        trace!("Merging small lines with threshold={}", threshold);
         if lines.is_empty() {
             return SmallVecLine::new();
         }
@@ -341,6 +363,7 @@ impl Grid {
     /// # Returns
     /// `true` if the row is empty (fully white), otherwise `false`.
     pub fn is_row_empty(img: &GrayImage, y: u32, width: u32) -> bool {
+        trace!("Checking if row y={} is empty", y);
         (0..width).all(|x| img.get_pixel(x, y).channels()[0] == 255)
     }
 
@@ -354,6 +377,7 @@ impl Grid {
     /// # Returns
     /// `true` if the column is empty (fully white), otherwise `false`.
     pub fn is_column_empty(img: &GrayImage, x: u32, height: u32) -> bool {
+        trace!("Checking if column x={} is empty", x);
         (0..height).all(|y| img.get_pixel(x, y).channels()[0] == 255)
     }
 
@@ -366,6 +390,7 @@ impl Grid {
     /// # Returns
     /// A vector of [`LineInfo`] representing the lines.
     pub fn collect_all_lines(length: u32, is_empty: &impl Fn(u32) -> bool) -> Vec<LineInfo> {
+        trace!("Collecting all lines with length={}", length);
         let mut lines = Vec::new();
         let mut current_start = 0;
         let mut current_kind = if is_empty(0) {
@@ -397,6 +422,7 @@ impl Grid {
         lines
     }
 }
+
 pub trait LineTrait {
     fn new(line: LineInfo) -> Self;
 }
@@ -432,8 +458,55 @@ impl TryFrom<DynamicImage> for Grid {
 
 impl TryFrom<&DynamicImage> for Grid {
     type Error = GridError;
+
     fn try_from(image: &DynamicImage) -> Result<Self, Self::Error> {
         Grid::try_from_image_with_config(&image, GridConfig::default())
+    }
+}
+
+/// Debug module for visualizing the grid on the image.
+pub mod debug {
+    use super::*;
+
+    /// Saves the image with grid lines for debugging.
+    ///
+    /// This function draws horizontal lines for [`Row`]s and vertical lines for [`Column`]s
+    /// on the image and saves it to the specified path.
+    ///
+    /// # Arguments
+    /// * `image` - The input image.
+    /// * `grid` - The [`Grid`] to visualize.
+    /// * `output_path` - The path to save the output image.
+    pub fn save_image_with_grid(image: &DynamicImage, grid: &Grid, output_path: &str) {
+        trace!("Saving image with grid to {}", output_path);
+        // Convert the image to RGBA for drawing
+        let mut rgba_img = image.to_rgba8();
+        let (w, h) = (rgba_img.width() as f32, rgba_img.height() as f32);
+
+        // Draw horizontal lines for rows
+        for row in &grid.rows {
+            let y = row.y + row.height;
+            draw_line_segment_mut(
+                &mut rgba_img,
+                (0.0, y as f32),
+                (w, y as f32),
+                Rgba([255, 0, 0, 255]), // Red color for rows
+            );
+        }
+
+        // Draw vertical lines for columns
+        for column in &grid.columns {
+            let x = column.x + column.width;
+            draw_line_segment_mut(
+                &mut rgba_img,
+                (x as f32, 0.0),
+                (x as f32, h),
+                Rgba([0, 0, 255, 255]), // Blue color for columns
+            );
+        }
+
+        // Save the image with grid lines
+        rgba_img.save(output_path).unwrap();
     }
 }
 #[macro_export]
@@ -468,49 +541,4 @@ macro_rules! make_grid {
             ]),
         }
     };
-}
-
-/// Debug module for visualizing the grid on the image.
-pub mod debug {
-    use super::*;
-
-    /// Saves the image with grid lines for debugging.
-    ///
-    /// This function draws horizontal lines for [`Row`]s and vertical lines for [`Column`]s
-    /// on the image and saves it to the specified path.
-    ///
-    /// # Arguments
-    /// * `image` - The input image.
-    /// * `grid` - The [`Grid`] to visualize.
-    /// * `output_path` - The path to save the output image.
-    pub fn save_image_with_grid(image: &DynamicImage, grid: &Grid, output_path: &str) {
-        // Convert the image to RGBA for drawing
-        let mut rgba_img = image.to_rgba8();
-        let (w, h) = (rgba_img.width() as f32, rgba_img.height() as f32);
-
-        // Draw horizontal lines for rows
-        for row in &grid.rows {
-            let y = row.y + row.height;
-            draw_line_segment_mut(
-                &mut rgba_img,
-                (0.0, y as f32),
-                (w, y as f32),
-                Rgba([255, 0, 0, 255]), // Red color for rows
-            );
-        }
-
-        // Draw vertical lines for columns
-        for column in &grid.columns {
-            let x = column.x + column.width;
-            draw_line_segment_mut(
-                &mut rgba_img,
-                (x as f32, 0.0),
-                (x as f32, h),
-                Rgba([0, 0, 255, 255]), // Blue color for columns
-            );
-        }
-
-        // Save the image with grid lines
-        rgba_img.save(output_path).unwrap();
-    }
 }
