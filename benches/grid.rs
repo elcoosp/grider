@@ -1,7 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use grider::{Grid, GridConfig};
 use image::{DynamicImage, GrayImage, Luma};
-use rayon::prelude::*;
 
 // Helper function to create test images of different patterns
 fn create_test_image(width: u32, height: u32, pattern: &str) -> DynamicImage {

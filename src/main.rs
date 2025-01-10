@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use grider::make_grid;
 use grider::{Grid, GridConfig};
 use image::GenericImageView;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -24,7 +23,7 @@ fn main() -> Result<()> {
 
     // Process the image with configuration
     let config = GridConfig::new(12, 0.8, true);
-    let grid = Grid::try_from_image_with_config(&img, config)?;
+    let _grid = Grid::try_from_image_with_config(&img, config)?;
 
     // Use debug features under feature flag
     #[cfg(feature = "debug")]
@@ -64,6 +63,63 @@ mod tests {
 
         let result = Grid::try_from_image_with_config(&dynamic_img, config);
         assert!(result.is_ok());
+    }
+    // Test for line 163
+    #[test]
+    fn test_specific_functionality_at_line_163() {
+        // Setup test environment
+        let img = GrayImage::from_pixel(10, 10, Luma([255u8]));
+        let config = GridConfig::default();
+
+        // Trigger the condition that leads to line 163 being executed
+        let grid = Grid::try_from_image_with_config(&DynamicImage::ImageLuma8(img), config);
+        assert!(grid.is_ok());
+    }
+
+    // Test for lines 302-305
+    #[test]
+    fn test_error_handling_at_lines_302_305() {
+        // Setup a scenario that triggers the error handling at these lines
+        let img = GrayImage::new(0, 0);
+        let config = GridConfig::default();
+
+        // Ensure the error is handled as expected
+        let grid = Grid::try_from_image_with_config(&DynamicImage::ImageLuma8(img), config);
+        assert!(grid.is_err());
+    }
+
+    // Test for lines 362 and 364
+    #[test]
+    fn test_condition_at_lines_362_364() {
+        // Setup test data that leads to lines 362 and 364 being executed
+        let img = GrayImage::from_fn(
+            10,
+            10,
+            |x, y| {
+                if x == y {
+                    Luma([0u8])
+                } else {
+                    Luma([255u8])
+                }
+            },
+        );
+        let config = GridConfig::default();
+
+        // Perform the test and verify the outcome
+        let grid = Grid::try_from_image_with_config(&DynamicImage::ImageLuma8(img), config);
+        assert!(grid.is_ok());
+    }
+
+    // Test for lines 404-405, 416, 438, 443, 472
+    #[test]
+    fn test_edge_cases_at_various_lines() {
+        // Setup edge case scenarios
+        let img = GrayImage::from_pixel(1, 1, Luma([255u8]));
+        let config = GridConfig::new(1, 0.5, false);
+
+        // Execute and verify
+        let grid = Grid::try_from_image_with_config(&DynamicImage::ImageLuma8(img), config);
+        assert!(grid.is_ok());
     }
 
     #[test_case(0, 100)]
@@ -613,23 +669,24 @@ mod tests {
     }
 
     // Macro to define a generic test for finding cells
-    macro_rules! test_find_cells {
-        ($name:ident, $row_indices:expr, $column_indices:expr) => {
-            #[test]
-            fn $name() {
-                let img = create_test_image(10, 10, "checkerboard");
-                let config = GridConfig::default();
-                let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+    // use test_case::test_case;
+    // macro_rules! test_find_cells {
+    //     ($name:ident, $row_indices:expr, $column_indices:expr) => {
+    //         #[test]
+    //         fn $name() {
+    //             let img = create_test_image(10, 10, "checkerboard");
+    //             let config = GridConfig::default();
+    //             let grid = Grid::try_from_image_with_config(&img, config).unwrap();
 
-                // Find cells based on row and column indices
-                let cells: Vec<_> = grid.find_cells($row_indices, $column_indices).collect();
-                assert!(!cells.is_empty());
-                for cell in cells {
-                    assert!(cell.is_ok());
-                }
-            }
-        };
-    }
+    //             // Find cells based on row and column indices
+    //             let cells: Vec<_> = grid.find_cells($row_indices, $column_indices).collect();
+    //             assert!(!cells.is_empty());
+    //             for cell in cells {
+    //                 assert!(cell.is_ok());
+    //             }
+    //         }
+    //     };
+    // }
 
     // Define tests using macros
     test_filter!(test_filtered_rows, filtered_rows, LineKind::Full);
@@ -904,7 +961,6 @@ mod tests {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use test_case::test_case;
 
         // Test line info creation with the new macro
         test_line_info! {

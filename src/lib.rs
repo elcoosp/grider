@@ -37,6 +37,16 @@ pub enum GridError {
 pub type SmallVecLine<T> = SmallVec<[T; DEFAULT_SMALLVEC_SIZE]>;
 
 /// Configuration for grid processing.
+///
+/// # Example
+/// ```
+/// use grider::GridConfig;
+///
+/// let config = GridConfig::default();
+/// assert_eq!(config.threshold_block_size, 12);
+/// assert_eq!(config.merge_threshold_ratio, 0.8);
+/// assert_eq!(config.enable_parallel, true);
+/// ```
 #[derive(Debug, Clone)]
 pub struct GridConfig {
     /// Block size for adaptive thresholding (default: 12)
@@ -48,6 +58,17 @@ pub struct GridConfig {
 }
 
 impl GridConfig {
+    /// Creates a new `GridConfig` with the specified parameters.
+    ///
+    /// # Example
+    /// ```
+    /// use grider::GridConfig;
+    ///
+    /// let config = GridConfig::new(15, 0.9, false);
+    /// assert_eq!(config.threshold_block_size, 15);
+    /// assert_eq!(config.merge_threshold_ratio, 0.9);
+    /// assert_eq!(config.enable_parallel, false);
+    /// ```
     pub fn new(
         threshold_block_size: u32,
         merge_threshold_ratio: f32,
@@ -79,6 +100,7 @@ pub enum LineKind {
     Full,
 }
 
+/// Information about a line in the grid.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct LineInfo {
@@ -88,6 +110,17 @@ pub struct LineInfo {
 }
 
 impl LineInfo {
+    /// Creates a new `LineInfo` with the given start position, length, and kind.
+    ///
+    /// # Example
+    /// ```
+    /// use grider::{LineInfo, LineKind};
+    ///
+    /// let line = LineInfo::new(0, 10, LineKind::Full);
+    /// assert_eq!(line.start, 0);
+    /// assert_eq!(line.length, 10);
+    /// assert_eq!(line.kind, LineKind::Full);
+    /// ```
     pub fn new(start: u32, length: u32, kind: LineKind) -> Self {
         Self {
             start,
@@ -97,6 +130,7 @@ impl LineInfo {
     }
 }
 
+/// Represents a row in the grid.
 #[derive(Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Row {
@@ -105,6 +139,7 @@ pub struct Row {
     pub kind: LineKind,
 }
 
+/// Represents a column in the grid.
 #[derive(Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Column {
@@ -112,7 +147,23 @@ pub struct Column {
     pub width: u32,
     pub kind: LineKind,
 }
+/// Represents a cell in the grid, referencing a row and a column.
+pub struct Cell<'a> {
+    pub row: &'a Row,
+    pub column: &'a Column,
+}
 
+/// Represents the grid of rows and columns extracted from an image.
+///
+/// # Example
+/// ```
+/// use grider::{Grid, GridConfig};
+/// use image::open;
+///
+/// let img = open("tests/large.png").unwrap();
+/// let config = GridConfig::default();
+/// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+/// ```
 #[derive(Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Grid {
@@ -120,34 +171,15 @@ pub struct Grid {
     pub columns: SmallVecLine<Column>,
 }
 
-/// Represents a cell in the grid, referencing a row and a column.
-pub struct Cell<'a> {
-    pub row: &'a Row,
-    pub column: &'a Column,
-}
-
 impl Grid {
-    /// Creates a new Grid from an image with custom configuration.
-    ///
-    /// # Arguments
-    /// * `image` - The input image to process
-    /// * `config` - Configuration parameters for grid processing
-    ///
-    /// # Returns
-    /// A Result containing either the processed Grid or a GridError
-    ///
-    /// # Errors
-    /// Returns GridError if:
-    /// * Image dimensions are invalid
-    /// * Image conversion fails
-    /// * Thresholding fails
-    /// * Line detection fails
+    /// Creates a new `Grid` from an image with custom configuration.
     ///
     /// # Example
     /// ```
     /// use grider::{Grid, GridConfig};
+    /// use image::open;
     ///
-    /// let img = image::open("tests/large.png").unwrap();
+    /// let img = open("tests/large.png").unwrap();
     /// let config = GridConfig::default();
     /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
     /// ```
@@ -181,11 +213,18 @@ impl Grid {
 
         Ok(Grid { rows, columns })
     }
+
     /// Returns an iterator over all rows in the grid.
     ///
     /// # Example
     /// ```
+    /// use grider::{Grid, GridConfig};
+    /// use image::open;
+    ///
+    /// let img = open("tests/large.png").unwrap();
+    /// let config = GridConfig::default();
     /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+    ///
     /// for row in grid.rows() {
     ///     println!("Row at y: {}", row.y);
     /// }
@@ -198,7 +237,13 @@ impl Grid {
     ///
     /// # Example
     /// ```
+    /// use grider::{Grid, GridConfig};
+    /// use image::open;
+    ///
+    /// let img = open("tests/large.png").unwrap();
+    /// let config = GridConfig::default();
     /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+    ///
     /// for column in grid.columns() {
     ///     println!("Column at x: {}", column.x);
     /// }
@@ -209,12 +254,15 @@ impl Grid {
 
     /// Returns an iterator over filtered rows based on the predicate.
     ///
-    /// # Arguments
-    /// * `predicate` - A function that determines if a row should be included.
-    ///
     /// # Example
     /// ```
+    /// use grider::{Grid, GridConfig, LineKind, Row};
+    /// use image::open;
+    ///
+    /// let img = open("tests/large.png").unwrap();
+    /// let config = GridConfig::default();
     /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+    ///
     /// let filtered_rows: Vec<&Row> = grid.filtered_rows(|row| row.kind == LineKind::Full).collect();
     /// ```
     pub fn filtered_rows<F>(&self, predicate: F) -> impl Iterator<Item = &Row>
@@ -226,12 +274,15 @@ impl Grid {
 
     /// Returns an iterator over filtered columns based on the predicate.
     ///
-    /// # Arguments
-    /// * `predicate` - A function that determines if a column should be included.
-    ///
     /// # Example
     /// ```
+    /// use grider::{Grid, GridConfig, LineKind, Column};
+    /// use image::open;
+    ///
+    /// let img = open("tests/large.png").unwrap();
+    /// let config = GridConfig::default();
     /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+    ///
     /// let filtered_columns: Vec<&Column> = grid.filtered_columns(|col| col.kind == LineKind::Full).collect();
     /// ```
     pub fn filtered_columns<F>(&self, predicate: F) -> impl Iterator<Item = &Column>
@@ -243,12 +294,15 @@ impl Grid {
 
     /// Counts the number of rows with the specified kind.
     ///
-    /// # Arguments
-    /// * `kind` - The kind of rows to count.
-    ///
     /// # Example
     /// ```
+    /// use grider::{Grid, GridConfig, LineKind};
+    /// use image::open;
+    ///
+    /// let img = open("tests/large.png").unwrap();
+    /// let config = GridConfig::default();
     /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+    ///
     /// let full_row_count = grid.count_rows_by_kind(LineKind::Full);
     /// ```
     pub fn count_rows_by_kind(&self, kind: LineKind) -> usize {
@@ -257,12 +311,15 @@ impl Grid {
 
     /// Counts the number of columns with the specified kind.
     ///
-    /// # Arguments
-    /// * `kind` - The kind of columns to count.
-    ///
     /// # Example
     /// ```
+    /// use grider::{Grid, GridConfig, LineKind};
+    /// use image::open;
+    ///
+    /// let img = open("tests/large.png").unwrap();
+    /// let config = GridConfig::default();
     /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+    ///
     /// let full_column_count = grid.count_columns_by_kind(LineKind::Full);
     /// ```
     pub fn count_columns_by_kind(&self, kind: LineKind) -> usize {
@@ -271,16 +328,15 @@ impl Grid {
 
     /// Finds cells based on row and column indices.
     ///
-    /// # Arguments
-    /// * `row_indices` - A slice of row indices to find.
-    /// * `column_indices` - A slice of column indices to find.
-    ///
-    /// # Returns
-    /// An iterator over the found cells, which may return errors if indices are invalid.
-    ///
     /// # Example
     /// ```
+    /// use grider::{Grid, GridConfig};
+    /// use image::open;
+    ///
+    /// let img = open("tests/large.png").unwrap();
+    /// let config = GridConfig::default();
     /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+    ///
     /// let cells = grid.find_cells(&[1, 2, 3], &[4, 5, 6]);
     /// for cell in cells {
     ///     match cell {
@@ -309,25 +365,40 @@ impl Grid {
 
     /// Finds a row by its y-coordinate.
     ///
-    /// # Arguments
-    /// * `y` - The y-coordinate of the row to find.
+    /// # Example
+    /// ```
+    /// use grider::{Grid, GridConfig};
+    /// use image::open;
     ///
-    /// # Returns
-    /// An `Option` containing the found row, or `None` if not found.
+    /// let img = open("tests/large.png").unwrap();
+    /// let config = GridConfig::default();
+    /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+    ///
+    /// let row = grid.find_row(0);
+    /// assert!(row.is_some());
+    /// ```
     pub fn find_row(&self, y: u32) -> Option<&Row> {
         self.rows.iter().find(|row| row.y == y)
     }
 
     /// Finds a column by its x-coordinate.
     ///
-    /// # Arguments
-    /// * `x` - The x-coordinate of the column to find.
+    /// # Example
+    /// ```
+    /// use grider::{Grid, GridConfig};
+    /// use image::open;
     ///
-    /// # Returns
-    /// An `Option` containing the found column, or `None` if not found.
+    /// let img = open("tests/large.png").unwrap();
+    /// let config = GridConfig::default();
+    /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+    /// println!("{grid:#?}");
+    /// let column = grid.find_column(0);
+    /// assert!(column.is_some());
+    /// ```
     pub fn find_column(&self, x: u32) -> Option<&Column> {
         self.columns.iter().find(|col| col.x == x)
     }
+
     /// Process image lines in parallel using rayon.
     fn process_lines_parallel(
         img: &GrayImage,
@@ -582,6 +653,19 @@ impl TryFrom<&DynamicImage> for Grid {
 }
 
 /// Debug module for visualizing the grid on the image.
+///
+/// # Example
+/// ```
+/// use grider::{Grid, GridConfig};
+/// use image::DynamicImage;
+///
+/// // Replace with actual image loading
+/// let img: DynamicImage = image::open("tests/large.png").unwrap();
+/// let config = GridConfig::default();
+/// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+///
+/// grider::debug::save_image_with_grid(&img, &grid, "output.png");
+/// ```
 pub mod debug {
     use super::*;
 
@@ -645,17 +729,39 @@ macro_rules! make_line {
     };
 }
 
+/// Creates a grid from rows and columns.
+///
+/// # Example
+/// ```
+/// use grider::make_grid;
+/// use grider::{Grid, Row, Column, LineKind};
+///
+/// let grid = make_grid!(
+///     rows: [
+///         (0, 10),
+///         (10, 20, LineKind::Full),
+///     ],
+///     columns: [
+///         (0, 5),
+///         (5, 15, LineKind::Full),
+///     ]
+/// );
+/// ```
 #[macro_export]
 macro_rules! make_grid {
     // Match rows and columns as separate lists with tuple syntax
-    (rows: [$($row:tt,)*], columns: [$($col:tt,)*]) => {
+    (rows: [$($row:tt,)*], columns: [$($col:tt,)*]) => {{
+
+        use grider::*;
+        use grider::make_line;
         Grid {
             rows: SmallVecLine::from_vec(vec![
                 $(make_line!(Row, $row)),*
-            ]),
-            columns: SmallVecLine::from_vec(vec![
-                $(make_line!(Column, $col)),*
-            ]),
-        }
+                ]),
+                columns: SmallVecLine::from_vec(vec![
+                    $(make_line!(Column, $col)),*
+                    ]),
+                }
+            }
     };
 }
