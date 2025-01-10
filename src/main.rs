@@ -1087,6 +1087,85 @@ mod tests {
             assert_eq!(result.len(), 2);
         }
 
+        #[test]
+        fn test_filter_smallest_rows() {
+            // Create a grid with rows of varying heights
+            let grid = Grid {
+                rows: SmallVecLine::from_vec(vec![
+                    Row::new(LineInfo::new(0, 5, LineKind::Full)), // Smallest row
+                    Row::new(LineInfo::new(5, 10, LineKind::Full)),
+                    Row::new(LineInfo::new(15, 15, LineKind::Full)),
+                ]),
+                columns: SmallVecLine::from_vec(vec![]),
+            };
+
+            // Filter out the smallest rows
+            let filtered_grid = grid.filter_smallest_rows();
+
+            // Verify that the smallest row (height = 5) is removed
+            assert_eq!(filtered_grid.rows.len(), 2);
+            assert!(filtered_grid.rows.iter().all(|row| row.height > 5));
+        }
+
+        #[test]
+        fn test_filter_biggest_rows() {
+            // Create a grid with rows of varying heights
+            let grid = Grid {
+                rows: SmallVecLine::from_vec(vec![
+                    Row::new(LineInfo::new(0, 5, LineKind::Full)),
+                    Row::new(LineInfo::new(5, 10, LineKind::Full)),
+                    Row::new(LineInfo::new(15, 15, LineKind::Full)), // Biggest row
+                ]),
+                columns: SmallVecLine::from_vec(vec![]),
+            };
+
+            // Filter out the biggest rows
+            let filtered_grid = grid.filter_biggest_rows();
+
+            // Verify that the biggest row (height = 15) is removed
+            assert_eq!(filtered_grid.rows.len(), 2);
+            assert!(filtered_grid.rows.iter().all(|row| row.height < 15));
+        }
+
+        #[test]
+        fn test_filter_smallest_columns() {
+            // Create a grid with columns of varying widths
+            let grid = Grid {
+                rows: SmallVecLine::from_vec(vec![]),
+                columns: SmallVecLine::from_vec(vec![
+                    Column::new(LineInfo::new(0, 5, LineKind::Full)), // Smallest column
+                    Column::new(LineInfo::new(5, 10, LineKind::Full)),
+                    Column::new(LineInfo::new(15, 15, LineKind::Full)),
+                ]),
+            };
+
+            // Filter out the smallest columns
+            let filtered_grid = grid.filter_smallest_columns();
+
+            // Verify that the smallest column (width = 5) is removed
+            assert_eq!(filtered_grid.columns.len(), 2);
+            assert!(filtered_grid.columns.iter().all(|col| col.width > 5));
+        }
+
+        #[test]
+        fn test_filter_biggest_columns() {
+            // Create a grid with columns of varying widths
+            let grid = Grid {
+                rows: SmallVecLine::from_vec(vec![]),
+                columns: SmallVecLine::from_vec(vec![
+                    Column::new(LineInfo::new(0, 5, LineKind::Full)),
+                    Column::new(LineInfo::new(5, 10, LineKind::Full)),
+                    Column::new(LineInfo::new(15, 15, LineKind::Full)), // Biggest column
+                ]),
+            };
+
+            // Filter out the biggest columns
+            let filtered_grid = grid.filter_biggest_columns();
+
+            // Verify that the biggest column (width = 15) is removed
+            assert_eq!(filtered_grid.columns.len(), 2);
+            assert!(filtered_grid.columns.iter().all(|col| col.width < 15));
+        }
         // Property-based tests for uncovered code
         proptest! {
             #[test]
