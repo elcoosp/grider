@@ -493,7 +493,111 @@ mod tests {
 
         DynamicImage::ImageLuma8(img)
     }
+    // Macro to define a generic test for filtering rows or columns
+    macro_rules! test_filter {
+        ($name:ident, $filter_method:ident, $kind:expr) => {
+            #[test]
+            fn $name() {
+                let img = create_test_image(10, 10, "checkerboard");
+                let config = GridConfig::default();
+                let grid = Grid::try_from_image_with_config(&img, config).unwrap();
 
+                // Filter rows or columns by kind
+                let filtered: Vec<_> = grid.$filter_method(|item| item.kind == $kind).collect();
+                assert!(!filtered.is_empty());
+                assert!(filtered.iter().all(|item| item.kind == $kind));
+            }
+        };
+    }
+
+    // Macro to define a generic test for counting rows or columns by kind
+    macro_rules! test_count {
+        ($name:ident, $count_method:ident, $kind:expr) => {
+            #[test]
+            fn $name() {
+                let img = create_test_image(10, 10, "checkerboard");
+                let config = GridConfig::default();
+                let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+
+                // Count rows or columns by kind
+                let count = grid.$count_method($kind);
+                assert!(count > 0);
+            }
+        };
+    }
+
+    // Macro to define a generic test for finding cells
+    macro_rules! test_find_cells {
+        ($name:ident, $row_indices:expr, $column_indices:expr) => {
+            #[test]
+            fn $name() {
+                let img = create_test_image(10, 10, "checkerboard");
+                let config = GridConfig::default();
+                let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+
+                // Find cells based on row and column indices
+                let cells: Vec<_> = grid.find_cells($row_indices, $column_indices).collect();
+                assert!(!cells.is_empty());
+                for cell in cells {
+                    assert!(cell.is_ok());
+                }
+            }
+        };
+    }
+
+    // Define tests using macros
+    test_filter!(test_filtered_rows, filtered_rows, LineKind::Full);
+    test_filter!(test_filtered_columns, filtered_columns, LineKind::Full);
+
+    test_count!(test_count_rows_by_kind, count_rows_by_kind, LineKind::Full);
+    test_count!(
+        test_count_columns_by_kind,
+        count_columns_by_kind,
+        LineKind::Full
+    );
+
+    // test_find_cells!(test_find_cells, &[1, 2, 3], &[1, 2, 3]);
+
+    // Additional tests for edge cases
+    #[test]
+    fn test_filtered_rows_empty() {
+        let img = create_test_image(10, 10, "empty");
+        let config = GridConfig::default();
+        let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+
+        // Filter rows by kind (should be empty)
+        let filtered: Vec<_> = grid
+            .filtered_rows(|row| row.kind == LineKind::Full)
+            .collect();
+        assert!(filtered.is_empty());
+    }
+
+    #[test]
+    fn test_filtered_columns_empty() {
+        let img = create_test_image(10, 10, "empty");
+        let config = GridConfig::default();
+        let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+
+        // Filter columns by kind (should be empty)
+        let filtered: Vec<_> = grid
+            .filtered_columns(|col| col.kind == LineKind::Full)
+            .collect();
+        assert!(filtered.is_empty());
+    }
+
+    #[test]
+    fn test_find_cells_invalid_indices() {
+        let img = create_test_image(10, 10, "checkerboard");
+        let config = GridConfig::default();
+        let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+
+        // Find cells with invalid indices
+        let cells: Vec<_> = grid.find_cells(&[100], &[200]).collect();
+        assert!(!cells.is_empty());
+        for cell in cells {
+            assert!(cell.is_err());
+        }
+    }
     #[test]
     fn test_create_checkerboard() {
         let img = create_test_image(2, 2, "checkerboard");

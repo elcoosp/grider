@@ -25,6 +25,12 @@ pub enum GridError {
 
     #[error("Invalid image dimensions: width={width}, height={height}")]
     InvalidDimensions { width: u32, height: u32 },
+
+    #[error("Row not found at y={y}")]
+    RowNotFound { y: u32 },
+
+    #[error("Column not found at x={x}")]
+    ColumnNotFound { x: u32 },
 }
 
 /// A type alias for SmallVec with an optimized stack-allocated buffer size.
@@ -114,6 +120,12 @@ pub struct Grid {
     pub columns: SmallVecLine<Column>,
 }
 
+/// Represents a cell in the grid, referencing a row and a column.
+pub struct Cell<'a> {
+    pub row: &'a Row,
+    pub column: &'a Column,
+}
+
 impl Grid {
     /// Creates a new Grid from an image with custom configuration.
     ///
@@ -169,7 +181,153 @@ impl Grid {
 
         Ok(Grid { rows, columns })
     }
+    /// Returns an iterator over all rows in the grid.
+    ///
+    /// # Example
+    /// ```
+    /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+    /// for row in grid.rows() {
+    ///     println!("Row at y: {}", row.y);
+    /// }
+    /// ```
+    pub fn rows(&self) -> impl Iterator<Item = &Row> {
+        self.rows.iter()
+    }
 
+    /// Returns an iterator over all columns in the grid.
+    ///
+    /// # Example
+    /// ```
+    /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+    /// for column in grid.columns() {
+    ///     println!("Column at x: {}", column.x);
+    /// }
+    /// ```
+    pub fn columns(&self) -> impl Iterator<Item = &Column> {
+        self.columns.iter()
+    }
+
+    /// Returns an iterator over filtered rows based on the predicate.
+    ///
+    /// # Arguments
+    /// * `predicate` - A function that determines if a row should be included.
+    ///
+    /// # Example
+    /// ```
+    /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+    /// let filtered_rows: Vec<&Row> = grid.filtered_rows(|row| row.kind == LineKind::Full).collect();
+    /// ```
+    pub fn filtered_rows<F>(&self, predicate: F) -> impl Iterator<Item = &Row>
+    where
+        F: Fn(&&Row) -> bool,
+    {
+        self.rows.iter().filter(predicate)
+    }
+
+    /// Returns an iterator over filtered columns based on the predicate.
+    ///
+    /// # Arguments
+    /// * `predicate` - A function that determines if a column should be included.
+    ///
+    /// # Example
+    /// ```
+    /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+    /// let filtered_columns: Vec<&Column> = grid.filtered_columns(|col| col.kind == LineKind::Full).collect();
+    /// ```
+    pub fn filtered_columns<F>(&self, predicate: F) -> impl Iterator<Item = &Column>
+    where
+        F: Fn(&&Column) -> bool,
+    {
+        self.columns.iter().filter(predicate)
+    }
+
+    /// Counts the number of rows with the specified kind.
+    ///
+    /// # Arguments
+    /// * `kind` - The kind of rows to count.
+    ///
+    /// # Example
+    /// ```
+    /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+    /// let full_row_count = grid.count_rows_by_kind(LineKind::Full);
+    /// ```
+    pub fn count_rows_by_kind(&self, kind: LineKind) -> usize {
+        self.rows.iter().filter(|row| row.kind == kind).count()
+    }
+
+    /// Counts the number of columns with the specified kind.
+    ///
+    /// # Arguments
+    /// * `kind` - The kind of columns to count.
+    ///
+    /// # Example
+    /// ```
+    /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+    /// let full_column_count = grid.count_columns_by_kind(LineKind::Full);
+    /// ```
+    pub fn count_columns_by_kind(&self, kind: LineKind) -> usize {
+        self.columns.iter().filter(|col| col.kind == kind).count()
+    }
+
+    /// Finds cells based on row and column indices.
+    ///
+    /// # Arguments
+    /// * `row_indices` - A slice of row indices to find.
+    /// * `column_indices` - A slice of column indices to find.
+    ///
+    /// # Returns
+    /// An iterator over the found cells, which may return errors if indices are invalid.
+    ///
+    /// # Example
+    /// ```
+    /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+    /// let cells = grid.find_cells(&[1, 2, 3], &[4, 5, 6]);
+    /// for cell in cells {
+    ///     match cell {
+    ///         Ok(c) => println!("Found cell at row {}, column {}", c.row.y, c.column.x),
+    ///         Err(e) => eprintln!("Error finding cell: {}", e),
+    ///     }
+    /// }
+    /// ```
+    pub fn find_cells<'a>(
+        &'a self,
+        row_indices: &'a [u32],
+        column_indices: &'a [u32],
+    ) -> impl Iterator<Item = Result<Cell<'a>, GridError>> + 'a {
+        row_indices.iter().flat_map(move |&row_idx| {
+            column_indices.iter().map(move |&col_idx| {
+                let row = self
+                    .find_row(row_idx)
+                    .ok_or(GridError::RowNotFound { y: row_idx })?;
+                let column = self
+                    .find_column(col_idx)
+                    .ok_or(GridError::ColumnNotFound { x: col_idx })?;
+                Ok(Cell { row, column })
+            })
+        })
+    }
+
+    /// Finds a row by its y-coordinate.
+    ///
+    /// # Arguments
+    /// * `y` - The y-coordinate of the row to find.
+    ///
+    /// # Returns
+    /// An `Option` containing the found row, or `None` if not found.
+    fn find_row(&self, y: u32) -> Option<&Row> {
+        self.rows.iter().find(|row| row.y == y)
+    }
+
+    /// Finds a column by its x-coordinate.
+    ///
+    /// # Arguments
+    /// * `x` - The x-coordinate of the column to find.
+    ///
+    /// # Returns
+    /// An `Option` containing the found column, or `None` if not found.
+    fn find_column(&self, x: u32) -> Option<&Column> {
+        self.columns.iter().find(|col| col.x == x)
+    }
     /// Process image lines in parallel using rayon.
     fn process_lines_parallel(
         img: &GrayImage,
