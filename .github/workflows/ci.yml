@@ -27,7 +27,7 @@ jobs:
             features: "--all-features"  # Test without additional features on nightly
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Rust (${{ matrix.rust }})
         uses: dtolnay/rust-toolchain@v1
@@ -82,7 +82,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@v1
@@ -109,7 +109,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')  # Only run on version tags
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@v1
