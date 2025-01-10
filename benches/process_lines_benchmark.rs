@@ -1,9 +1,13 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use grider::{process_lines, Row};
+use grider::{process_lines, Row, SmallVecLine};
 use image::{GrayImage, Luma}; // Import from the `grider` module (or your crate name)
 
 /// Original implementation of `process_lines` for benchmarking.
-fn process_lines_original<T>(img: &GrayImage, length: u32, is_empty: impl Fn(u32) -> bool) -> Vec<T>
+fn process_lines_original<T>(
+    _img: &GrayImage,
+    length: u32,
+    is_empty: impl Fn(u32) -> bool,
+) -> Vec<T>
 where
     T: grider::LineTrait,
 {
@@ -86,7 +90,7 @@ where
 
 /// Benchmark the original `process_lines` implementation.
 fn benchmark_process_lines_original(c: &mut Criterion) {
-    let img = GrayImage::from_fn(1000, 1000, |_x, y| {
+    let img = GrayImage::from_fn(10000, 10000, |_x, y| {
         if y < 500 {
             Luma([255u8]) // First 500 rows are empty
         } else {
@@ -97,7 +101,7 @@ fn benchmark_process_lines_original(c: &mut Criterion) {
     c.bench_function("process_lines_original", |b| {
         b.iter(|| {
             let _rows: Vec<Row> =
-                process_lines_original(&img, 1000, |y| grider::is_row_empty(&img, y, 1000));
+                process_lines_original(&img, 10000, |y| grider::is_row_empty(&img, y, 10000));
             black_box(_rows);
         });
     });
@@ -105,7 +109,7 @@ fn benchmark_process_lines_original(c: &mut Criterion) {
 
 /// Benchmark the refactored `process_lines` implementation.
 fn benchmark_process_lines_refactored(c: &mut Criterion) {
-    let img = GrayImage::from_fn(1000, 1000, |_x, y| {
+    let img = GrayImage::from_fn(10000, 10000, |_x, y| {
         if y < 500 {
             Luma([255u8]) // First 500 rows are empty
         } else {
@@ -115,8 +119,8 @@ fn benchmark_process_lines_refactored(c: &mut Criterion) {
 
     c.bench_function("process_lines_refactored", |b| {
         b.iter(|| {
-            let _rows: Vec<Row> =
-                process_lines(&img, 1000, |y| grider::is_row_empty(&img, y, 1000));
+            let _rows: SmallVecLine<Row> =
+                process_lines(&img, 10000, |y| grider::is_row_empty(&img, y, 10000));
             black_box(_rows);
         });
     });

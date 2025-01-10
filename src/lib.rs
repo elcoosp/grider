@@ -3,9 +3,13 @@
 //! The `serde` feature is used to enable serialization for snapshot testing.
 use image::*;
 use imageproc::{contrast::adaptive_threshold, drawing::draw_line_segment_mut};
-use rayon::prelude::*; // SIMD type for 16 u8 elements
 #[cfg(feature = "simd")]
 use simsimd::SpatialSimilarity;
+use smallvec::SmallVec;
+
+/// A type alias for SmallVec with a stack-allocated buffer of Line elements.
+pub type SmallVecLine<T> = SmallVec<[T; 16]>;
+
 /// Represents the kind of a line (row or column).
 ///
 /// A line can be either [`LineKind::Empty`] (fully white) or [`LineKind::Full`] (contains non-white pixels).
@@ -14,6 +18,20 @@ use simsimd::SpatialSimilarity;
 pub enum LineKind {
     Empty,
     Full,
+}
+
+/// Represents information about a line (row or column) in the grid.
+///
+/// A line is defined by its starting coordinate (`start`), length (`length`), and [`LineKind`].
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct LineInfo {
+    /// The starting coordinate of the line (x for columns, y for rows).
+    pub start: u32,
+    /// The length of the line (width for columns, height for rows).
+    pub length: u32,
+    /// The kind of the line, either [`LineKind::Empty`] or [`LineKind::Full`].
+    pub kind: LineKind,
 }
 
 /// Represents a row in the grid.
@@ -45,8 +63,8 @@ pub struct Column {
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Grid {
-    rows: Vec<Row>,
-    columns: Vec<Column>,
+    rows: SmallVecLine<Row>,       // Use SmallVec8 for rows
+    columns: SmallVecLine<Column>, // Use SmallVec8 for columns
 }
 
 /// Trait to create lines (rows or columns).
@@ -102,6 +120,7 @@ pub fn is_row_empty(img: &GrayImage, y: u32, width: u32) -> bool {
     let distance = SpatialSimilarity::sqeuclidean(&row, &white).unwrap();
     distance == 0.0 // If the distance is 0, the row is fully white
 }
+
 /// Checks if a column is empty (all pixels are white).
 ///
 /// # Arguments
@@ -128,6 +147,7 @@ pub fn is_column_empty(img: &GrayImage, x: u32, height: u32) -> bool {
     let distance = SpatialSimilarity::cosine(&column, &white).unwrap();
     distance == 0.0 // If the distance is 0, the column is fully white
 }
+
 /// Processes lines (rows or columns) and groups them by their [`LineKind`].
 ///
 /// This function merges adjacent lines of the same kind and uses a dynamic threshold
@@ -141,10 +161,10 @@ pub fn is_column_empty(img: &GrayImage, x: u32, height: u32) -> bool {
 /// # Returns
 /// A vector of lines grouped by their [`LineKind`].
 pub fn process_lines<T>(
-    img: &GrayImage,
+    _img: &GrayImage,
     length: u32,
     is_empty: impl Fn(u32) -> bool + Sync,
-) -> Vec<T>
+) -> SmallVecLine<T>
 where
     T: LineTrait + Send,
 {
@@ -153,7 +173,6 @@ where
 
     // Step 2: Calculate the average size of all lines
     let average_size = calculate_average_line_size(&all_lines);
-    // println!("Average size: {}", average_size);
 
     // Step 3: Merge lines smaller than the threshold
     let threshold = (average_size * 8) / 10; // 80% of the average size
@@ -161,8 +180,8 @@ where
 
     // Step 4: Convert merged lines into the appropriate type
     merged_lines
-        .into_iter() // Parallelize the conversion
-        .map(|(start, length, kind)| T::new(start, length, kind))
+        .into_iter()
+        .map(|line| T::new(line.start, line.length, line.kind))
         .collect()
 }
 
@@ -173,8 +192,8 @@ where
 /// * `is_empty` - A function to check if a line is empty.
 ///
 /// # Returns
-/// A vector of tuples representing the lines: (start, length, kind).
-pub fn collect_lines(length: u32, is_empty: &impl Fn(u32) -> bool) -> Vec<(u32, u32, LineKind)> {
+/// A vector of [`LineInfo`] representing the lines.
+pub fn collect_lines(length: u32, is_empty: &impl Fn(u32) -> bool) -> Vec<LineInfo> {
     let mut lines = Vec::new();
     let mut current_start = 0;
     let mut current_kind = if is_empty(0) {
@@ -194,7 +213,11 @@ pub fn collect_lines(length: u32, is_empty: &impl Fn(u32) -> bool) -> Vec<(u32, 
         if new_kind == current_kind {
             current_length += 1;
         } else {
-            lines.push((current_start, current_length, current_kind.clone()));
+            lines.push(LineInfo {
+                start: current_start,
+                length: current_length,
+                kind: current_kind,
+            });
             current_start = i;
             current_kind = new_kind;
             current_length = 1;
@@ -202,19 +225,23 @@ pub fn collect_lines(length: u32, is_empty: &impl Fn(u32) -> bool) -> Vec<(u32, 
     }
 
     // Push the last line
-    lines.push((current_start, current_length, current_kind));
+    lines.push(LineInfo {
+        start: current_start,
+        length: current_length,
+        kind: current_kind,
+    });
     lines
 }
 
 /// Calculates the average size of all lines.
 ///
 /// # Arguments
-/// * `lines` - A vector of tuples representing the lines: (start, length, kind).
+/// * `lines` - A vector of [`LineInfo`] representing the lines.
 ///
 /// # Returns
 /// The average size of the lines.
-fn calculate_average_line_size(lines: &[(u32, u32, LineKind)]) -> u32 {
-    let total_size: u32 = lines.iter().map(|&(_, length, _)| length).sum();
+fn calculate_average_line_size(lines: &[LineInfo]) -> u32 {
+    let total_size: u32 = lines.iter().map(|line| line.length).sum();
     if lines.is_empty() {
         0
     } else {
@@ -225,34 +252,43 @@ fn calculate_average_line_size(lines: &[(u32, u32, LineKind)]) -> u32 {
 /// Merges lines smaller than the threshold.
 ///
 /// # Arguments
-/// * `lines` - A vector of tuples representing the lines: (start, length, kind).
+/// * `lines` - A vector of [`LineInfo`] representing the lines.
 /// * `threshold` - The threshold for merging lines.
 ///
 /// # Returns
-/// A vector of merged lines: (start, length, kind).
-fn merge_lines(lines: Vec<(u32, u32, LineKind)>, threshold: u32) -> Vec<(u32, u32, LineKind)> {
-    let mut merged_lines = Vec::with_capacity(lines.len()); // Pre-allocate memory
-    let mut current_start = lines[0].0;
-    let mut current_length = lines[0].1;
-    let mut current_kind = lines[0].2.clone();
+/// A vector of merged [`LineInfo`].
+fn merge_lines(lines: Vec<LineInfo>, threshold: u32) -> SmallVecLine<LineInfo> {
+    let mut merged_lines = SmallVecLine::new(); // Use SmallVec8 with a small stack-allocated buffer
+    let mut current_start = lines[0].start;
+    let mut current_length = lines[0].length;
+    let mut current_kind = lines[0].kind.clone();
 
-    for (start, length, kind) in lines.into_iter().skip(1) {
-        if current_length < threshold || length < threshold {
+    for line in lines.into_iter().skip(1) {
+        if current_length < threshold || line.length < threshold {
             // Merge with the previous line if either is smaller than the threshold
-            current_length += length;
+            current_length += line.length;
         } else {
             // Push the merged line
-            merged_lines.push((current_start, current_length, current_kind));
-            current_start = start;
-            current_length = length;
-            current_kind = kind;
+            merged_lines.push(LineInfo {
+                start: current_start,
+                length: current_length,
+                kind: current_kind,
+            });
+            current_start = line.start;
+            current_length = line.length;
+            current_kind = line.kind;
         }
     }
 
     // Push the last merged line
-    merged_lines.push((current_start, current_length, current_kind.clone()));
+    merged_lines.push(LineInfo {
+        start: current_start,
+        length: current_length,
+        kind: current_kind,
+    });
     merged_lines
 }
+
 /// Processes the image and generates the [`Grid`].
 ///
 /// This function converts the image to grayscale, applies adaptive thresholding,
@@ -272,11 +308,11 @@ pub fn process_image(image: DynamicImage) -> Grid {
 
     // Process rows and columns in parallel
     let (width, height) = binarized_img.dimensions();
-    let rows: Vec<Row> = process_lines(&binarized_img, height, |y| {
+    let rows: SmallVecLine<Row> = process_lines(&binarized_img, height, |y| {
         is_row_empty(&binarized_img, y, width)
     });
 
-    let columns: Vec<Column> = process_lines(&binarized_img, width, |x| {
+    let columns: SmallVecLine<Column> = process_lines(&binarized_img, width, |x| {
         is_column_empty(&binarized_img, x, height)
     });
 

@@ -1,5 +1,27 @@
 use grider::process_image;
 
+fn main() {
+    // Replace with the path to your image file
+    let image_path = "tests/13.png";
+
+    // Open the image file
+    match image::open(image_path) {
+        Ok(img) => {
+            // Process the image
+            let grid = process_image(img.clone());
+
+            // Print the grid (or use it as needed)
+            // println!("{:?}", grid);
+
+            // Save the image with grid lines for debugging
+            grider::debug::save_image_with_grid(&img, &grid, "output_with_grid.png");
+        }
+        Err(e) => {
+            println!("Failed to open image: {}", e);
+        }
+    }
+}
+
 /// Unit tests for the grid generation logic.
 #[cfg(test)]
 mod tests {
@@ -32,7 +54,7 @@ mod tests {
     fn test_process_lines_small_image() {
         let img =
             GrayImage::from_raw(3, 3, vec![255, 255, 255, 255, 0, 255, 255, 255, 255]).unwrap();
-        let rows: Vec<Row> = process_lines(&img, 3, |y| is_row_empty(&img, y, 3));
+        let rows: SmallVecLine<Row> = process_lines(&img, 3, |y| is_row_empty(&img, y, 3));
 
         // Assert YAML snapshot with a custom name
         assert_yaml_snapshot!("process_lines_small_image", rows);
@@ -48,7 +70,7 @@ mod tests {
                 Luma([0u8]) // Last 5 rows are full
             }
         });
-        let rows: Vec<Row> = process_lines(&img, 10, |y| is_row_empty(&img, y, 10));
+        let rows: SmallVecLine<Row> = process_lines(&img, 10, |y| is_row_empty(&img, y, 10));
 
         // Assert YAML snapshot with a custom name
         assert_yaml_snapshot!("process_lines_large_image", rows);
@@ -94,7 +116,7 @@ mod tests {
     fn test_process_lines_inline_snapshot() {
         let img =
             GrayImage::from_raw(3, 3, vec![255, 255, 255, 255, 0, 255, 255, 255, 255]).unwrap();
-        let rows: Vec<Row> = process_lines(&img, 3, |y| is_row_empty(&img, y, 3));
+        let rows: SmallVecLine<Row> = process_lines(&img, 3, |y| is_row_empty(&img, y, 3));
 
         // Assert inline YAML snapshot
         assert_yaml_snapshot!(rows, @r"
@@ -108,28 +130,5 @@ mod tests {
           height: 1
           kind: Empty
         ");
-    }
-}
-
-fn main() {
-    // Replace with the path to your image file
-    let image_path = "tests/13.png";
-
-    // Open the image file
-    match image::open(image_path) {
-        Ok(img) => {
-            // Process the image
-            let grid = process_image(img.clone());
-
-            // Print the grid (or use it as needed)
-            // println!("{:?}", grid);
-
-            // Save the image with grid lines for debugging
-            grider::debug::save_image_with_grid(&img, &grid, "output_with_grid.png");
-        }
-        Err(e) => {
-            // println!("Failed to open image: {}", e);
-            // e
-        }
     }
 }
