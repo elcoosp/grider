@@ -1,0 +1,129 @@
+name: CI and Publish
+
+on:
+  push:
+    branches:
+      - main  # Run CI on pushes to the main branch
+    tags:
+      - "v*"  # Trigger publishing on tags like v1.0.0, v2.1.0, etc.
+  pull_request:
+    branches:
+      - main  # Run CI on pull requests targeting the main branch
+
+jobs:
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]  # Test on multiple OSes
+        rust: [stable, beta, nightly]  # Test on multiple Rust versions
+        include:
+          - os: ubuntu-latest
+            rust: stable
+            features: "--all-features"  # Test with all features on stable
+          - os: ubuntu-latest
+            rust: nightly
+            features: "--all-features"  # Test without additional features on nightly
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Rust (${{ matrix.rust }})
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: ${{ runner.os }}-cargo-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ matrix.rust }}-
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        run: cargo test ${{ matrix.features }}
+
+      - name: Check documentation
+        run: cargo doc --no-deps --all-features
+
+      - name: Run cargo audit
+        run: |
+          cargo install cargo-audit
+          cargo audit
+
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin
+
+      - name: Run tarpaulin (code coverage)
+        run: cargo tarpaulin --all-features --out Xml
+
+      - name: Run benchmarks
+        run: cargo bench
+
+      - name: Install cargo-outdated
+        run: cargo install cargo-outdated
+
+      - name: Check for outdated dependencies
+        run: cargo outdated
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: ${{ runner.os }}-cargo-stable-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-stable-
+
+      - name: Build the project
+        run: cargo build --release
+
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    needs: [test, build]  # Ensure tests and builds pass before publishing
+    if: startsWith(github.ref, 'refs/tags/v')  # Only run on version tags
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: ${{ runner.os }}-cargo-stable-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-stable-
+
+      - name: Publish to crates.io
+        run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
