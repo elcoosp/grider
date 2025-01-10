@@ -314,7 +314,7 @@ impl Grid {
     ///
     /// # Returns
     /// An `Option` containing the found row, or `None` if not found.
-    fn find_row(&self, y: u32) -> Option<&Row> {
+    pub fn find_row(&self, y: u32) -> Option<&Row> {
         self.rows.iter().find(|row| row.y == y)
     }
 
@@ -325,7 +325,7 @@ impl Grid {
     ///
     /// # Returns
     /// An `Option` containing the found column, or `None` if not found.
-    fn find_column(&self, x: u32) -> Option<&Column> {
+    pub fn find_column(&self, x: u32) -> Option<&Column> {
         self.columns.iter().find(|col| col.x == x)
     }
     /// Process image lines in parallel using rayon.
@@ -426,11 +426,11 @@ impl Grid {
     }
 
     /// Collects initial lines without merging.
-    fn collect_lines(
+    pub fn collect_lines(
         img: &GrayImage,
         primary_dim: u32,
         secondary_dim: u32,
-        is_empty_fn: &impl Fn(&GrayImage, u32, u32) -> bool,
+        is_empty_fn: impl Fn(&GrayImage, u32, u32) -> bool,
     ) -> Result<Vec<LineInfo>, GridError> {
         trace!("Collecting lines");
         let mut lines = Vec::new();
@@ -537,47 +537,6 @@ impl Grid {
     pub fn is_column_empty(img: &GrayImage, x: u32, height: u32) -> bool {
         trace!("Checking if column x={} is empty", x);
         (0..height).all(|y| img.get_pixel(x, y).channels()[0] == 255)
-    }
-
-    /// Collects all lines without grouping.
-    ///
-    /// # Arguments
-    /// * `length` - The length of the lines (height for rows, width for columns).
-    /// * `is_empty` - A function to check if a line is empty.
-    ///
-    /// # Returns
-    /// A vector of [`LineInfo`] representing the lines.
-    pub fn collect_all_lines(length: u32, is_empty: &impl Fn(u32) -> bool) -> Vec<LineInfo> {
-        trace!("Collecting all lines with length={}", length);
-        let mut lines = Vec::new();
-        let mut current_start = 0;
-        let mut current_kind = if is_empty(0) {
-            LineKind::Empty
-        } else {
-            LineKind::Full
-        };
-        let mut current_length = 1;
-
-        for i in 1..length {
-            let new_kind = if is_empty(i) {
-                LineKind::Empty
-            } else {
-                LineKind::Full
-            };
-
-            if new_kind == current_kind {
-                current_length += 1;
-            } else {
-                lines.push(LineInfo::new(current_start, current_length, current_kind));
-                current_start = i;
-                current_kind = new_kind;
-                current_length = 1;
-            }
-        }
-
-        // Push the last line
-        lines.push(LineInfo::new(current_start, current_length, current_kind));
-        lines
     }
 }
 

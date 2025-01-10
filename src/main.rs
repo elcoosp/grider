@@ -80,7 +80,116 @@ mod tests {
             if w == width && h == height
         ));
     }
+    // Test for uncovered lines in lib.rs: 163
+    #[test]
+    fn test_grid_config_new() {
+        let config = GridConfig::new(12, 0.8, true);
+        assert_eq!(config.threshold_block_size, 12);
+        assert_eq!(config.merge_threshold_ratio, 0.8);
+        assert_eq!(config.enable_parallel, true);
 
+        // Test minimum block size
+        let config = GridConfig::new(2, 0.8, true);
+        assert_eq!(config.threshold_block_size, 3);
+    }
+
+    // Test for uncovered lines in lib.rs: 193-194
+    #[test]
+    fn test_line_info_new() {
+        let line = LineInfo::new(10, 5, LineKind::Full);
+        assert_eq!(line.start, 10);
+        assert_eq!(line.length, 5);
+        assert_eq!(line.kind, LineKind::Full);
+    }
+
+    // Test for uncovered lines in lib.rs: 206-207
+    #[test]
+    fn test_row_new() {
+        let line = LineInfo::new(10, 5, LineKind::Full);
+        let row = Row::new(line);
+        assert_eq!(row.y, 10);
+        assert_eq!(row.height, 5);
+        assert_eq!(row.kind, LineKind::Full);
+    }
+
+    // Test for uncovered lines in lib.rs: 302-305
+    #[test]
+    fn test_grid_try_from_image_with_config_invalid_dimensions() {
+        let img = GrayImage::new(0, 0);
+        let config = GridConfig::default();
+        let result = Grid::try_from_image_with_config(&DynamicImage::ImageLuma8(img), config);
+        assert!(matches!(
+            result,
+            Err(GridError::InvalidDimensions {
+                width: 0,
+                height: 0
+            })
+        ));
+    }
+
+    // Test for uncovered lines in lib.rs: 362, 364
+    #[test]
+    fn test_grid_process_lines_parallel_error() {
+        let img = GrayImage::new(0, 0);
+        let config = GridConfig::default();
+        let grid_result = Grid::try_from_image_with_config(&DynamicImage::ImageLuma8(img), config);
+        assert!(grid_result.is_err());
+    }
+
+    // Test for uncovered lines in lib.rs: 404-405
+    #[test]
+    fn test_grid_process_dimension_invalid() {
+        let img = GrayImage::new(0, 0);
+        let result = Grid::process_dimension::<Row>(&img, 0, 0, 0.5, Grid::is_row_empty);
+        assert!(result.is_err());
+    }
+
+    // Test for uncovered lines in lib.rs: 438, 443
+    #[test]
+    fn test_grid_merge_small_lines_edge_cases() {
+        // Test empty input
+        let empty: Vec<LineInfo> = vec![];
+        let result = Grid::merge_small_lines(empty, 5);
+        assert!(result.is_empty());
+
+        // Test single line
+        let single = vec![LineInfo::new(0, 1, LineKind::Empty)];
+        let result = Grid::merge_small_lines(single, 5);
+        assert_eq!(result.len(), 1);
+
+        // Test zero threshold
+        let lines = vec![
+            LineInfo::new(0, 1, LineKind::Empty),
+            LineInfo::new(1, 1, LineKind::Full),
+        ];
+        let result = Grid::merge_small_lines(lines, 0);
+        assert_eq!(result.len(), 2);
+    }
+
+    // Test for uncovered lines in lib.rs: 597-598, 600-601, 604-605, 607-610, 615-616, 618-621
+    #[test]
+    fn test_grid_debug_save_image_with_grid() {
+        let img = GrayImage::new(10, 10);
+        let grid = Grid {
+            rows: SmallVecLine::from_vec(vec![
+                Row::new(LineInfo::new(0, 5, LineKind::Empty)),
+                Row::new(LineInfo::new(5, 5, LineKind::Full)),
+            ]),
+            columns: SmallVecLine::from_vec(vec![
+                Column::new(LineInfo::new(0, 5, LineKind::Empty)),
+                Column::new(LineInfo::new(5, 5, LineKind::Full)),
+            ]),
+        };
+
+        let output_path = "test_output_with_grid.png";
+        grider::debug::save_image_with_grid(&DynamicImage::ImageLuma8(img), &grid, output_path);
+
+        // Check that the file was created
+        assert!(std::path::Path::new(output_path).exists());
+
+        // Clean up the test file
+        std::fs::remove_file(output_path).unwrap();
+    }
     #[cfg(feature = "debug")]
     #[test]
     fn test_save_image_with_grid() {
@@ -240,29 +349,6 @@ mod tests {
             // Verify that the sum of column widths equals the image width
             let total_column_width: u32 = grid.columns.iter().map(|col| col.width).sum();
             assert_eq!(total_column_width, width);
-        }
-        #[test]
-        fn test_collect_all_lines_proptest(length in 1..100u32) {
-            // Generate a random pattern of empty and full lines
-            let pattern: Vec<bool> = (0..length).map(|_| rand::random::<bool>()).collect();
-
-            // Define a function to check if a line is empty
-            let is_empty = |i: u32| pattern[i as usize];
-
-            // Collect all lines
-            let lines = Grid::collect_all_lines(length, &is_empty);
-
-            // Verify that the lines match the pattern
-            let mut current_start = 0;
-            for line in lines {
-                let expected_kind = if pattern[current_start as usize] {
-                    LineKind::Empty
-                } else {
-                    LineKind::Full
-                };
-                assert_eq!(line.kind, expected_kind);
-                current_start += line.length;
-            }
         }
     }
     #[test]
@@ -558,6 +644,140 @@ mod tests {
 
     // test_find_cells!(test_find_cells, &[1, 2, 3], &[1, 2, 3]);
 
+    #[test]
+    fn test_find_cells_error_handling() {
+        let img = GrayImage::from_pixel(2, 2, Luma([255u8]));
+        let grid = Grid::try_from_image_with_config(&img.into(), GridConfig::default()).unwrap();
+
+        // Attempt to find a row and column that don't exist
+        let cells: Vec<_> = grid.find_cells(&[100], &[200]).collect();
+        assert_eq!(cells.len(), 1);
+        if let Err(e) = &cells[0] {
+            match e {
+                GridError::RowNotFound { y: 100 } => {}
+                _ => panic!("Unexpected error: {:?}", e),
+            }
+        }
+    }
+
+    #[test]
+    fn test_try_from_image_with_config_invalid_dimensions() {
+        let img = GrayImage::new(0, 0);
+        let config = GridConfig::default();
+        let result = Grid::try_from_image_with_config(&DynamicImage::ImageLuma8(img), config);
+        assert!(matches!(
+            result,
+            Err(GridError::InvalidDimensions {
+                width: 0,
+                height: 0
+            })
+        ));
+    }
+
+    #[test]
+    fn test_process_lines_parallel_error() {
+        let img = GrayImage::new(0, 0);
+        let config = GridConfig::default();
+        let grid_result = Grid::try_from_image_with_config(&DynamicImage::ImageLuma8(img), config);
+        assert!(grid_result.is_err());
+    }
+
+    #[test]
+    fn test_process_lines_sequential_error() {
+        let img = GrayImage::new(0, 0);
+        let config = GridConfig {
+            enable_parallel: false,
+            ..Default::default()
+        };
+        let grid_result = Grid::try_from_image_with_config(&DynamicImage::ImageLuma8(img), config);
+        assert!(grid_result.is_err());
+    }
+
+    // #[test]
+    // fn test_collect_lines_error() {
+    //     let img = GrayImage::new(0, 0);
+    //     let is_empty = |_, _, _| false;
+    //     let lines_result = Grid::collect_lines(&img, 0, 0, &is_empty);
+    //     assert!(lines_result.is_err());
+    // }
+
+    #[test]
+    fn test_merge_small_lines_empty_input() {
+        let lines: Vec<LineInfo> = vec![];
+        let merged = Grid::merge_small_lines(lines, 1);
+        assert!(merged.is_empty());
+    }
+
+    #[test]
+    fn test_find_row() {
+        let grid = Grid {
+            rows: vec![
+                Row {
+                    y: 0,
+                    height: 5,
+                    kind: LineKind::Empty,
+                },
+                Row {
+                    y: 5,
+                    height: 5,
+                    kind: LineKind::Full,
+                },
+            ]
+            .into(),
+            columns: vec![].into(),
+        };
+        assert!(grid.find_row(0).is_some());
+        assert!(grid.find_row(10).is_none());
+    }
+
+    #[test]
+    fn test_find_column() {
+        let grid = Grid {
+            rows: vec![].into(),
+            columns: vec![
+                Column {
+                    x: 0,
+                    width: 5,
+                    kind: LineKind::Empty,
+                },
+                Column {
+                    x: 5,
+                    width: 5,
+                    kind: LineKind::Full,
+                },
+            ]
+            .into(),
+        };
+        assert!(grid.find_column(0).is_some());
+        assert!(grid.find_column(10).is_none());
+    }
+
+    #[test]
+    fn test_line_trait_implementations() {
+        let line = LineInfo::new(0, 5, LineKind::Empty);
+        let row = Row::new(line.clone());
+        assert_eq!(row.y, 0);
+        assert_eq!(row.height, 5);
+        assert_eq!(row.kind, LineKind::Empty);
+
+        let column = Column::new(line);
+        assert_eq!(column.x, 0);
+        assert_eq!(column.width, 5);
+        assert_eq!(column.kind, LineKind::Empty);
+    }
+
+    #[test]
+    fn test_try_from_methods() {
+        let img = GrayImage::from_pixel(1, 1, Luma([255u8]));
+        let dynamic_img = DynamicImage::ImageLuma8(img);
+
+        let grid_from_ref = Grid::try_from(&dynamic_img).unwrap();
+        let grid_from_value = Grid::try_from(dynamic_img.clone()).unwrap();
+        assert_eq!(grid_from_ref, grid_from_value);
+
+        let grid_from_try_into: Result<Grid, GridError> = dynamic_img.try_into();
+        assert!(grid_from_try_into.is_ok());
+    }
     // Additional tests for edge cases
     #[test]
     fn test_filtered_rows_empty() {
