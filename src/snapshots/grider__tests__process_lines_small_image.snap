@@ -1,0 +1,14 @@
+---
+source: src/main.rs
+expression: rows
+snapshot_kind: text
+---
+- y: 0
+  height: 1
+  kind: Empty
+- y: 1
+  height: 1
+  kind: Full
+- y: 2
+  height: 1
+  kind: Empty
