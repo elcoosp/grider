@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use grider::{Grid, GridConfig};
+use grider::{drawing::GridDrawingConfig, Grid, GridConfig};
 use image::GenericImageView;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 fn main() -> Result<()> {
@@ -30,7 +30,13 @@ fn main() -> Result<()> {
         let grid = Grid::try_from_image_with_config(&img, config)?;
         // Save the image with grid lines for debugging
         let output_path = format!("{image_path}_output_with_grid.png");
-        grider::debug::save_image_with_grid(&img, &grid, &output_path);
+        grider::debug::save_image_with_grid(
+            &img,
+            &grid,
+            &output_path,
+            &GridDrawingConfig::default(),
+        )
+        .unwrap();
     }
 
     Ok(())
@@ -39,6 +45,7 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use drawing::GridDrawingConfig;
     use grider::*;
     use image::*;
     use insta::assert_yaml_snapshot;
@@ -238,7 +245,13 @@ mod tests {
         };
 
         let output_path = "test_output_with_grid.png";
-        grider::debug::save_image_with_grid(&DynamicImage::ImageLuma8(img), &grid, output_path);
+        grider::debug::save_image_with_grid(
+            &DynamicImage::ImageLuma8(img),
+            &grid,
+            output_path,
+            &GridDrawingConfig::default(),
+        )
+        .unwrap();
 
         // Check that the file was created
         assert!(std::path::Path::new(output_path).exists());
@@ -267,7 +280,13 @@ mod tests {
 
         // Save the image with grid lines
         let output_path = "test_output_with_grid.png";
-        grider::debug::save_image_with_grid(&dynamic_img, &grid, output_path);
+        grider::debug::save_image_with_grid(
+            &dynamic_img,
+            &grid,
+            output_path,
+            &GridDrawingConfig::default(),
+        )
+        .unwrap();
 
         // Check that the file was created
         assert!(std::path::Path::new(output_path).exists());

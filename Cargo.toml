@@ -26,7 +26,8 @@ name = "grid"
 harness = false
 
 [features]
-debug = []
+debug = ["drawing"]
+drawing = []
 default = ["serde"]
 serde = [
     "dep:serde",

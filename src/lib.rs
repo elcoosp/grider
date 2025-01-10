@@ -1,8 +1,8 @@
 //! This module provides functionality for processing images into grids of rows and columns.
 //! It uses the `image` and `imageproc` crates for image manipulation and `insta` for snapshot testing.
-
+pub mod drawing;
 use image::*;
-use imageproc::{contrast::adaptive_threshold, drawing::draw_line_segment_mut};
+use imageproc::{contrast::adaptive_threshold, drawing::draw_line_segment_mut, rect::Rect};
 use smallvec::SmallVec;
 use thiserror::Error;
 use tracing::*;
@@ -152,7 +152,12 @@ pub struct Cell<'a> {
     pub row: &'a Row,
     pub column: &'a Column,
 }
-
+impl From<&Cell<'_>> for Rect {
+    fn from(cell: &Cell) -> Self {
+        Rect::at(cell.column.x as i32, cell.row.y as i32)
+            .of_size(cell.column.width, cell.row.height)
+    }
+}
 /// Represents the grid of rows and columns extracted from an image.
 ///
 /// # Example
@@ -712,47 +717,48 @@ impl TryFrom<&DynamicImage> for Grid {
 /// grider::debug::save_image_with_grid(&img, &grid, "output.png");
 /// ```
 pub mod debug {
-    use super::*;
+    use drawing::*;
+    use imageproc::drawing::{draw_filled_rect, draw_filled_rect_mut};
 
-    /// Saves the image with grid lines for debugging.
+    use super::*;
+    /// Saves the image with the grid drawn on it.
     ///
-    /// This function draws horizontal lines for [`Row`]s and vertical lines for [`Column`]s
-    /// on the image and saves it to the specified path.
+    /// This function draws the grid, cells, and grid lines on the provided image
+    /// and saves the result to the specified path.
     ///
     /// # Arguments
     /// * `image` - The input image.
-    /// * `grid` - The [`Grid`] to visualize.
+    /// * `grid` - The grid to draw.
     /// * `output_path` - The path to save the output image.
-    pub fn save_image_with_grid(image: &DynamicImage, grid: &Grid, output_path: &str) {
-        trace!("Saving image with grid to {}", output_path);
-        // Convert the image to RGBA for drawing
+    /// * `config` - The drawing configuration.
+    ///
+    /// # Errors
+    /// Returns [`GridError`] if drawing or saving fails.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use grider::{Grid, GridConfig, drawing::*};
+    /// use image::open;
+    ///
+    /// let img = open("tests/large.png").unwrap();
+    /// let config = GridConfig::default();
+    /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+    ///
+    /// let drawing_config = GridDrawingConfig::default();
+    /// save_image_with_grid(&img, &grid, "output_with_grid.png", &drawing_config).unwrap();
+    /// ```
+    pub fn save_image_with_grid(
+        image: &DynamicImage,
+        grid: &Grid,
+        output_path: &str,
+        config: &GridDrawingConfig,
+    ) -> Result<(), GridError> {
         let mut rgba_img = image.to_rgba8();
-        let (w, h) = (rgba_img.width() as f32, rgba_img.height() as f32);
-
-        // Draw horizontal lines for rows
-        for row in &grid.rows {
-            let y = row.y + row.height;
-            draw_line_segment_mut(
-                &mut rgba_img,
-                (0.0, y as f32),
-                (w, y as f32),
-                Rgba([255, 0, 0, 255]), // Red color for rows
-            );
-        }
-
-        // Draw vertical lines for columns
-        for column in &grid.columns {
-            let x = column.x + column.width;
-            draw_line_segment_mut(
-                &mut rgba_img,
-                (x as f32, 0.0),
-                (x as f32, h),
-                Rgba([0, 0, 255, 255]), // Blue color for columns
-            );
-        }
-
-        // Save the image with grid lines
-        rgba_img.save(output_path).unwrap();
+        grid.draw(&mut rgba_img, config)?;
+        rgba_img
+            .save(output_path)
+            .map_err(|e| GridError::ImageConversionError(e.to_string()))
     }
 }
 /// Creates a `Row` or `Column` instance from a tuple of values.
