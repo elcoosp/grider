@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use grider::{process_lines, Row, SmallVecLine};
+use grider::{process_lines, LineInfo, Row, SmallVecLine};
 use image::{GrayImage, Luma}; // Import from the `grider` module (or your crate name)
 
 /// Original implementation of `process_lines` for benchmarking.
@@ -63,26 +63,26 @@ where
             current_merged_length += length;
         } else {
             // Push the merged line
-            merged_lines.push((
-                current_merged_start,
-                current_merged_length,
-                current_merged_kind.clone(),
-            ));
+            merged_lines.push(LineInfo {
+                start: current_merged_start,
+                length: current_merged_length,
+                kind: current_merged_kind,
+            });
             current_merged_start = *start;
             current_merged_length = *length;
             current_merged_kind = kind.clone();
         }
     }
     // Push the last merged line
-    merged_lines.push((
-        current_merged_start,
-        current_merged_length,
-        current_merged_kind,
-    ));
+    merged_lines.push(LineInfo {
+        start: current_merged_start,
+        length: current_merged_length,
+        kind: current_merged_kind,
+    });
 
     // Convert merged lines to the appropriate type
-    for (start, length, kind) in merged_lines {
-        lines.push(T::new(start, length, kind));
+    for line in merged_lines {
+        lines.push(T::new(line));
     }
 
     lines

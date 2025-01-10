@@ -71,25 +71,25 @@ pub struct Grid {
 ///
 /// This trait is implemented for both [`Row`] and [`Column`] to allow generic processing of lines.
 pub trait LineTrait {
-    fn new(start: u32, length: u32, kind: LineKind) -> Self;
+    fn new(line: LineInfo) -> Self;
 }
 
 impl LineTrait for Row {
-    fn new(start: u32, length: u32, kind: LineKind) -> Self {
+    fn new(line: LineInfo) -> Self {
         Row {
-            y: start,
-            height: length,
-            kind,
+            y: line.start,
+            height: line.length,
+            kind: line.kind,
         }
     }
 }
 
 impl LineTrait for Column {
-    fn new(start: u32, length: u32, kind: LineKind) -> Self {
+    fn new(line: LineInfo) -> Self {
         Column {
-            x: start,
-            width: length,
-            kind,
+            x: line.start,
+            width: line.length,
+            kind: line.kind,
         }
     }
 }
@@ -179,10 +179,7 @@ where
     let merged_lines = merge_lines(all_lines, threshold);
 
     // Step 4: Convert merged lines into the appropriate type
-    merged_lines
-        .into_iter()
-        .map(|line| T::new(line.start, line.length, line.kind))
-        .collect()
+    merged_lines.into_iter().map(|line| T::new(line)).collect()
 }
 
 /// Collects all lines without grouping.
