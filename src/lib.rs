@@ -3,8 +3,9 @@
 //! The `serde` feature is used to enable serialization for snapshot testing.
 use image::*;
 use imageproc::{contrast::adaptive_threshold, drawing::draw_line_segment_mut};
-use rayon::prelude::*;
-
+use rayon::prelude::*; // SIMD type for 16 u8 elements
+#[cfg(feature = "simd")]
+use simsimd::SpatialSimilarity;
 /// Represents the kind of a line (row or column).
 ///
 /// A line can be either [`LineKind::Empty`] (fully white) or [`LineKind::Full`] (contains non-white pixels).
@@ -84,10 +85,23 @@ impl LineTrait for Column {
 ///
 /// # Returns
 /// `true` if the row is empty (fully white), otherwise `false`.
+#[cfg(not(feature = "simd"))]
 pub fn is_row_empty(img: &GrayImage, y: u32, width: u32) -> bool {
     (0..width).all(|x| img.get_pixel(x, y).channels()[0] == 255)
 }
+#[cfg(feature = "simd")]
+pub fn is_row_empty(img: &GrayImage, y: u32, width: u32) -> bool {
+    let mut row = Vec::with_capacity(width as usize);
+    for x in 0..width {
+        row.push(img.get_pixel(x, y).0[0] as i8);
+    }
 
+    let white = vec![127i8; width as usize];
+
+    // Use SimSIMD to compute the Euclidean distance between the row and a white vector
+    let distance = SpatialSimilarity::sqeuclidean(&row, &white).unwrap();
+    distance == 0.0 // If the distance is 0, the row is fully white
+}
 /// Checks if a column is empty (all pixels are white).
 ///
 /// # Arguments
@@ -97,10 +111,23 @@ pub fn is_row_empty(img: &GrayImage, y: u32, width: u32) -> bool {
 ///
 /// # Returns
 /// `true` if the column is empty (fully white), otherwise `false`.
+#[cfg(not(feature = "simd"))]
 pub fn is_column_empty(img: &GrayImage, x: u32, height: u32) -> bool {
     (0..height).all(|y| img.get_pixel(x, y).channels()[0] == 255)
 }
+#[cfg(feature = "simd")]
+pub fn is_column_empty(img: &GrayImage, x: u32, height: u32) -> bool {
+    let mut column = Vec::with_capacity(height as usize);
+    for y in 0..height {
+        column.push(img.get_pixel(x, y).0[0] as i8);
+    }
 
+    let white = vec![127i8; height as usize];
+
+    // Use SimSIMD to compare the column with a white vector
+    let distance = SpatialSimilarity::cosine(&column, &white).unwrap();
+    distance == 0.0 // If the distance is 0, the column is fully white
+}
 /// Processes lines (rows or columns) and groups them by their [`LineKind`].
 ///
 /// This function merges adjacent lines of the same kind and uses a dynamic threshold
@@ -123,7 +150,7 @@ where
 {
     // Step 1: Collect all lines without grouping (in parallel)
     let all_lines: Vec<(u32, u32, LineKind)> = (0..length)
-        .into_par_iter()
+        .into_iter()
         .map(|i| {
             let kind = if is_empty(i) {
                 LineKind::Empty
@@ -144,7 +171,7 @@ where
 
     // Step 4: Convert merged lines into the appropriate type
     merged_lines
-        .into_par_iter() // Parallelize the conversion
+        .into_iter() // Parallelize the conversion
         .map(|(start, length, kind)| T::new(start, length, kind))
         .collect()
 }
@@ -173,7 +200,7 @@ fn collect_lines(length: u32, is_empty: &impl Fn(u32) -> bool) -> Vec<(u32, u32,
 /// # Returns
 /// The average size of the lines.
 fn calculate_average_line_size(lines: &[(u32, u32, LineKind)]) -> u32 {
-    let total_size: u32 = lines.par_iter().map(|&(_, length, _)| length).sum();
+    let total_size: u32 = lines.iter().map(|&(_, length, _)| length).sum();
     if lines.is_empty() {
         0
     } else {
