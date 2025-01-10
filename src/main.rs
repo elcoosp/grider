@@ -21,13 +21,13 @@ fn main() -> Result<()> {
         anyhow::bail!("Invalid image dimensions: {}x{}", width, height);
     }
 
-    // Process the image with configuration
-    let config = GridConfig::new(12, 0.8, true);
-    let _grid = Grid::try_from_image_with_config(&img, config)?;
-
     // Use debug features under feature flag
     #[cfg(feature = "debug")]
     {
+        // Process the image with configuration
+        let config = GridConfig::new(12, 0.8, true);
+
+        let grid = Grid::try_from_image_with_config(&img, config)?;
         // Save the image with grid lines for debugging
         let output_path = format!("{image_path}_output_with_grid.png");
         grider::debug::save_image_with_grid(&img, &grid, &output_path);
