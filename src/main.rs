@@ -23,6 +23,7 @@ fn main() -> Result<()> {
     // Use debug features under feature flag
     #[cfg(feature = "debug")]
     {
+        use grider::{drawing::*, *};
         // Process the image with configuration
         let config = GridConfig::new(12, 0.8, true);
 
