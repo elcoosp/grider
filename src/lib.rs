@@ -305,13 +305,19 @@ pub fn process_image(image: DynamicImage) -> Grid {
 
     // Process rows and columns in parallel
     let (width, height) = binarized_img.dimensions();
-    let rows: SmallVecLine<Row> = process_lines(&binarized_img, height, |y| {
-        is_row_empty(&binarized_img, y, width)
-    });
-
-    let columns: SmallVecLine<Column> = process_lines(&binarized_img, width, |x| {
-        is_column_empty(&binarized_img, x, height)
-    });
+    // Process rows and columns in parallel
+    let (rows, columns): (SmallVecLine<Row>, SmallVecLine<Column>) = rayon::join(
+        || {
+            process_lines(&binarized_img, height, |y| {
+                is_row_empty(&binarized_img, y, width)
+            })
+        },
+        || {
+            process_lines(&binarized_img, width, |x| {
+                is_column_empty(&binarized_img, x, height)
+            })
+        },
+    );
 
     // Create the Grid
     Grid { rows, columns }
