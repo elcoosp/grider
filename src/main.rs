@@ -24,7 +24,48 @@ mod tests {
     use image::*;
     use insta::assert_yaml_snapshot;
     use pretty_assertions::assert_eq;
+    use proptest::proptest;
+    #[test]
+    fn test_save_image_with_grid() {
+        // Create a 10x10 grayscale image with a gradient from black to white
+        let img = GrayImage::from_fn(10, 10, |x, _y| Luma([(x * 25) as u8]));
+        let dynamic_img = DynamicImage::ImageLuma8(img);
 
+        // Create a grid with some rows and columns
+        let grid = Grid {
+            rows: SmallVecLine::from_vec(vec![
+                Row::new(LineInfo::new(0, 5, LineKind::Empty)),
+                Row::new(LineInfo::new(5, 5, LineKind::Full)),
+            ]),
+            columns: SmallVecLine::from_vec(vec![
+                Column::new(LineInfo::new(0, 5, LineKind::Empty)),
+                Column::new(LineInfo::new(5, 5, LineKind::Full)),
+            ]),
+        };
+
+        // Save the image with grid lines
+        let output_path = "test_output_with_grid.png";
+        debug::save_image_with_grid(&dynamic_img, &grid, output_path);
+
+        // Check that the file was created
+        assert!(std::path::Path::new(output_path).exists());
+
+        // Clean up the test file
+        std::fs::remove_file(output_path).unwrap();
+    }
+    #[test]
+    fn test_adaptive_threshold() {
+        // Create a 10x10 grayscale image with a gradient from black to white
+        let img = GrayImage::from_fn(10, 10, |x, _y| Luma([(x * 25) as u8]));
+
+        // Process the image
+        let grid = process_image(DynamicImage::ImageLuma8(img));
+
+        // Check that the grid has been generated correctly
+        // For a gradient image, we expect some rows and columns to be marked as Full
+        assert!(!grid.rows.is_empty());
+        assert!(!grid.columns.is_empty());
+    }
     #[test]
     fn test_is_row_empty_2() {
         // Create a 10x10 grayscale image with all pixels set to white (255)
@@ -128,7 +169,15 @@ mod tests {
         assert!(!is_row_empty(&img, 1, 3));
         assert!(is_row_empty(&img, 2, 3));
     }
-
+    proptest! {
+        #[test]
+        fn test_is_row_empty_prop(width in 1..100u32, height in 1..100u32, y in 0..100u32) {
+            let img = GrayImage::from_pixel(width, height, Luma([255]));
+            if y < height {
+                assert!(is_row_empty(&img, y, width));
+            }
+        }
+    }
     #[test]
     fn test_is_column_empty() {
         let img =
