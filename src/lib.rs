@@ -718,7 +718,7 @@ impl TryFrom<&DynamicImage> for Grid {
 /// ```
 pub mod debug {
     use drawing::*;
-    use imageproc::drawing::{draw_filled_rect, draw_filled_rect_mut};
+    
 
     use super::*;
     /// Saves the image with the grid drawn on it.

@@ -149,8 +149,8 @@ impl Drawable for Cell<'_> {
 impl Drawable for Grid {
     fn draw(&self, image: &mut RgbaImage, config: &GridDrawingConfig) -> Result<(), GridError> {
         // Draw cells with padding
-        for (row_index, row) in self.rows.iter().enumerate() {
-            for (col_index, column) in self.columns.iter().enumerate() {
+        for (_row_index, row) in self.rows.iter().enumerate() {
+            for (_col_index, column) in self.columns.iter().enumerate() {
                 let cell = Cell { row, column };
                 cell.draw(image, config)?;
             }

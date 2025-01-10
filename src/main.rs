@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use grider::{drawing::GridDrawingConfig, Grid, GridConfig};
 use image::GenericImageView;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 fn main() -> Result<()> {
