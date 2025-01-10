@@ -1,4 +1,4 @@
-# Grider: Image Grid Processing for Rust
+# Grider: Image Grid Processing for Rust 🖼️
 
 ## Badges
 

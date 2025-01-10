@@ -755,6 +755,83 @@ pub mod debug {
         rgba_img.save(output_path).unwrap();
     }
 }
+/// Creates a `Row` or `Column` instance from a tuple of values.
+///
+/// This macro simplifies the creation of `Row` or `Column` instances by providing
+/// a concise syntax. It supports optional specification of the `LineKind` (defaulting
+/// to `LineKind::Empty` if not provided).
+///
+/// # Syntax
+///
+/// The macro has two forms for each type (`Row` and `Column`):
+///
+/// 1. **With `LineKind` specified:**
+///    ```rust
+///    use grider::*;
+///    let _ = make_line!(Row, (0, 0, LineKind::Empty));
+///    let _ = make_line!(Column, (0, 0, LineKind::Full));
+///    ```
+///    - `y` / `x`: The starting position of the row/column.
+///    - `height` / `width`: The length of the row/column.
+///    - `kind`: The `LineKind` (`LineKind::Empty` or `LineKind::Full`).
+///
+/// 2. **Without `LineKind` (defaults to `LineKind::Empty`):**
+///    ```rust
+///    use grider::*;
+///    let _ = make_line!(Row, (0, 0));
+///    let _ = make_line!(Column, (0, 0));
+///    ```
+///    - `y` / `x`: The starting position of the row/column.
+///    - `height` / `width`: The length of the row/column.
+///
+/// # Examples
+///
+/// ## Creating a `Row`
+///
+/// ```rust
+/// use grider::*;
+///
+/// // With LineKind::Full
+/// let row = make_line!(Row, (0, 10, LineKind::Full));
+/// assert_eq!(row.y, 0);
+/// assert_eq!(row.height, 10);
+/// assert_eq!(row.kind, LineKind::Full);
+///
+/// // Without LineKind (defaults to LineKind::Empty)
+/// let row = make_line!(Row, (10, 20));
+/// assert_eq!(row.y, 10);
+/// assert_eq!(row.height, 20);
+/// assert_eq!(row.kind, LineKind::Empty);
+/// ```
+///
+/// ## Creating a `Column`
+///
+/// ```rust
+/// use grider::*;
+///
+/// // With LineKind::Full
+/// let column = make_line!(Column, (5, 15, LineKind::Full));
+/// assert_eq!(column.x, 5);
+/// assert_eq!(column.width, 15);
+/// assert_eq!(column.kind, LineKind::Full);
+///
+/// // Without LineKind (defaults to LineKind::Empty)
+/// let column = make_line!(Column, (20, 30));
+/// assert_eq!(column.x, 20);
+/// assert_eq!(column.width, 30);
+/// assert_eq!(column.kind, LineKind::Empty);
+/// ```
+///
+/// # Notes
+///
+/// - The macro internally uses the `LineInfo` struct to create `Row` or `Column` instances.
+/// - If `LineKind` is not provided, it defaults to `LineKind::Empty`.
+///
+/// # See Also
+///
+/// - [`LineInfo`](struct.LineInfo.html): The underlying struct used to create rows and columns.
+/// - [`Row`](struct.Row.html): Represents a row in the grid.
+/// - [`Column`](struct.Column.html): Represents a column in the grid.
 #[macro_export]
 macro_rules! make_line {
     // For Rows
@@ -774,24 +851,76 @@ macro_rules! make_line {
     };
 }
 
-/// Creates a grid from rows and columns.
+/// Creates a `Grid` instance from a list of rows and columns.
 ///
-/// # Example
-/// ```
-/// use grider::make_grid;
-/// use grider::{Grid, Row, Column, LineKind};
+/// This macro simplifies the creation of a `Grid` by allowing you to specify rows and columns
+/// as lists of tuples. Each tuple represents a `Row` or `Column`, and the macro internally
+/// uses the `make_line!` macro to construct the individual rows and columns.
 ///
+/// # Syntax
+///
+/// The macro takes two lists: one for rows and one for columns. Each list contains tuples
+/// that define the properties of the rows or columns.
+///
+/// ```rust
+/// use grider::*;
+/// let x = 0;
+/// let y = 0;
+/// let height = 0;
+/// let width = 0;
 /// let grid = make_grid!(
 ///     rows: [
-///         (0, 10),
-///         (10, 20, LineKind::Full),
+///         (y, height),                // Row with default LineKind::Empty
+///         (y, height, LineKind::Full), // Row with explicit LineKind
 ///     ],
 ///     columns: [
-///         (0, 5),
-///         (5, 15, LineKind::Full),
+///         (x, width),                 // Column with default LineKind::Empty
+///         (x, width, LineKind::Full), // Column with explicit LineKind
 ///     ]
 /// );
 /// ```
+///
+/// - `y`: The starting y-coordinate of the row.
+/// - `height`: The height of the row.
+/// - `x`: The starting x-coordinate of the column.
+/// - `width`: The width of the column.
+/// - `LineKind`: Optional. Specifies the kind of line (`LineKind::Empty` or `LineKind::Full`).
+///   If not provided, it defaults to `LineKind::Empty`.
+///
+/// # Examples
+///
+/// ## Creating a Grid
+///
+/// ```rust
+/// use grider::{make_grid, LineKind};
+///
+/// let grid = make_grid!(
+///     rows: [
+///         (0, 10),                     // Row at y=0, height=10, LineKind::Empty
+///         (10, 20, LineKind::Full),    // Row at y=10, height=20, LineKind::Full
+///     ],
+///     columns: [
+///         (0, 5),                      // Column at x=0, width=5, LineKind::Empty
+///         (5, 15, LineKind::Full),     // Column at x=5, width=15, LineKind::Full
+///     ]
+/// );
+///
+/// assert_eq!(grid.rows.len(), 2);
+/// assert_eq!(grid.columns.len(), 2);
+/// ```
+///
+/// ## Notes
+///
+/// - The macro internally uses the `make_line!` macro to create individual rows and columns.
+/// - If `LineKind` is not provided for a row or column, it defaults to `LineKind::Empty`.
+/// - The resulting `Grid` contains `SmallVecLine` collections for rows and columns.
+///
+/// # See Also
+///
+/// - [`make_line!`]: The macro used internally to create rows and columns.
+/// - [`Grid`]: The struct representing the grid of rows and columns.
+/// - [`Row`]: Represents a row in the grid.
+/// - [`Column`]: Represents a column in the grid.
 #[macro_export]
 macro_rules! make_grid {
     // Match rows and columns as separate lists with tuple syntax
