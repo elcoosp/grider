@@ -181,7 +181,7 @@ impl LineInfo {
 }
 
 /// Represents a row in the grid.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Row {
     pub y: u32,
@@ -190,7 +190,7 @@ pub struct Row {
 }
 
 /// Represents a column in the grid.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Column {
     pub x: u32,
@@ -219,7 +219,7 @@ impl From<&Cell<'_>> for Rect {
 /// let config = GridConfig::default();
 /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
 /// ```
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Grid {
     pub rows: SmallVecLine<Row>,
@@ -227,6 +227,139 @@ pub struct Grid {
 }
 
 impl Grid {
+    /// Generic function to filter rows or columns based on a predicate.
+    ///
+    /// # Arguments
+    /// * `lines` - A vector of rows or columns to filter.
+    /// * `predicate` - A closure that determines whether a line should be included.
+    ///
+    /// # Returns
+    /// # Example
+    ///
+    /// ```
+    /// use grider::{Grid, GridConfig};
+    /// use image::open;
+    ///
+    /// let img = open("tests/large.png").unwrap();
+    /// let config = GridConfig::default();
+    /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+    ///
+    /// // Automatically filter out the smallest rows
+    /// let filtered_grid = grid.filter_smallest_rows();
+    ///
+    /// // Automatically filter out the biggest rows
+    /// let filtered_grid = grid.filter_biggest_rows();
+    ///
+    /// // Automatically filter out the smallest columns
+    /// let filtered_grid = grid.filter_smallest_columns();
+    ///
+    /// // Automatically filter out the biggest columns
+    /// let filtered_grid = grid.filter_biggest_columns();
+    /// ```
+    /// A new vector containing only the lines that satisfy the predicate.
+    fn filter_lines<T, F>(lines: &[T], predicate: F) -> SmallVecLine<T>
+    where
+        T: Clone,
+        F: Fn(&T) -> bool,
+    {
+        lines
+            .iter()
+            .filter(|&line| predicate(line))
+            .cloned()
+            .collect()
+    }
+
+    /// Filters out the smallest rows in the grid.
+    ///
+    /// # Returns
+    /// A new `Grid` with the smallest rows removed.
+    pub fn filter_smallest_rows(&self) -> Self {
+        if let Some(smallest_height) = self.smallest_row_height() {
+            Grid {
+                rows: Self::filter_lines(&self.rows, |row| row.height > smallest_height),
+                columns: self.columns.clone(),
+            }
+        } else {
+            self.clone()
+        }
+    }
+
+    /// Filters out the biggest rows in the grid.
+    ///
+    /// # Returns
+    /// A new `Grid` with the biggest rows removed.
+    pub fn filter_biggest_rows(&self) -> Self {
+        if let Some(biggest_height) = self.biggest_row_height() {
+            Grid {
+                rows: Self::filter_lines(&self.rows, |row| row.height < biggest_height),
+                columns: self.columns.clone(),
+            }
+        } else {
+            self.clone()
+        }
+    }
+
+    /// Filters out the smallest columns in the grid.
+    ///
+    /// # Returns
+    /// A new `Grid` with the smallest columns removed.
+    pub fn filter_smallest_columns(&self) -> Self {
+        if let Some(smallest_width) = self.smallest_column_width() {
+            Grid {
+                rows: self.rows.clone(),
+                columns: Self::filter_lines(&self.columns, |col| col.width > smallest_width),
+            }
+        } else {
+            self.clone()
+        }
+    }
+
+    /// Filters out the biggest columns in the grid.
+    ///
+    /// # Returns
+    /// A new `Grid` with the biggest columns removed.
+    pub fn filter_biggest_columns(&self) -> Self {
+        if let Some(biggest_width) = self.biggest_column_width() {
+            Grid {
+                rows: self.rows.clone(),
+                columns: Self::filter_lines(&self.columns, |col| col.width < biggest_width),
+            }
+        } else {
+            self.clone()
+        }
+    }
+
+    /// Finds the smallest height among all rows in the grid.
+    ///
+    /// # Returns
+    /// The smallest height of the rows, or `None` if there are no rows.
+    pub fn smallest_row_height(&self) -> Option<u32> {
+        self.rows.iter().map(|row| row.height).min()
+    }
+
+    /// Finds the biggest height among all rows in the grid.
+    ///
+    /// # Returns
+    /// The biggest height of the rows, or `None` if there are no rows.
+    pub fn biggest_row_height(&self) -> Option<u32> {
+        self.rows.iter().map(|row| row.height).max()
+    }
+
+    /// Finds the smallest width among all columns in the grid.
+    ///
+    /// # Returns
+    /// The smallest width of the columns, or `None` if there are no columns.
+    pub fn smallest_column_width(&self) -> Option<u32> {
+        self.columns.iter().map(|col| col.width).min()
+    }
+
+    /// Finds the biggest width among all columns in the grid.
+    ///
+    /// # Returns
+    /// The biggest width of the columns, or `None` if there are no columns.
+    pub fn biggest_column_width(&self) -> Option<u32> {
+        self.columns.iter().map(|col| col.width).max()
+    }
     /// Creates a new `Grid` from an image with custom configuration.
     ///
     /// # Example
