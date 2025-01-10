@@ -8,9 +8,9 @@ imageproc = "0.25"
 insta = { version = "1.42.0", features = ["yaml", "redactions"] }
 serde = { version = "1.0", features = ["derive"], optional = true }
 serde_derive = { version = "1.0", optional = true }
-
+rayon = "1"
 [dev-dependencies]
-criterion = "0.4"
+criterion = "0.5"
 
 [[bench]]
 name = "process_lines_benchmark"

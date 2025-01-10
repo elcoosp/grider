@@ -1,9 +1,9 @@
 //! This module provides functionality for processing images into grids of rows and columns.
 //! It uses the `image` and `imageproc` crates for image manipulation and `insta` for snapshot testing.
 //! The `serde` feature is used to enable serialization for snapshot testing.
-
 use image::*;
 use imageproc::{contrast::adaptive_threshold, drawing::draw_line_segment_mut};
+use rayon::prelude::*;
 
 /// Represents the kind of a line (row or column).
 ///
@@ -100,6 +100,7 @@ pub fn is_row_empty(img: &GrayImage, y: u32, width: u32) -> bool {
 pub fn is_column_empty(img: &GrayImage, x: u32, height: u32) -> bool {
     (0..height).all(|y| img.get_pixel(x, y).channels()[0] == 255)
 }
+
 /// Processes lines (rows or columns) and groups them by their [`LineKind`].
 ///
 /// This function merges adjacent lines of the same kind and uses a dynamic threshold
@@ -112,12 +113,26 @@ pub fn is_column_empty(img: &GrayImage, x: u32, height: u32) -> bool {
 ///
 /// # Returns
 /// A vector of lines grouped by their [`LineKind`].
-pub fn process_lines<T>(img: &GrayImage, length: u32, is_empty: impl Fn(u32) -> bool) -> Vec<T>
+pub fn process_lines<T>(
+    img: &GrayImage,
+    length: u32,
+    is_empty: impl Fn(u32) -> bool + Sync,
+) -> Vec<T>
 where
-    T: LineTrait,
+    T: LineTrait + Send,
 {
-    // Step 1: Collect all lines without grouping
-    let all_lines = collect_lines(length, &is_empty);
+    // Step 1: Collect all lines without grouping (in parallel)
+    let all_lines: Vec<(u32, u32, LineKind)> = (0..length)
+        .into_par_iter()
+        .map(|i| {
+            let kind = if is_empty(i) {
+                LineKind::Empty
+            } else {
+                LineKind::Full
+            };
+            (i, 1, kind)
+        })
+        .collect();
 
     // Step 2: Calculate the average size of all lines
     let average_size = calculate_average_line_size(&all_lines);
@@ -129,49 +144,25 @@ where
 
     // Step 4: Convert merged lines into the appropriate type
     merged_lines
-        .into_iter()
+        .into_par_iter() // Parallelize the conversion
         .map(|(start, length, kind)| T::new(start, length, kind))
         .collect()
 }
 
 /// Collects all lines without grouping.
 ///
-/// # Arguments
-/// * `length` - The length of the lines (height for rows, width for columns).
-/// * `is_empty` - A function to check if a line is empty.
-///
-/// # Returns
-/// A vector of tuples representing the lines: (start, length, kind).
-pub fn collect_lines(length: u32, is_empty: &impl Fn(u32) -> bool) -> Vec<(u32, u32, LineKind)> {
-    let mut lines = Vec::new();
-    let mut current_start = 0;
-    let mut current_kind = if is_empty(0) {
-        LineKind::Empty
-    } else {
-        LineKind::Full
-    };
-    let mut current_length = 1;
-
-    for i in 1..length {
-        let new_kind = if is_empty(i) {
-            LineKind::Empty
-        } else {
-            LineKind::Full
-        };
-
-        if new_kind == current_kind {
-            current_length += 1;
-        } else {
-            lines.push((current_start, current_length, current_kind.clone()));
-            current_start = i;
-            current_kind = new_kind;
-            current_length = 1;
-        }
-    }
-
-    // Push the last line
-    lines.push((current_start, current_length, current_kind));
-    lines
+/// This function is replaced by the parallelized version in `process_lines`.
+fn collect_lines(length: u32, is_empty: &impl Fn(u32) -> bool) -> Vec<(u32, u32, LineKind)> {
+    (0..length)
+        .map(|i| {
+            let kind = if is_empty(i) {
+                LineKind::Empty
+            } else {
+                LineKind::Full
+            };
+            (i, 1, kind)
+        })
+        .collect()
 }
 
 /// Calculates the average size of all lines.
@@ -181,8 +172,8 @@ pub fn collect_lines(length: u32, is_empty: &impl Fn(u32) -> bool) -> Vec<(u32, 
 ///
 /// # Returns
 /// The average size of the lines.
-pub fn calculate_average_line_size(lines: &[(u32, u32, LineKind)]) -> u32 {
-    let total_size: u32 = lines.iter().map(|&(_, length, _)| length).sum();
+fn calculate_average_line_size(lines: &[(u32, u32, LineKind)]) -> u32 {
+    let total_size: u32 = lines.par_iter().map(|&(_, length, _)| length).sum();
     if lines.is_empty() {
         0
     } else {
@@ -198,8 +189,8 @@ pub fn calculate_average_line_size(lines: &[(u32, u32, LineKind)]) -> u32 {
 ///
 /// # Returns
 /// A vector of merged lines: (start, length, kind).
-pub fn merge_lines(lines: Vec<(u32, u32, LineKind)>, threshold: u32) -> Vec<(u32, u32, LineKind)> {
-    let mut merged_lines = Vec::new();
+fn merge_lines(lines: Vec<(u32, u32, LineKind)>, threshold: u32) -> Vec<(u32, u32, LineKind)> {
+    let mut merged_lines = Vec::with_capacity(lines.len()); // Pre-allocate memory
     let mut current_start = lines[0].0;
     let mut current_length = lines[0].1;
     let mut current_kind = lines[0].2.clone();
@@ -208,13 +199,9 @@ pub fn merge_lines(lines: Vec<(u32, u32, LineKind)>, threshold: u32) -> Vec<(u32
         if current_length < threshold || length < threshold {
             // Merge with the previous line if either is smaller than the threshold
             current_length += length;
-            // println!(
-            // "Merging line: start={}, length={}, kind={:?}",
-            // start, length, kind
-            // );
         } else {
             // Push the merged line
-            merged_lines.push((current_start, current_length, current_kind.clone()));
+            merged_lines.push((current_start, current_length, current_kind));
             current_start = start;
             current_length = length;
             current_kind = kind;
@@ -225,7 +212,6 @@ pub fn merge_lines(lines: Vec<(u32, u32, LineKind)>, threshold: u32) -> Vec<(u32
     merged_lines.push((current_start, current_length, current_kind));
     merged_lines
 }
-
 /// Processes the image and generates the [`Grid`].
 ///
 /// This function converts the image to grayscale, applies adaptive thresholding,
@@ -243,12 +229,13 @@ pub fn process_image(image: DynamicImage) -> Grid {
     // Apply adaptive thresholding
     let binarized_img = adaptive_threshold(&img, 12); // Adjust the radius as needed
 
-    // Process rows and columns
+    // Process rows and columns in parallel
     let (width, height) = binarized_img.dimensions();
-    let rows = process_lines(&binarized_img, height, |y| {
+    let rows: Vec<Row> = process_lines(&binarized_img, height, |y| {
         is_row_empty(&binarized_img, y, width)
     });
-    let columns = process_lines(&binarized_img, width, |x| {
+
+    let columns: Vec<Column> = process_lines(&binarized_img, width, |x| {
         is_column_empty(&binarized_img, x, height)
     });
 
