@@ -1,13 +1,6 @@
-use super::*;
-#[cfg(feature = "drawing")]
 use crate::{Cell, Grid, GridError};
 use image::*;
-#[cfg(feature = "drawing")]
-use image::{DynamicImage, Rgb, Rgba, RgbaImage};
-use imageproc::drawing::draw_filled_rect_mut;
-#[cfg(feature = "drawing")]
-use imageproc::drawing::draw_line_segment_mut;
-#[cfg(feature = "drawing")]
+use imageproc::drawing::*;
 use imageproc::rect::Rect;
 use std::fmt;
 

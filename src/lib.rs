@@ -52,7 +52,7 @@ pub mod debug;
 /// ```
 pub mod drawing;
 use image::*;
-use imageproc::{contrast::adaptive_threshold, drawing::draw_line_segment_mut, rect::Rect};
+use imageproc::{contrast::adaptive_threshold, rect::Rect};
 use smallvec::SmallVec;
 use thiserror::Error;
 use tracing::*;

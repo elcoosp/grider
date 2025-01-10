@@ -35,6 +35,7 @@ pub fn save_image_with_grid(
     config: &GridDrawingConfig,
 ) -> Result<(), GridError> {
     let mut rgba_img = image.to_rgba8();
+    #[cfg(feature = "drawing")]
     grid.draw(&mut rgba_img, config)?;
     rgba_img
         .save(output_path)
