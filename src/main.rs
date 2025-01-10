@@ -122,13 +122,14 @@ fn main() {
             let grid = process_image(img.clone());
 
             // Print the grid (or use it as needed)
-            println!("{:?}", grid);
+            // println!("{:?}", grid);
 
             // Save the image with grid lines for debugging
             grider::debug::save_image_with_grid(&img, &grid, "output_with_grid.png");
         }
         Err(e) => {
-            eprintln!("Failed to open image: {}", e);
+            // println!("Failed to open image: {}", e);
+            // e
         }
     }
 }

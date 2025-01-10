@@ -121,7 +121,7 @@ where
 
     // Step 2: Calculate the average size of all lines
     let average_size = calculate_average_line_size(&all_lines);
-    println!("Average size: {}", average_size);
+    // println!("Average size: {}", average_size);
 
     // Step 3: Merge lines smaller than the threshold
     let threshold = (average_size * 8) / 10; // 80% of the average size
@@ -208,10 +208,10 @@ pub fn merge_lines(lines: Vec<(u32, u32, LineKind)>, threshold: u32) -> Vec<(u32
         if current_length < threshold || length < threshold {
             // Merge with the previous line if either is smaller than the threshold
             current_length += length;
-            println!(
-                "Merging line: start={}, length={}, kind={:?}",
-                start, length, kind
-            );
+            // println!(
+            // "Merging line: start={}, length={}, kind={:?}",
+            // start, length, kind
+            // );
         } else {
             // Push the merged line
             merged_lines.push((current_start, current_length, current_kind.clone()));
@@ -298,6 +298,6 @@ pub mod debug {
 
         // Save the image with grid lines
         rgba_img.save(output_path).unwrap();
-        println!("Image with grid lines saved to {}", output_path);
+        // println!("Image with grid lines saved to {}", output_path);
     }
 }
