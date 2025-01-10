@@ -1,6 +1,10 @@
 //! This module provides functionality for drawing grids, cells, and grid lines on images.
 //! It is feature-gated under the `drawing` feature and requires the `image` and `imageproc` crates.
 //!
+//! The main components of this module are:
+//! - [`GridDrawingConfig`]: Configuration for customizing the appearance of grids, cells, and grid lines.
+//! - [`Drawable`]: A trait implemented by types that can be drawn on an image, such as [`Cell`] and [`Grid`].
+//!
 //! # Examples
 //!
 //! ```rust
@@ -19,7 +23,7 @@
 //!     padding: 2,
 //!     row_color: Rgba([255, 0, 0, 255]), // Red for rows
 //!     column_color: Rgba([0, 0, 255, 255]), // Blue for columns
-//!     cell_background_color: Rgb([200, 200, 200]), // Light gray for cells
+//!     cell_background_color: Rgba([200, 200, 200, 255]), // Light gray for cells
 //!     row_color_provider: None, // Use uniform row color
 //!     column_color_provider: None, // Use uniform column color
 //!     line_thickness: 1,
@@ -59,7 +63,7 @@ use imageproc::rect::Rect;
 ///     padding: 2,
 ///     row_color: Rgba([255, 0, 0, 255]), // Red for rows
 ///     column_color: Rgba([0, 0, 255, 255]), // Blue for columns
-///     cell_background_color: Rgb([200, 200, 200]), // Light gray for cells
+///     cell_background_color: Rgba([200, 200, 200, 255]), // Light gray for cells
 ///     row_color_provider: None, // Use uniform row color
 ///     column_color_provider: None, // Use uniform column color
 ///     line_thickness: 1,
@@ -81,6 +85,7 @@ pub struct GridDrawingConfig {
     /// Thickness of grid lines.
     pub line_thickness: u32,
 }
+
 // Manually implement Debug for GridDrawingConfig
 impl fmt::Debug for GridDrawingConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -95,6 +100,7 @@ impl fmt::Debug for GridDrawingConfig {
             .finish()
     }
 }
+
 impl Default for GridDrawingConfig {
     fn default() -> Self {
         GridDrawingConfig {
@@ -113,6 +119,18 @@ impl Default for GridDrawingConfig {
 ///
 /// This trait is implemented for [`Cell`], [`Grid`], and other types that represent
 /// drawable components of a grid.
+///
+/// # Examples
+///
+/// ```
+/// use grider::{Cell, drawing::{Drawable, GridDrawingConfig}};
+/// use image::RgbaImage;
+///
+/// let mut image = RgbaImage::new(100, 100);
+/// let config = GridDrawingConfig::default();
+/// let cell = Cell { row: &0, column: &0 };
+/// cell.draw(&mut image, &config).unwrap();
+/// ```
 pub trait Drawable {
     /// Draws the object on the provided image using the given configuration.
     ///
