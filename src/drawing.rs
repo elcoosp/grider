@@ -80,12 +80,12 @@ impl Default for GridDrawingConfig {
 /// # Examples
 ///
 /// ```
-/// use grider::{Cell, drawing::{Drawable, GridDrawingConfig}};
-/// use image::RgbaImage;
+/// use grider::{*, drawing::*};
+/// use image::*;
 ///
 /// let mut image = RgbaImage::new(100, 100);
 /// let config = GridDrawingConfig::default();
-/// let cell = Cell { row: &0, column: &0 };
+/// let cell = Cell { row: &Row::new(LineInfo::new(0, 10, LineKind::Full)), column: &Column::new(LineInfo::new(0, 10, LineKind::Full)) };
 /// cell.draw(&mut image, &config).unwrap();
 /// ```
 pub trait Drawable {

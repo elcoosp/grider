@@ -18,7 +18,7 @@ use super::*;
 /// # Examples
 ///
 /// ```rust
-/// use grider::{Grid, GridConfig, drawing::*};
+/// use grider::{*, drawing::*};
 /// use image::open;
 ///
 /// let img = open("tests/large.png").unwrap();
@@ -26,7 +26,7 @@ use super::*;
 /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
 ///
 /// let drawing_config = GridDrawingConfig::default();
-/// save_image_with_grid(&img, &grid, "output_with_grid.png", &drawing_config).unwrap();
+/// debug::save_image_with_grid(&img, &grid, "output_with_grid.png", &drawing_config).unwrap();
 /// ```
 pub fn save_image_with_grid(
     image: &DynamicImage,

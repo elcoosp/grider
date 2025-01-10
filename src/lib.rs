@@ -5,7 +5,7 @@
 ///
 /// # Example
 /// ```
-/// use grider::{Grid, GridConfig};
+/// use grider::{*, drawing::*};
 /// use image::DynamicImage;
 ///
 /// // Replace with actual image loading
@@ -13,7 +13,7 @@
 /// let config = GridConfig::default();
 /// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
 ///
-/// grider::debug::save_image_with_grid(&img, &grid, "output.png");
+/// grider::debug::save_image_with_grid(&img, &grid, "output.png", &GridDrawingConfig::default());
 /// ```
 pub mod debug;
 /// This module provides functionality for drawing grids, cells, and grid lines on images.
@@ -26,8 +26,8 @@ pub mod debug;
 /// # Examples
 ///
 /// ```rust
-/// use grider::{Grid, GridConfig, drawing::*};
-/// use image::open;
+/// use grider::{*, drawing::*};
+/// use image::*;
 ///
 /// // Load an image
 /// let img = open("tests/large.png").unwrap();
@@ -48,7 +48,7 @@ pub mod debug;
 /// };
 ///
 /// // Save the image with the grid drawn on it
-/// save_image_with_grid(&img, &grid, "output_with_grid.png", &drawing_config).unwrap();
+/// debug::save_image_with_grid(&img, &grid, "output_with_grid.png", &drawing_config).unwrap();
 /// ```
 pub mod drawing;
 use image::*;

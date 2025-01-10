@@ -78,7 +78,7 @@ let grid = Grid::try_from_image_with_config(&img, config).unwrap();
 ### Debugging with Visual Grid
 
 ```rust
-grider::debug::save_image_with_grid(&img, &grid, "output_with_grid.png");
+grider::debug::save_image_with_grid(&img, &grid, "output_with_grid.png", &GridDrawingConfig::default());
 ```
 
 ## API Documentation
