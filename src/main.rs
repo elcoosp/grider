@@ -1,18 +1,43 @@
+//! This program processes an image into a grid of rows and columns.
+//! It uses the `image` and `imageproc` crates for image manipulation.
+//!
+//! # Usage
+//!
+//! ```bash
+//! cargo run -- <image_path>
+//! ```
+//!
+//! # Example
+//!
+//! ```bash
+//! cargo run -- tests/large.png
+//! ```
+
 use anyhow::{Context, Result};
+use clap::Parser;
 use image::GenericImageView;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+
+/// Command-line arguments for the grid processing program.
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Path to the input image file.
+    #[arg(required = true)]
+    image_path: String,
+}
+
 fn main() -> Result<()> {
     // Initialize tracing subscriber
-
     tracing_subscriber::registry()
         .with(EnvFilter::from_default_env())
         .init();
 
-    // Replace with the path to your image file
-    let image_path = "tests/large.png";
+    // Parse command-line arguments
+    let args = Args::parse();
 
     // Open and process the image
-    let img = image::open(image_path).context("Failed to open image")?;
+    let img = image::open(&args.image_path).context("Failed to open image")?;
 
     // Validate image dimensions
     let (width, height) = img.dimensions();
@@ -29,7 +54,7 @@ fn main() -> Result<()> {
 
         let grid = Grid::try_from_image_with_config(&img, config)?;
         // Save the image with grid lines for debugging
-        let output_path = format!("{image_path}_output_with_grid.png");
+        let output_path = format!("{}_output_with_grid.png", args.image_path);
         grider::debug::save_image_with_grid(
             &img,
             &grid,
@@ -41,7 +66,6 @@ fn main() -> Result<()> {
 
     Ok(())
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;

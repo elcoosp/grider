@@ -18,6 +18,7 @@ thiserror = "2.0.10"
 test-case = "3.3.1"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap = { version = "4.5.26", features = ["derive"] }
 [dev-dependencies]
 criterion = "0.5"
 
