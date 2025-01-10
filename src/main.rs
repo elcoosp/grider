@@ -4,7 +4,7 @@ use imageproc::{contrast::adaptive_threshold, drawing::draw_line_segment_mut};
 /// Represents the kind of a line (row or column).
 ///
 /// A line can be either [`LineKind::Empty`] (fully white) or [`LineKind::Full`] (contains non-white pixels).
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 enum LineKind {
     Empty,
     Full,
@@ -47,7 +47,6 @@ trait LineTrait {
     fn new(start: u32, length: u32, kind: LineKind) -> Self;
 }
 
-/// Implement the trait for [`Row`].
 impl LineTrait for Row {
     fn new(start: u32, length: u32, kind: LineKind) -> Self {
         Row {
@@ -58,7 +57,6 @@ impl LineTrait for Row {
     }
 }
 
-/// Implement the trait for [`Column`].
 impl LineTrait for Column {
     fn new(start: u32, length: u32, kind: LineKind) -> Self {
         Column {
@@ -79,12 +77,7 @@ impl LineTrait for Column {
 /// # Returns
 /// `true` if the row is empty (fully white), otherwise `false`.
 fn is_row_empty(img: &GrayImage, y: u32, width: u32) -> bool {
-    for x in 0..width {
-        if img.get_pixel(x, y).channels()[0] != 255 {
-            return false;
-        }
-    }
-    true
+    (0..width).all(|x| img.get_pixel(x, y).channels()[0] == 255)
 }
 
 /// Checks if a column is empty (all pixels are white).
@@ -97,32 +90,21 @@ fn is_row_empty(img: &GrayImage, y: u32, width: u32) -> bool {
 /// # Returns
 /// `true` if the column is empty (fully white), otherwise `false`.
 fn is_column_empty(img: &GrayImage, x: u32, height: u32) -> bool {
-    for y in 0..height {
-        if img.get_pixel(x, y).channels()[0] != 255 {
-            return false;
-        }
-    }
-    true
+    (0..height).all(|y| img.get_pixel(x, y).channels()[0] == 255)
 }
-
 /// Processes lines (rows or columns) and groups them by their [`LineKind`].
 ///
-/// This function merges adjacent lines of the same kind and ignores lines smaller than a minimum size.
+/// This function merges adjacent lines of the same kind and uses a dynamic threshold
+/// to ignore lines smaller than a fraction of the average size.
 ///
 /// # Arguments
 /// * `img` - The grayscale image to process.
 /// * `length` - The length of the lines (height for rows, width for columns).
 /// * `is_empty` - A function to check if a line is empty.
-/// * `min_size` - The minimum size (height/width) for a line to be included.
 ///
 /// # Returns
 /// A vector of lines grouped by their [`LineKind`].
-fn process_lines<T>(
-    img: &GrayImage,
-    length: u32,
-    is_empty: impl Fn(u32) -> bool,
-    min_size: u32,
-) -> Vec<T>
+fn process_lines<T>(img: &GrayImage, length: u32, is_empty: impl Fn(u32) -> bool) -> Vec<T>
 where
     T: LineTrait,
 {
@@ -135,6 +117,8 @@ where
     };
     let mut current_length = 1;
 
+    // First pass: Collect all lines without grouping
+    let mut all_lines = Vec::new();
     for i in 1..length {
         let new_kind = if is_empty(i) {
             LineKind::Empty
@@ -144,20 +128,103 @@ where
         if new_kind == current_kind {
             current_length += 1;
         } else {
-            // Only add the line if it meets the minimum size requirement
-            if current_length >= min_size {
-                lines.push(T::new(current_start, current_length, current_kind));
-            }
+            all_lines.push((current_start, current_length, current_kind.clone()));
             current_start = i;
             current_kind = new_kind;
             current_length = 1;
         }
     }
-    // Push the last line if it meets the minimum size requirement
-    if current_length >= min_size {
-        lines.push(T::new(current_start, current_length, current_kind));
+    // Push the last line
+    all_lines.push((current_start, current_length, current_kind));
+
+    // Calculate the average size of all lines
+    let total_size: u32 = all_lines.iter().map(|&(_, length, _)| length).sum();
+    let average_size = if all_lines.is_empty() {
+        0
+    } else {
+        total_size / all_lines.len() as u32
+    };
+    println!("Average size: {}", average_size);
+
+    // Use 80% of the average size as the threshold to merge more lines
+    let threshold = (average_size * 8) / 10;
+
+    // Second pass: Merge lines smaller than the threshold and of the same kind
+    let mut merged_lines = Vec::new();
+    let mut current_merged_start = all_lines[0].0;
+    let mut current_merged_length = all_lines[0].1;
+    let mut current_merged_kind = all_lines[0].2.clone();
+
+    for (start, length, kind) in &all_lines[1..] {
+        if current_merged_length < threshold || *length < threshold {
+            // Merge with the previous line if they are of the same kind and either is smaller than the threshold
+            current_merged_length += length;
+            println!(
+                "Merging line: start={}, length={}, kind={:?}",
+                start, length, kind
+            );
+        } else {
+            // Push the merged line
+            merged_lines.push((
+                current_merged_start,
+                current_merged_length,
+                current_merged_kind.clone(),
+            ));
+            current_merged_start = *start;
+            current_merged_length = *length;
+            current_merged_kind = kind.clone();
+        }
     }
+    // Push the last merged line
+    merged_lines.push((
+        current_merged_start,
+        current_merged_length,
+        current_merged_kind,
+    ));
+
+    println!(
+        "Lines before merging: {}, after merging: {}",
+        all_lines.len(),
+        merged_lines.len()
+    );
+
+    // Convert merged lines to the appropriate type
+    for (start, length, kind) in merged_lines {
+        lines.push(T::new(start, length, kind));
+    }
+
     lines
+}
+/// Quickselect algorithm to find the k-th smallest element in a vector.
+fn quickselect(arr: &mut [u32], k: usize) -> u32 {
+    let pivot_index = partition(arr);
+    if pivot_index == k {
+        arr[pivot_index]
+    } else if pivot_index < k {
+        quickselect(&mut arr[pivot_index + 1..], k - pivot_index - 1)
+    } else {
+        quickselect(&mut arr[..pivot_index], k)
+    }
+}
+
+/// Partition function for quickselect.
+fn partition(arr: &mut [u32]) -> usize {
+    let pivot = arr[arr.len() / 2];
+    let (mut i, mut j) = (0, arr.len() - 1);
+    while i <= j {
+        while arr[i] < pivot {
+            i += 1;
+        }
+        while arr[j] > pivot {
+            j -= 1;
+        }
+        if i <= j {
+            arr.swap(i, j);
+            i += 1;
+            j -= 1;
+        }
+    }
+    j + 1
 }
 
 /// Processes the image and generates the [`Grid`].
@@ -175,53 +242,19 @@ fn process_image(image: DynamicImage) -> Grid {
     let img = image.to_luma8();
 
     // Apply adaptive thresholding
-    let binarized_img = adaptive_threshold(&img, 12); // 5x5 neighborhood
+    let binarized_img = adaptive_threshold(&img, 12); // Adjust the radius as needed
 
-    // Process rows and columns with a minimum size threshold
+    // Process rows and columns
     let (width, height) = binarized_img.dimensions();
-    let min_size = 12; // Minimum height/width for a row/column to be included
-    let rows = process_lines(
-        &binarized_img,
-        height,
-        |y| is_row_empty(&binarized_img, y, width),
-        min_size,
-    );
-    let columns = process_lines(
-        &binarized_img,
-        width,
-        |x| is_column_empty(&binarized_img, x, height),
-        min_size,
-    );
+    let rows = process_lines(&binarized_img, height, |y| {
+        is_row_empty(&binarized_img, y, width)
+    });
+    let columns = process_lines(&binarized_img, width, |x| {
+        is_column_empty(&binarized_img, x, height)
+    });
 
     // Create the Grid
     Grid { rows, columns }
-}
-
-/// Calculates the local threshold for a pixel based on its neighborhood.
-///
-/// # Arguments
-/// * `img` - The grayscale image.
-/// * `x` - The x-coordinate of the pixel.
-/// * `y` - The y-coordinate of the pixel.
-/// * `radius` - The radius of the neighborhood (e.g., 5 for a 5x5 neighborhood).
-///
-/// # Returns
-/// The local threshold value.
-fn calculate_local_threshold(img: &GrayImage, x: u32, y: u32, radius: u32) -> u8 {
-    let mut sum = 0;
-    let mut count = 0;
-
-    for i in x.saturating_sub(radius)..=x.saturating_add(radius) {
-        for j in y.saturating_sub(radius)..=y.saturating_add(radius) {
-            if i < img.width() && j < img.height() {
-                sum += img.get_pixel(i, j).0[0] as u32;
-                count += 1;
-            }
-        }
-    }
-
-    // Use the mean of the neighborhood as the threshold
-    (sum / count) as u8
 }
 
 /// Debug module for visualizing the grid on the image.
@@ -241,6 +274,7 @@ mod debug {
         // Convert the image to RGBA for drawing
         let mut rgba_img = image.to_rgba8();
         let (w, h) = (rgba_img.width() as f32, rgba_img.height() as f32);
+
         // Draw horizontal lines for rows
         for row in &grid.rows {
             let y = row.y + row.height;
@@ -266,6 +300,43 @@ mod debug {
         // Save the image with grid lines
         rgba_img.save(output_path).unwrap();
         println!("Image with grid lines saved to {}", output_path);
+    }
+}
+
+/// Unit tests for the grid generation logic.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Tests the `is_row_empty` function.
+    #[test]
+    fn test_is_row_empty() {
+        let img =
+            GrayImage::from_raw(3, 3, vec![255, 255, 255, 255, 0, 255, 255, 255, 255]).unwrap();
+        assert!(is_row_empty(&img, 0, 3));
+        assert!(!is_row_empty(&img, 1, 3));
+        assert!(is_row_empty(&img, 2, 3));
+    }
+
+    /// Tests the `is_column_empty` function.
+    #[test]
+    fn test_is_column_empty() {
+        let img =
+            GrayImage::from_raw(3, 3, vec![255, 255, 255, 255, 0, 255, 255, 255, 255]).unwrap();
+        assert!(is_column_empty(&img, 0, 3));
+        assert!(!is_column_empty(&img, 1, 3));
+        assert!(is_column_empty(&img, 2, 3));
+    }
+
+    /// Tests the `process_lines` function.
+    #[test]
+    fn test_process_lines() {
+        let img =
+            GrayImage::from_raw(3, 3, vec![255, 255, 255, 255, 0, 255, 255, 255, 255]).unwrap();
+        let rows: Vec<Row> = process_lines(&img, 3, |y| is_row_empty(&img, y, 3));
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].height, 1);
+        assert_eq!(rows[1].height, 2);
     }
 }
 
