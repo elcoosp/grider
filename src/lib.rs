@@ -718,7 +718,6 @@ impl TryFrom<&DynamicImage> for Grid {
 /// ```
 pub mod debug {
     use drawing::*;
-    
 
     use super::*;
     /// Saves the image with the grid drawn on it.
