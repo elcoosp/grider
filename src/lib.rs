@@ -8,7 +8,7 @@ use simsimd::SpatialSimilarity;
 use smallvec::SmallVec;
 
 /// A type alias for SmallVec with a stack-allocated buffer of Line elements.
-pub type SmallVecLine<T> = SmallVec<[T; 16]>;
+pub type SmallVecLine<T> = SmallVec<[T; 6]>;
 
 /// Represents the kind of a line (row or column).
 ///
