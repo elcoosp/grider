@@ -28,7 +28,164 @@ mod tests {
     use grider::*;
     use image::*;
     use insta::assert_yaml_snapshot;
+    use pretty_assertions::assert_eq;
 
+    #[test]
+    fn test_is_row_empty_2() {
+        // Create a 10x10 grayscale image with all pixels set to white (255)
+        let img = GrayImage::from_pixel(10, 10, Luma([255]));
+
+        // Check that all rows are empty
+        for y in 0..10 {
+            assert!(is_row_empty(&img, y, 10));
+        }
+
+        // Set one pixel in the first row to black (0)
+        let mut img = img;
+        img.put_pixel(5, 0, Luma([0]));
+
+        // Check that the first row is no longer empty
+        assert!(!is_row_empty(&img, 0, 10));
+    }
+
+    #[test]
+    fn test_merge_lines() {
+        // Create a vector of lines with varying lengths and kinds
+        let lines = vec![
+            LineInfo {
+                start: 0,
+                length: 5,
+                kind: LineKind::Empty,
+            },
+            LineInfo {
+                start: 5,
+                length: 3,
+                kind: LineKind::Empty,
+            },
+            LineInfo {
+                start: 8,
+                length: 10,
+                kind: LineKind::Full,
+            },
+            LineInfo {
+                start: 18,
+                length: 2,
+                kind: LineKind::Full,
+            },
+        ];
+
+        // Merge lines smaller than the threshold (e.g., 4)
+        let merged_lines = merge_small_lines(lines, 4);
+
+        // Expected result:
+        // - The first two Empty lines are merged (length 5 + 3 = 8)
+        // - The last two Full lines are merged (length 10 + 2 = 12)
+        assert_eq!(
+            merged_lines,
+            SmallVecLine::from_vec(vec![
+                LineInfo {
+                    start: 0,
+                    length: 8,
+                    kind: LineKind::Empty,
+                },
+                LineInfo {
+                    start: 8,
+                    length: 12,
+                    kind: LineKind::Full,
+                },
+            ])
+        );
+    }
+    #[test]
+    fn test_is_column_empty_2() {
+        // Create a 10x10 grayscale image with all pixels set to white (255)
+        let img = GrayImage::from_pixel(10, 10, Luma([255]));
+
+        // Check that all columns are empty
+        for x in 0..10 {
+            assert!(is_column_empty(&img, x, 10));
+        }
+
+        // Set one pixel in the first column to black (0)
+        let mut img = img;
+        img.put_pixel(0, 5, Luma([0]));
+
+        // Check that the first column is no longer empty
+        assert!(!is_column_empty(&img, 0, 10));
+    }
+    #[test]
+    fn test_process_lines() {
+        // Create a 10x10 grayscale image with alternating empty and full rows
+        let mut img = GrayImage::new(10, 10);
+        for y in 0..10 {
+            let pixel_value = if y % 2 == 0 { 255 } else { 0 }; // Even rows are empty, odd rows are full
+            for x in 0..10 {
+                img.put_pixel(x, y, Luma([pixel_value]));
+            }
+        }
+
+        // Process rows
+        let rows: SmallVecLine<Row> = process_lines(&img, 10, |y| is_row_empty(&img, y, 10));
+
+        // Expected result:
+        // - Even rows are empty (LineKind::Empty)
+        // - Odd rows are full (LineKind::Full)
+        assert_eq!(
+            rows,
+            SmallVecLine::from_vec(vec![
+                Row {
+                    y: 0,
+                    height: 1,
+                    kind: LineKind::Empty,
+                },
+                Row {
+                    y: 1,
+                    height: 1,
+                    kind: LineKind::Full,
+                },
+                Row {
+                    y: 2,
+                    height: 1,
+                    kind: LineKind::Empty,
+                },
+                Row {
+                    y: 3,
+                    height: 1,
+                    kind: LineKind::Full,
+                },
+                Row {
+                    y: 4,
+                    height: 1,
+                    kind: LineKind::Empty,
+                },
+                Row {
+                    y: 5,
+                    height: 1,
+                    kind: LineKind::Full,
+                },
+                Row {
+                    y: 6,
+                    height: 1,
+                    kind: LineKind::Empty,
+                },
+                Row {
+                    y: 7,
+                    height: 1,
+                    kind: LineKind::Full,
+                },
+                Row {
+                    y: 8,
+                    height: 1,
+                    kind: LineKind::Empty,
+                },
+                Row {
+                    y: 9,
+                    height: 1,
+                    kind: LineKind::Full,
+                },
+            ])
+        );
+    }
     /// Tests the `is_row_empty` function.
     #[test]
     fn test_is_row_empty() {
@@ -104,7 +261,19 @@ mod tests {
         });
         let grid = process_image(DynamicImage::ImageLuma8(img));
 
-        // Assert YAML snapshot with redactions
+        // Define the expected grid using the higher-order macro
+        let expected_grid = make_grid! {
+                rows: [
+                    (0, 5),
+                    (5, 5, LineKind::Full),
+                ],
+                columns: [
+                    (0, 10, LineKind::Full),
+                ]
+        };
+
+        // Assert that the generated grid matches the expected grid
+        assert_eq!(grid, expected_grid);
         assert_yaml_snapshot!("process_image_with_redactions", grid, {
             ".rows[0].y" => 0, // Redact the first row's y-coordinate
             ".rows[1].y" => 5, // Redact the second row's y-coordinate
