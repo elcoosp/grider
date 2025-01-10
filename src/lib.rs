@@ -38,7 +38,7 @@ pub mod debug;
 ///
 /// // Configure drawing settings
 /// let drawing_config = GridDrawingConfig {
-///     padding: 2,
+///     padding: 0,
 ///     row_color: Rgba([255, 0, 0, 255]), // Red for rows
 ///     column_color: Rgba([0, 0, 255, 255]), // Blue for columns
 ///     cell_background_color: Rgba([200, 200, 200, 255]), // Light gray for cells
@@ -249,14 +249,105 @@ pub struct Grid {
 }
 
 impl Grid {
+    /// Filters out rows of approximately the same size as the smallest row.
+    ///
+    /// # Arguments
+    /// * `tolerance` - The tolerance for determining if rows are of approximately the same size.
+    ///
+    /// # Returns
+    /// A new `Grid` with rows of approximately the same size as the smallest row removed.
+    pub fn filter_smallest_rows_with_tolerance(&self, tolerance: f32) -> Self {
+        if let Some(smallest_height) = self.smallest_row_height() {
+            let min_height = smallest_height as f32 * (1.0 - tolerance);
+            let max_height = smallest_height as f32 * (1.0 + tolerance);
+
+            Grid {
+                rows: Self::filter_lines(&self.rows, |row| {
+                    (row.height as f32) < min_height || (row.height as f32) > max_height
+                }),
+                columns: self.columns.clone(),
+            }
+        } else {
+            self.clone()
+        }
+    }
+
+    /// Filters out rows of approximately the same size as the biggest row.
+    ///
+    /// # Arguments
+    /// * `tolerance` - The tolerance for determining if rows are of approximately the same size.
+    ///
+    /// # Returns
+    /// A new `Grid` with rows of approximately the same size as the biggest row removed.
+    pub fn filter_biggest_rows_with_tolerance(&self, tolerance: f32) -> Self {
+        if let Some(biggest_height) = self.biggest_row_height() {
+            let min_height = biggest_height as f32 * (1.0 - tolerance);
+            let max_height = biggest_height as f32 * (1.0 + tolerance);
+
+            Grid {
+                rows: Self::filter_lines(&self.rows, |row| {
+                    (row.height as f32) < min_height || (row.height as f32 > max_height)
+                }),
+                columns: self.columns.clone(),
+            }
+        } else {
+            self.clone()
+        }
+    }
+
+    /// Filters out columns of approximately the same size as the smallest column.
+    ///
+    /// # Arguments
+    /// * `tolerance` - The tolerance for determining if columns are of approximately the same size.
+    ///
+    /// # Returns
+    /// A new `Grid` with columns of approximately the same size as the smallest column removed.
+    pub fn filter_smallest_columns_with_tolerance(&self, tolerance: f32) -> Self {
+        if let Some(smallest_width) = self.smallest_column_width() {
+            let min_width = smallest_width as f32 * (1.0 - tolerance);
+            let max_width = smallest_width as f32 * (1.0 + tolerance);
+
+            Grid {
+                rows: self.rows.clone(),
+                columns: Self::filter_lines(&self.columns, |col| {
+                    (col.width as f32) < min_width || (col.width as f32) > max_width
+                }),
+            }
+        } else {
+            self.clone()
+        }
+    }
+
+    /// Filters out columns of approximately the same size as the biggest column.
+    ///
+    /// # Arguments
+    /// * `tolerance` - The tolerance for determining if columns are of approximately the same size.
+    ///
+    /// # Returns
+    /// A new `Grid` with columns of approximately the same size as the biggest column removed.
+    pub fn filter_biggest_columns_with_tolerance(&self, tolerance: f32) -> Self {
+        if let Some(biggest_width) = self.biggest_column_width() {
+            let min_width = biggest_width as f32 * (1.0 - tolerance);
+            let max_width = biggest_width as f32 * (1.0 + tolerance);
+
+            Grid {
+                rows: self.rows.clone(),
+                columns: Self::filter_lines(&self.columns, |col| {
+                    (col.width as f32) < min_width || (col.width as f32) > max_width
+                }),
+            }
+        } else {
+            self.clone()
+        }
+    }
     /// Generic function to filter rows or columns based on a predicate.
     ///
     /// # Arguments
-    /// * `lines` - A vector of rows or columns to filter.
+    /// * `lines` - A slice of rows or columns to filter.
     /// * `predicate` - A closure that determines whether a line should be included.
     ///
     /// # Returns
-    /// A new vector containing only the lines that satisfy the predicate.
+    /// A `SmallVecLine` containing only the lines that satisfy the predicate.
     fn filter_lines<T, F>(lines: &[T], predicate: F) -> SmallVecLine<T>
     where
         T: Clone,
@@ -264,24 +355,20 @@ impl Grid {
     {
         lines
             .iter()
-            .filter(|&line| predicate(line))
+            .filter(|line| predicate(line))
             .cloned()
             .collect()
     }
+    /// Default tolerance for filtering rows or columns of approximately the same size.
+    const DEFAULT_TOLERANCE: f32 = 0.3;
 
     /// Filters out the smallest rows in the grid.
     ///
     /// # Returns
     /// A new `Grid` with the smallest rows removed.
     pub fn filter_smallest_rows(&self) -> Self {
-        if let Some(smallest_height) = self.smallest_row_height() {
-            Grid {
-                rows: Self::filter_lines(&self.rows, |row| row.height > smallest_height),
-                columns: self.columns.clone(),
-            }
-        } else {
-            self.clone()
-        }
+        // Use the default tolerance to filter only the smallest rows
+        self.filter_smallest_rows_with_tolerance(Self::DEFAULT_TOLERANCE)
     }
 
     /// Filters out the biggest rows in the grid.
@@ -289,14 +376,8 @@ impl Grid {
     /// # Returns
     /// A new `Grid` with the biggest rows removed.
     pub fn filter_biggest_rows(&self) -> Self {
-        if let Some(biggest_height) = self.biggest_row_height() {
-            Grid {
-                rows: Self::filter_lines(&self.rows, |row| row.height < biggest_height),
-                columns: self.columns.clone(),
-            }
-        } else {
-            self.clone()
-        }
+        // Use the default tolerance to filter only the biggest rows
+        self.filter_biggest_rows_with_tolerance(Self::DEFAULT_TOLERANCE)
     }
 
     /// Filters out the smallest columns in the grid.
@@ -304,14 +385,8 @@ impl Grid {
     /// # Returns
     /// A new `Grid` with the smallest columns removed.
     pub fn filter_smallest_columns(&self) -> Self {
-        if let Some(smallest_width) = self.smallest_column_width() {
-            Grid {
-                rows: self.rows.clone(),
-                columns: Self::filter_lines(&self.columns, |col| col.width > smallest_width),
-            }
-        } else {
-            self.clone()
-        }
+        // Use the default tolerance to filter only the smallest columns
+        self.filter_smallest_columns_with_tolerance(Self::DEFAULT_TOLERANCE)
     }
 
     /// Filters out the biggest columns in the grid.
@@ -319,14 +394,8 @@ impl Grid {
     /// # Returns
     /// A new `Grid` with the biggest columns removed.
     pub fn filter_biggest_columns(&self) -> Self {
-        if let Some(biggest_width) = self.biggest_column_width() {
-            Grid {
-                rows: self.rows.clone(),
-                columns: Self::filter_lines(&self.columns, |col| col.width < biggest_width),
-            }
-        } else {
-            self.clone()
-        }
+        // Use the default tolerance to filter only the biggest columns
+        self.filter_biggest_columns_with_tolerance(Self::DEFAULT_TOLERANCE)
     }
 
     /// Finds the smallest height among all rows in the grid.

@@ -17,7 +17,7 @@ use std::fmt;
 /// use image::Rgba;
 ///
 /// let config = GridDrawingConfig {
-///     padding: 2,
+///     padding: 0,
 ///     row_color: Rgba([255, 0, 0, 255]), // Red for rows
 ///     column_color: Rgba([0, 0, 255, 255]), // Blue for columns
 ///     cell_background_color: Rgba([200, 200, 200, 255]), // Light gray for cells
@@ -61,7 +61,7 @@ impl fmt::Debug for GridDrawingConfig {
 impl Default for GridDrawingConfig {
     fn default() -> Self {
         GridDrawingConfig {
-            padding: 2,
+            padding: 0,
             row_color: Rgba([255, 0, 0, 255]),    // Red
             column_color: Rgba([0, 0, 255, 255]), // Blue
             cell_background_color: Rgba([200, 200, 200, 255]), // Light gray

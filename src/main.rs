@@ -52,7 +52,7 @@ fn main() -> Result<()> {
         // Process the image with configuration
         let config = GridConfig::new(12, 0.8, true);
 
-        let grid = Grid::try_from_image_with_config(&img, config)?;
+        let grid = Grid::try_from_image_with_config(&img, config)?.filter_biggest_rows();
         // Save the image with grid lines for debugging
         let output_path = format!("{}_output_with_grid.png", args.image_path);
         grider::debug::save_image_with_grid(
@@ -283,6 +283,90 @@ mod tests {
         // Clean up the test file
         std::fs::remove_file(output_path).unwrap();
     }
+
+    #[test]
+    fn test_filter_smallest_rows_with_tolerance() {
+        // Create a grid with rows of varying heights
+        let grid = Grid {
+            rows: SmallVecLine::from_vec(vec![
+                Row::new(LineInfo::new(0, 5, LineKind::Full)), // Smallest row
+                Row::new(LineInfo::new(5, 6, LineKind::Full)), // Approximately the same size
+                Row::new(LineInfo::new(11, 10, LineKind::Full)),
+                Row::new(LineInfo::new(21, 15, LineKind::Full)),
+            ]),
+            columns: SmallVecLine::from_vec(vec![]),
+        };
+
+        // Filter out rows of approximately the same size as the smallest row
+        let filtered_grid = grid.filter_smallest_rows_with_tolerance(0.5);
+
+        // Verify that rows of approximately the same size (height = 5 or 6) are removed
+        assert_eq!(filtered_grid.rows.len(), 2);
+        assert!(filtered_grid.rows.iter().all(|row| row.height > 6));
+    }
+
+    #[test]
+    fn test_filter_biggest_rows_with_tolerance() {
+        // Create a grid with rows of varying heights
+        let grid = Grid {
+            rows: SmallVecLine::from_vec(vec![
+                Row::new(LineInfo::new(0, 5, LineKind::Full)),
+                Row::new(LineInfo::new(5, 10, LineKind::Full)),
+                Row::new(LineInfo::new(15, 14, LineKind::Full)), // Approximately the same size
+                Row::new(LineInfo::new(29, 15, LineKind::Full)), // Biggest row
+            ]),
+            columns: SmallVecLine::from_vec(vec![]),
+        };
+
+        // Filter out rows of approximately the same size as the biggest row
+        let filtered_grid = grid.filter_biggest_rows_with_tolerance(0.1);
+
+        // Verify that rows of approximately the same size (height = 14 or 15) are removed
+        assert_eq!(filtered_grid.rows.len(), 2);
+        assert!(filtered_grid.rows.iter().all(|row| row.height < 14));
+    }
+    #[test]
+    fn test_filter_smallest_columns_with_tolerance() {
+        // Create a grid with columns of varying widths
+        let grid = Grid {
+            rows: SmallVecLine::from_vec(vec![]),
+            columns: SmallVecLine::from_vec(vec![
+                Column::new(LineInfo::new(0, 5, LineKind::Full)), // Smallest column
+                Column::new(LineInfo::new(5, 6, LineKind::Full)), // Approximately the same size
+                Column::new(LineInfo::new(11, 10, LineKind::Full)),
+                Column::new(LineInfo::new(21, 15, LineKind::Full)),
+            ]),
+        };
+
+        // Filter out columns of approximately the same size as the smallest column
+        let filtered_grid = grid.filter_smallest_columns_with_tolerance(0.5);
+
+        // Verify that columns of approximately the same size (width = 5 or 6) are removed
+        assert_eq!(filtered_grid.columns.len(), 2);
+        assert!(filtered_grid.columns.iter().all(|col| col.width > 6));
+    }
+
+    #[test]
+    fn test_filter_biggest_columns_with_tolerance() {
+        // Create a grid with columns of varying widths
+        let grid = Grid {
+            rows: SmallVecLine::from_vec(vec![]),
+            columns: SmallVecLine::from_vec(vec![
+                Column::new(LineInfo::new(0, 5, LineKind::Full)),
+                Column::new(LineInfo::new(5, 10, LineKind::Full)),
+                Column::new(LineInfo::new(15, 14, LineKind::Full)), // Approximately the same size
+                Column::new(LineInfo::new(29, 15, LineKind::Full)), // Biggest column
+            ]),
+        };
+
+        // Filter out columns of approximately the same size as the biggest column
+        let filtered_grid = grid.filter_biggest_columns_with_tolerance(0.1);
+
+        // Verify that columns of approximately the same size (width = 14 or 15) are removed
+        assert_eq!(filtered_grid.columns.len(), 2);
+        assert!(filtered_grid.columns.iter().all(|col| col.width < 14));
+    }
+
     #[cfg(feature = "debug")]
     #[test]
     fn test_save_image_with_grid() {
