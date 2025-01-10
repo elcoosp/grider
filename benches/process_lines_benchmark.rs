@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use grider::{process_lines, LineInfo, Row, SmallVecLine};
+use grider::{process_lines, Row, SmallVecLine};
 use image::{GrayImage, Luma}; // Import from the `grider` module (or your crate name)
 
 /// Benchmark the refactored `process_lines` implementation.

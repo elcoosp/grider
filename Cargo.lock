@@ -528,10 +528,12 @@ dependencies = [
  "insta",
  "pretty_assertions",
  "proptest",
+ "rand",
  "rayon",
  "serde",
  "serde_derive",
  "smallvec",
+ "thiserror 2.0.10",
 ]
 
 [[package]]

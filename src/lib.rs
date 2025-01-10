@@ -4,7 +4,14 @@
 use image::*;
 use imageproc::{contrast::adaptive_threshold, drawing::draw_line_segment_mut};
 use smallvec::SmallVec;
+use thiserror::Error;
 
+#[derive(Error, Debug)]
+pub enum GridError {
+    #[error("Image processing failed")]
+    ProcessingError,
+    // Add more error variants as needed
+}
 /// A type alias for SmallVec with a stack-allocated buffer of Line elements.
 pub type SmallVecLine<T> = SmallVec<[T; 6]>;
 
@@ -259,42 +266,53 @@ pub fn merge_small_lines(lines: Vec<LineInfo>, threshold: u32) -> SmallVecLine<L
     merged_lines
 }
 
-/// Processes the image and generates the [`Grid`].
-///
-/// This function converts the image to grayscale, applies adaptive thresholding,
-/// and processes it to generate the [`Grid`] of [`Row`]s and [`Column`]s.
-///
-/// # Arguments
-/// * `image` - The input image to process.
-///
-/// # Returns
-/// A [`Grid`] representing the rows and columns of the image.
-pub fn process_image(image: DynamicImage) -> Grid {
-    // Convert the image to grayscale
-    let img = image.to_luma8();
+impl TryFrom<DynamicImage> for Grid {
+    type Error = GridError;
 
-    // Apply adaptive thresholding
-    let binarized_img = adaptive_threshold(&img, 12); // Adjust the radius as needed
-
-    // Process rows and columns in parallel
-    let (width, height) = binarized_img.dimensions();
-    let (rows, columns): (SmallVecLine<Row>, SmallVecLine<Column>) = rayon::join(
-        || {
-            process_lines(&binarized_img, height, |y| {
-                is_row_empty(&binarized_img, y, width)
-            })
-        },
-        || {
-            process_lines(&binarized_img, width, |x| {
-                is_column_empty(&binarized_img, x, height)
-            })
-        },
-    );
-
-    // Create the Grid
-    Grid { rows, columns }
+    fn try_from(image: DynamicImage) -> Result<Self, Self::Error> {
+        // Delegate to the &DynamicImage implementation
+        TryFrom::try_from(&image)
+    }
 }
 
+impl TryFrom<&DynamicImage> for Grid {
+    type Error = GridError;
+    /// Processes the image and generates the [`Grid`].
+    ///
+    /// This function converts the image to grayscale, applies adaptive thresholding,
+    /// and processes it to generate the [`Grid`] of [`Row`]s and [`Column`]s.
+    ///
+    /// # Arguments
+    /// * `image` - The input image to process.
+    ///
+    /// # Returns
+    /// A [`Grid`] representing the rows and columns of the image.
+    fn try_from(image: &DynamicImage) -> Result<Self, Self::Error> {
+        // Convert the image to grayscale
+        let img = image.to_luma8();
+
+        // Apply adaptive thresholding
+        let binarized_img = adaptive_threshold(&img, 12);
+
+        // Process rows and columns in parallel
+        let (width, height) = binarized_img.dimensions();
+        let (rows, columns): (SmallVecLine<Row>, SmallVecLine<Column>) = rayon::join(
+            || {
+                process_lines(&binarized_img, height, |y| {
+                    is_row_empty(&binarized_img, y, width)
+                })
+            },
+            || {
+                process_lines(&binarized_img, width, |x| {
+                    is_column_empty(&binarized_img, x, height)
+                })
+            },
+        );
+
+        // Create the Grid
+        Ok(Grid { rows, columns })
+    }
+}
 #[macro_export]
 macro_rules! make_line {
     // For Rows
