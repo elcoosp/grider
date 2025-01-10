@@ -376,7 +376,7 @@ impl Grid {
             .collect()
     }
     /// Default tolerance for filtering rows or columns of approximately the same size.
-    const DEFAULT_TOLERANCE: f32 = 0.3;
+    const DEFAULT_TOLERANCE: f32 = 0.1;
 
     /// Filters out the smallest rows in the grid.
     ///
