@@ -1,25 +1,20 @@
-use grider::process_image;
+use anyhow::{Context, Result};
+use grider::{debug::save_image_with_grid, process_image};
 
-fn main() {
+fn main() -> Result<()> {
     // Replace with the path to your image file
     let image_path = "tests/13.png";
 
     // Open the image file
-    match image::open(image_path) {
-        Ok(img) => {
-            // Process the image
-            let grid = process_image(img.clone());
+    let img = image::open(image_path).context("Failed to open image")?;
 
-            // Print the grid (or use it as needed)
-            // println!("{:?}", grid);
+    // Process the image
+    let grid = process_image(img.clone());
 
-            // Save the image with grid lines for debugging
-            grider::debug::save_image_with_grid(&img, &grid, "output_with_grid.png");
-        }
-        Err(e) => {
-            println!("Failed to open image: {}", e);
-        }
-    }
+    // Save the image with grid lines for debugging
+    save_image_with_grid(&img, &grid, "output_with_grid.png");
+
+    Ok(())
 }
 
 /// Unit tests for the grid generation logic.
@@ -52,26 +47,10 @@ mod tests {
     fn test_merge_lines() {
         // Create a vector of lines with varying lengths and kinds
         let lines = vec![
-            LineInfo {
-                start: 0,
-                length: 5,
-                kind: LineKind::Empty,
-            },
-            LineInfo {
-                start: 5,
-                length: 3,
-                kind: LineKind::Empty,
-            },
-            LineInfo {
-                start: 8,
-                length: 10,
-                kind: LineKind::Full,
-            },
-            LineInfo {
-                start: 18,
-                length: 2,
-                kind: LineKind::Full,
-            },
+            LineInfo::new(0, 5, LineKind::Empty),
+            LineInfo::new(5, 3, LineKind::Empty),
+            LineInfo::new(8, 10, LineKind::Full),
+            LineInfo::new(18, 2, LineKind::Full),
         ];
 
         // Merge lines smaller than the threshold (e.g., 4)
@@ -83,19 +62,12 @@ mod tests {
         assert_eq!(
             merged_lines,
             SmallVecLine::from_vec(vec![
-                LineInfo {
-                    start: 0,
-                    length: 8,
-                    kind: LineKind::Empty,
-                },
-                LineInfo {
-                    start: 8,
-                    length: 12,
-                    kind: LineKind::Full,
-                },
+                LineInfo::new(0, 8, LineKind::Empty),
+                LineInfo::new(8, 12, LineKind::Full),
             ])
         );
     }
+
     #[test]
     fn test_is_column_empty_2() {
         // Create a 10x10 grayscale image with all pixels set to white (255)
@@ -113,6 +85,7 @@ mod tests {
         // Check that the first column is no longer empty
         assert!(!is_column_empty(&img, 0, 10));
     }
+
     #[test]
     fn test_process_lines() {
         // Create a 10x10 grayscale image with alternating empty and full rows
@@ -133,60 +106,20 @@ mod tests {
         assert_eq!(
             rows,
             SmallVecLine::from_vec(vec![
-                Row {
-                    y: 0,
-                    height: 1,
-                    kind: LineKind::Empty,
-                },
-                Row {
-                    y: 1,
-                    height: 1,
-                    kind: LineKind::Full,
-                },
-                Row {
-                    y: 2,
-                    height: 1,
-                    kind: LineKind::Empty,
-                },
-                Row {
-                    y: 3,
-                    height: 1,
-                    kind: LineKind::Full,
-                },
-                Row {
-                    y: 4,
-                    height: 1,
-                    kind: LineKind::Empty,
-                },
-                Row {
-                    y: 5,
-                    height: 1,
-                    kind: LineKind::Full,
-                },
-                Row {
-                    y: 6,
-                    height: 1,
-                    kind: LineKind::Empty,
-                },
-                Row {
-                    y: 7,
-                    height: 1,
-                    kind: LineKind::Full,
-                },
-                Row {
-                    y: 8,
-                    height: 1,
-                    kind: LineKind::Empty,
-                },
-                Row {
-                    y: 9,
-                    height: 1,
-                    kind: LineKind::Full,
-                },
+                Row::new(LineInfo::new(0, 1, LineKind::Empty)),
+                Row::new(LineInfo::new(1, 1, LineKind::Full)),
+                Row::new(LineInfo::new(2, 1, LineKind::Empty)),
+                Row::new(LineInfo::new(3, 1, LineKind::Full)),
+                Row::new(LineInfo::new(4, 1, LineKind::Empty)),
+                Row::new(LineInfo::new(5, 1, LineKind::Full)),
+                Row::new(LineInfo::new(6, 1, LineKind::Empty)),
+                Row::new(LineInfo::new(7, 1, LineKind::Full)),
+                Row::new(LineInfo::new(8, 1, LineKind::Empty)),
+                Row::new(LineInfo::new(9, 1, LineKind::Full)),
             ])
         );
     }
-    /// Tests the `is_row_empty` function.
+
     #[test]
     fn test_is_row_empty() {
         let img =
@@ -196,7 +129,6 @@ mod tests {
         assert!(is_row_empty(&img, 2, 3));
     }
 
-    /// Tests the `is_column_empty` function.
     #[test]
     fn test_is_column_empty() {
         let img =
@@ -206,7 +138,6 @@ mod tests {
         assert!(is_column_empty(&img, 2, 3));
     }
 
-    /// Tests the `process_lines` function with a small image.
     #[test]
     fn test_process_lines_small_image() {
         let img =
@@ -217,7 +148,6 @@ mod tests {
         assert_yaml_snapshot!("process_lines_small_image", rows);
     }
 
-    /// Tests the `process_lines` function with a larger image.
     #[test]
     fn test_process_lines_large_image() {
         let img = GrayImage::from_fn(10, 10, |_x, y| {
@@ -233,7 +163,6 @@ mod tests {
         assert_yaml_snapshot!("process_lines_large_image", rows);
     }
 
-    /// Tests the `process_image` function.
     #[test]
     fn test_process_image() {
         let img = GrayImage::from_fn(10, 10, |_x, y| {
@@ -249,7 +178,6 @@ mod tests {
         assert_yaml_snapshot!("process_image", grid);
     }
 
-    /// Tests the `process_image` function with redactions.
     #[test]
     fn test_process_image_with_redactions() {
         let img = GrayImage::from_fn(10, 10, |_x, y| {
@@ -263,13 +191,13 @@ mod tests {
 
         // Define the expected grid using the higher-order macro
         let expected_grid = make_grid! {
-                rows: [
-                    (0, 5),
-                    (5, 5, LineKind::Full),
-                ],
-                columns: [
-                    (0, 10, LineKind::Full),
-                ]
+            rows: [
+                (0, 5),
+                (5, 5, LineKind::Full),
+            ],
+            columns: [
+                (0, 10, LineKind::Full),
+            ]
         };
 
         // Assert that the generated grid matches the expected grid
@@ -280,7 +208,6 @@ mod tests {
         });
     }
 
-    /// Tests the `process_lines` function with inline snapshots.
     #[test]
     fn test_process_lines_inline_snapshot() {
         let img =
@@ -288,7 +215,7 @@ mod tests {
         let rows: SmallVecLine<Row> = process_lines(&img, 3, |y| is_row_empty(&img, y, 3));
 
         // Assert inline YAML snapshot
-        assert_yaml_snapshot!(rows, @r"
+        assert_yaml_snapshot!(rows, @r###"
         - y: 0
           height: 1
           kind: Empty
@@ -298,6 +225,6 @@ mod tests {
         - y: 2
           height: 1
           kind: Empty
-        ");
+        "###);
     }
 }

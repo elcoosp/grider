@@ -33,7 +33,14 @@ pub struct LineInfo {
     /// The kind of the line, either [`LineKind::Empty`] or [`LineKind::Full`].
     pub kind: LineKind,
 }
+
 impl LineInfo {
+    /// Creates a new `LineInfo` instance.
+    ///
+    /// # Arguments
+    /// * `start` - The starting coordinate of the line.
+    /// * `length` - The length of the line.
+    /// * `kind` - The kind of the line.
     pub fn new(start: u32, length: u32, kind: LineKind) -> Self {
         LineInfo {
             start,
@@ -42,6 +49,7 @@ impl LineInfo {
         }
     }
 }
+
 /// Represents a row in the grid.
 ///
 /// A row is defined by its starting y-coordinate (`y`), height (`height`), and [`LineKind`].
@@ -79,6 +87,7 @@ pub struct Grid {
 ///
 /// This trait is implemented for both [`Row`] and [`Column`] to allow generic processing of lines.
 pub trait LineTrait {
+    /// Creates a new line (row or column) from a `LineInfo`.
     fn new(line: LineInfo) -> Self;
 }
 
@@ -190,11 +199,7 @@ pub fn collect_all_lines(length: u32, is_empty: &impl Fn(u32) -> bool) -> Vec<Li
         if new_kind == current_kind {
             current_length += 1;
         } else {
-            lines.push(LineInfo {
-                start: current_start,
-                length: current_length,
-                kind: current_kind,
-            });
+            lines.push(LineInfo::new(current_start, current_length, current_kind));
             current_start = i;
             current_kind = new_kind;
             current_length = 1;
@@ -202,11 +207,7 @@ pub fn collect_all_lines(length: u32, is_empty: &impl Fn(u32) -> bool) -> Vec<Li
     }
 
     // Push the last line
-    lines.push(LineInfo {
-        start: current_start,
-        length: current_length,
-        kind: current_kind,
-    });
+    lines.push(LineInfo::new(current_start, current_length, current_kind));
     lines
 }
 
@@ -235,7 +236,7 @@ fn calculate_average_line_size(lines: &[LineInfo]) -> u32 {
 /// # Returns
 /// A vector of merged [`LineInfo`].
 pub fn merge_small_lines(lines: Vec<LineInfo>, threshold: u32) -> SmallVecLine<LineInfo> {
-    let mut merged_lines = SmallVecLine::new(); // Use SmallVec8 with a small stack-allocated buffer
+    let mut merged_lines = SmallVecLine::new();
     let mut current_start = lines[0].start;
     let mut current_length = lines[0].length;
     let mut current_kind = lines[0].kind.clone();
@@ -246,11 +247,7 @@ pub fn merge_small_lines(lines: Vec<LineInfo>, threshold: u32) -> SmallVecLine<L
             current_length += line.length;
         } else {
             // Push the merged line
-            merged_lines.push(LineInfo {
-                start: current_start,
-                length: current_length,
-                kind: current_kind,
-            });
+            merged_lines.push(LineInfo::new(current_start, current_length, current_kind));
             current_start = line.start;
             current_length = line.length;
             current_kind = line.kind;
@@ -258,11 +255,7 @@ pub fn merge_small_lines(lines: Vec<LineInfo>, threshold: u32) -> SmallVecLine<L
     }
 
     // Push the last merged line
-    merged_lines.push(LineInfo {
-        start: current_start,
-        length: current_length,
-        kind: current_kind,
-    });
+    merged_lines.push(LineInfo::new(current_start, current_length, current_kind));
     merged_lines
 }
 
@@ -285,7 +278,6 @@ pub fn process_image(image: DynamicImage) -> Grid {
 
     // Process rows and columns in parallel
     let (width, height) = binarized_img.dimensions();
-    // Process rows and columns in parallel
     let (rows, columns): (SmallVecLine<Row>, SmallVecLine<Column>) = rayon::join(
         || {
             process_lines(&binarized_img, height, |y| {
@@ -336,6 +328,7 @@ macro_rules! make_grid {
         }
     };
 }
+
 /// Debug module for visualizing the grid on the image.
 pub mod debug {
     use super::*;
@@ -378,6 +371,5 @@ pub mod debug {
 
         // Save the image with grid lines
         rgba_img.save(output_path).unwrap();
-        // println!("Image with grid lines saved to {}", output_path);
     }
 }
