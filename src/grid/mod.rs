@@ -5,11 +5,17 @@ use imageproc::rect::Rect;
 use smallvec::SmallVec;
 use thiserror::Error;
 use tracing::*;
+pub mod components;
+pub mod config;
+pub mod constants;
+pub mod lines;
+pub mod traits;
 
-// Determined through benchmarking typical use cases
-const DEFAULT_SMALLVEC_SIZE: usize = 32;
-const DEFAULT_THRESHOLD_BLOCK_SIZE: u32 = 12;
-const DEFAULT_MERGE_THRESHOLD_RATIO: f32 = 0.8;
+pub use components::*;
+pub use config::*;
+pub use constants::*;
+pub use lines::*;
+pub use traits::*;
 
 #[derive(Error, Debug)]
 pub enum GridError {
@@ -30,199 +36,6 @@ pub enum GridError {
 
     #[error("Column not found at x={x}")]
     ColumnNotFound { x: u32 },
-}
-
-/// A type alias for SmallVec with an optimized stack-allocated buffer size.
-pub type SmallVecLine<T> = SmallVec<[T; DEFAULT_SMALLVEC_SIZE]>;
-
-/// Configuration for grid processing.
-///
-/// # Example
-/// ```
-/// use grider::GridConfig;
-///
-/// let config = GridConfig::default();
-/// assert_eq!(config.threshold_block_size, 12);
-/// assert_eq!(config.merge_threshold_ratio, 0.8);
-/// assert_eq!(config.enable_parallel, true);
-/// ```
-#[derive(Debug, Clone)]
-pub struct GridConfig {
-    /// Block size for adaptive thresholding (default: 12)
-    pub threshold_block_size: u32,
-    /// Ratio for merging small lines (default: 0.8)
-    pub merge_threshold_ratio: f32,
-    /// Enable parallel processing (default: true)
-    pub enable_parallel: bool,
-}
-
-impl GridConfig {
-    /// Creates a new `GridConfig` with the specified parameters.
-    ///
-    /// # Example
-    /// ```
-    /// use grider::GridConfig;
-    ///
-    /// let config = GridConfig::new(15, 0.9, false);
-    /// assert_eq!(config.threshold_block_size, 15);
-    /// assert_eq!(config.merge_threshold_ratio, 0.9);
-    /// assert_eq!(config.enable_parallel, false);
-    /// ```
-    pub fn new(
-        threshold_block_size: u32,
-        merge_threshold_ratio: f32,
-        enable_parallel: bool,
-    ) -> Self {
-        Self {
-            threshold_block_size: threshold_block_size.max(3), // Minimum block size
-            merge_threshold_ratio,
-            enable_parallel,
-        }
-    }
-}
-
-impl Default for GridConfig {
-    fn default() -> Self {
-        GridConfig::new(
-            DEFAULT_THRESHOLD_BLOCK_SIZE,
-            DEFAULT_MERGE_THRESHOLD_RATIO,
-            true,
-        )
-    }
-}
-/// Represents the kind of a line (row or column).
-#[derive(Debug, PartialEq, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub enum LineKind {
-    Empty,
-    Full,
-}
-
-/// Information about a line in the grid.
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct LineInfo {
-    pub start: u32,
-    pub length: u32,
-    pub kind: LineKind,
-}
-
-impl LineInfo {
-    /// Creates a new `LineInfo` with the given start position, length, and kind.
-    ///
-    /// # Example
-    /// ```
-    /// use grider::{LineInfo, LineKind};
-    ///
-    /// let line = LineInfo::new(0, 10, LineKind::Full);
-    /// assert_eq!(line.start, 0);
-    /// assert_eq!(line.length, 10);
-    /// assert_eq!(line.kind, LineKind::Full);
-    /// ```
-    pub fn new(start: u32, length: u32, kind: LineKind) -> Self {
-        Self {
-            start,
-            length,
-            kind,
-        }
-    }
-}
-
-/// Represents a row in the grid.
-#[derive(Debug, PartialEq, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct Row {
-    pub y: u32,
-    pub height: u32,
-    pub kind: LineKind,
-}
-
-/// Represents a column in the grid.
-#[derive(Debug, PartialEq, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct Column {
-    pub x: u32,
-    pub width: u32,
-    pub kind: LineKind,
-}
-/// Represents a cell in the grid, referencing a row and a column.
-pub struct Cell<'a> {
-    pub row: &'a Row,
-    pub column: &'a Column,
-}
-impl From<&Cell<'_>> for Rect {
-    fn from(cell: &Cell) -> Self {
-        Rect::at(cell.column.x as i32, cell.row.y as i32)
-            .of_size(cell.column.width, cell.row.height)
-    }
-}
-/// A trait providing a factory method to create instances from a [`LineInfo`].
-///
-/// This trait is implemented by types like [`Row`] and [`Column`],
-/// allowing them to be instantiated from a `LineInfo` that contains
-/// the start position, length, and kind of a line.
-///
-/// The `new` function is used to convert generic line information
-/// into specific row or column instances, facilitating the processing
-/// of grid lines in a uniform manner.
-///
-/// # Examples
-///
-/// ```
-/// use grider::{LineTrait, LineInfo, Row, Column, LineKind};
-///
-/// // Create a LineInfo instance
-/// let line_info = LineInfo::new(0, 100, LineKind::Full);
-///
-/// // Instantiate a Row from the LineInfo
-/// let row = Row::new(line_info.clone());
-///
-/// // Similarly, instantiate a Column
-/// let column = Column::new(line_info);
-/// ```
-///
-/// # See Also
-///
-/// * [`LineInfo`] for details on line information.
-/// * [`Row`] and [`Column`] for grid line representations.
-///
-/// [`Row`]: struct.Row.html
-/// [`Column`]: struct.Column.html
-/// [`LineInfo`]: struct.LineInfo.html
-pub trait LineTrait {
-    /// Creates a new instance from the given `LineInfo`.
-    ///
-    /// This function is responsible for mapping the generic line information
-    /// to the specific attributes of the implementing type.
-    ///
-    /// # Parameters
-    ///
-    /// * `line` - The `LineInfo` containing the details for the new instance.
-    ///
-    /// # Returns
-    ///
-    /// A new instance of the implementing type initialized with the provided line information.
-    fn new(line: LineInfo) -> Self;
-}
-
-impl LineTrait for Row {
-    fn new(line: LineInfo) -> Self {
-        Row {
-            y: line.start,
-            height: line.length,
-            kind: line.kind,
-        }
-    }
-}
-
-impl LineTrait for Column {
-    fn new(line: LineInfo) -> Self {
-        Column {
-            x: line.start,
-            width: line.length,
-            kind: line.kind,
-        }
-    }
 }
 
 /// Represents the grid of rows and columns extracted from an image.

@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use grider::{Grid, GridConfig};
+use grider::{config::GridConfig, Grid};
 use image::{DynamicImage, GrayImage, Luma};
 
 // Helper function to create test images of different patterns
