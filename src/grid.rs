@@ -98,12 +98,12 @@ impl Grid {
 
 impl GridLike for Grid {
     /// Returns an iterator over all rows in the grid.
-    fn rows(&self) -> impl Iterator<Item = &Row> {
+    fn rows_iter(&self) -> impl Iterator<Item = &Row> {
         self.rows.iter()
     }
 
     /// Returns an iterator over all columns in the grid.
-    fn columns(&self) -> impl Iterator<Item = &Column> {
+    fn columns_iter(&self) -> impl Iterator<Item = &Column> {
         self.columns.iter()
     }
 }
