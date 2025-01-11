@@ -395,7 +395,6 @@ impl Grid {
             rows: rows_to_keep,
             columns: columns_to_keep,
         }
-        .filter_smallest_rows()
     }
     /// Filters out the smallest rows in the grid.
     ///
