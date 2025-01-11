@@ -127,4 +127,4 @@ jobs:
             ${{ runner.os }}-cargo-stable-
 
       - name: Publish to crates.io
-        run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
+        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
