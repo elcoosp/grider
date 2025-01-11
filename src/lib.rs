@@ -318,8 +318,85 @@ impl Grid {
             .collect()
     }
     /// Default tolerance for filtering rows or columns of approximately the same size.
-    const DEFAULT_TOLERANCE: f32 = 0.1;
+    const DEFAULT_TOLERANCE: f32 = 1.1;
+    /// Filters out the biggest rows and biggest columns in the grid.
+    ///
+    /// # Arguments
+    /// * `row_tolerance` - The tolerance for determining if rows are approximately the biggest.
+    /// * `col_tolerance` - The tolerance for determining if columns are approximately the biggest.
+    ///
+    /// # Returns
+    /// A new `Grid` with the biggest rows and biggest columns removed.
+    pub fn filter_biggest_rows_and_columns(&self, row_tolerance: f32, col_tolerance: f32) -> Grid {
+        // Step 1: Filter out the biggest rows
+        let filtered_grid = self
+            .filter_biggest_rows_with_tolerance(row_tolerance)
+            .filter_biggest_columns_with_tolerance(col_tolerance);
 
+        // Return the filtered grid
+        filtered_grid
+    }
+    /// Filters out cells where both the row and column are of kind `LineKind::Full`.
+    ///
+    /// # Returns
+    /// A new `Grid` with the fullest cells removed.
+    pub fn filter_most_full_cells(&self) -> Grid {
+        // Step 1: Calculate the "fullness" score for each cell
+        let mut cell_fullness = Vec::new();
+
+        for (row_idx, row) in self.rows.iter().enumerate() {
+            for (col_idx, col) in self.columns.iter().enumerate() {
+                // Calculate the "fullness" score for the cell
+                let row_fullness = if row.kind == LineKind::Full { 1 } else { 0 };
+                let col_fullness = if col.kind == LineKind::Full { 1 } else { 0 };
+                let cell_score = row_fullness + col_fullness;
+
+                // Store the cell's score and its position
+                cell_fullness.push((row_idx, col_idx, cell_score));
+            }
+        }
+
+        // Step 2: Find the maximum "fullness" score
+        let max_score = cell_fullness
+            .iter()
+            .map(|&(_, _, score)| score)
+            .max()
+            .unwrap_or(0);
+
+        // Step 3: Identify rows and columns to keep (those part of the most full cells)
+        let rows_to_keep: SmallVecLine<Row> = self
+            .rows
+            .iter()
+            .enumerate()
+            .filter(|&(row_idx, _)| {
+                // Keep rows that are part of the most full cells
+                cell_fullness
+                    .iter()
+                    .any(|&(r_idx, _, score)| r_idx == row_idx && score == max_score)
+            })
+            .map(|(_, row)| row.clone())
+            .collect();
+
+        let columns_to_keep: SmallVecLine<Column> = self
+            .columns
+            .iter()
+            .enumerate()
+            .filter(|&(col_idx, _)| {
+                // Keep columns that are part of the most full cells
+                cell_fullness
+                    .iter()
+                    .any(|&(_, c_idx, score)| c_idx == col_idx && score == max_score)
+            })
+            .map(|(_, col)| col.clone())
+            .collect();
+
+        // Step 4: Return the filtered grid
+        Grid {
+            rows: rows_to_keep,
+            columns: columns_to_keep,
+        }
+        .filter_smallest_rows()
+    }
     /// Filters out the smallest rows in the grid.
     ///
     /// # Returns

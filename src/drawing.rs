@@ -64,7 +64,7 @@ impl Default for GridDrawingConfig {
             padding: 0,
             row_color: Rgba([255, 0, 0, 255]),    // Red
             column_color: Rgba([0, 0, 255, 255]), // Blue
-            cell_background_color: Rgba([200, 200, 200, 255]), // Light gray
+            cell_background_color: Rgba([200, 100, 200, 255]), // Light gray
             row_color_provider: None,
             column_color_provider: None,
             line_thickness: 2,

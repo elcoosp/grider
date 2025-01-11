@@ -51,8 +51,7 @@ fn main() -> Result<()> {
         use grider::{drawing::*, *};
         // Process the image with configuration
         let config = GridConfig::new(12, 0.8, true);
-
-        let grid = Grid::try_from_image_with_config(&img, config)?.filter_biggest_rows();
+        let grid = Grid::try_from_image_with_config(&img, config)?.filter_most_full_cells();
         // Save the image with grid lines for debugging
         let output_path = format!("{}_output_with_grid.png", args.image_path);
         grider::debug::save_image_with_grid(
