@@ -1,4 +1,5 @@
 use drawing::*;
+use image::DynamicImage;
 
 use super::*;
 /// Saves the image with the grid drawn on it.
