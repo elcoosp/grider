@@ -1,4 +1,4 @@
-use crate::{Cell, Grid, GridError};
+use crate::{grid::Cell, Grid, GridError};
 use image::*;
 use imageproc::drawing::*;
 use imageproc::rect::Rect;

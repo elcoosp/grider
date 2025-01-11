@@ -70,7 +70,7 @@ fn main() -> Result<()> {
 mod tests {
     use super::*;
     use drawing::GridDrawingConfig;
-    use grider::*;
+    use grider::{grid, *};
     use image::*;
     use insta::assert_yaml_snapshot;
     use proptest::prelude::*;
@@ -183,20 +183,20 @@ mod tests {
     // Test for uncovered lines in lib.rs: 193-194
     #[test]
     fn test_line_info_new() {
-        let line = LineInfo::new(10, 5, LineKind::Full);
+        let line = grid::LineInfo::new(10, 5, grid::LineKind::Full);
         assert_eq!(line.start, 10);
         assert_eq!(line.length, 5);
-        assert_eq!(line.kind, LineKind::Full);
+        assert_eq!(line.kind, grid::LineKind::Full);
     }
 
     // Test for uncovered lines in lib.rs: 206-207
     #[test]
     fn test_row_new() {
-        let line = LineInfo::new(10, 5, LineKind::Full);
-        let row = Row::new(line);
+        let line = grid::LineInfo::new(10, 5, grid::LineKind::Full);
+        let row = grid::Row::new(line);
         assert_eq!(row.y, 10);
         assert_eq!(row.height, 5);
-        assert_eq!(row.kind, LineKind::Full);
+        assert_eq!(row.kind, grid::LineKind::Full);
     }
 
     // Test for uncovered lines in lib.rs: 302-305
@@ -227,7 +227,7 @@ mod tests {
     #[test]
     fn test_grid_process_dimension_invalid() {
         let img = GrayImage::new(0, 0);
-        let result = Grid::process_dimension::<Row>(&img, 0, 0, 0.5, Grid::is_row_empty);
+        let result = Grid::process_dimension::<grid::Row>(&img, 0, 0, 0.5, Grid::is_row_empty);
         assert!(result.is_err());
     }
 
@@ -235,19 +235,19 @@ mod tests {
     #[test]
     fn test_grid_merge_small_lines_edge_cases() {
         // Test empty input
-        let empty: Vec<LineInfo> = vec![];
+        let empty: Vec<grid::LineInfo> = vec![];
         let result = Grid::merge_small_lines(empty, 5);
         assert!(result.is_empty());
 
         // Test single line
-        let single = vec![LineInfo::new(0, 1, LineKind::Empty)];
+        let single = vec![grid::LineInfo::new(0, 1, grid::LineKind::Empty)];
         let result = Grid::merge_small_lines(single, 5);
         assert_eq!(result.len(), 1);
 
         // Test zero threshold
         let lines = vec![
-            LineInfo::new(0, 1, LineKind::Empty),
-            LineInfo::new(1, 1, LineKind::Full),
+            grid::LineInfo::new(0, 1, grid::LineKind::Empty),
+            grid::LineInfo::new(1, 1, grid::LineKind::Full),
         ];
         let result = Grid::merge_small_lines(lines, 0);
         assert_eq!(result.len(), 2);
@@ -259,12 +259,12 @@ mod tests {
         let img = GrayImage::new(10, 10);
         let grid = Grid {
             rows: SmallVecLine::from_vec(vec![
-                Row::new(LineInfo::new(0, 5, LineKind::Empty)),
-                Row::new(LineInfo::new(5, 5, LineKind::Full)),
+                grid::Row::new(grid::LineInfo::new(0, 5, grid::LineKind::Empty)),
+                grid::Row::new(grid::LineInfo::new(5, 5, grid::LineKind::Full)),
             ]),
             columns: SmallVecLine::from_vec(vec![
-                Column::new(LineInfo::new(0, 5, LineKind::Empty)),
-                Column::new(LineInfo::new(5, 5, LineKind::Full)),
+                grid::Column::new(grid::LineInfo::new(0, 5, grid::LineKind::Empty)),
+                grid::Column::new(grid::LineInfo::new(5, 5, grid::LineKind::Full)),
             ]),
         };
 
@@ -289,10 +289,10 @@ mod tests {
         // Create a grid with rows of varying heights
         let grid = Grid {
             rows: SmallVecLine::from_vec(vec![
-                Row::new(LineInfo::new(0, 5, LineKind::Full)), // Smallest row
-                Row::new(LineInfo::new(5, 6, LineKind::Full)), // Approximately the same size
-                Row::new(LineInfo::new(11, 10, LineKind::Full)),
-                Row::new(LineInfo::new(21, 15, LineKind::Full)),
+                grid::Row::new(grid::LineInfo::new(0, 5, grid::LineKind::Full)), // Smallest row
+                grid::Row::new(grid::LineInfo::new(5, 6, grid::LineKind::Full)), // Approximately the same size
+                grid::Row::new(grid::LineInfo::new(11, 10, grid::LineKind::Full)),
+                grid::Row::new(grid::LineInfo::new(21, 15, grid::LineKind::Full)),
             ]),
             columns: SmallVecLine::from_vec(vec![]),
         };
@@ -310,10 +310,10 @@ mod tests {
         // Create a grid with rows of varying heights
         let grid = Grid {
             rows: SmallVecLine::from_vec(vec![
-                Row::new(LineInfo::new(0, 5, LineKind::Full)),
-                Row::new(LineInfo::new(5, 10, LineKind::Full)),
-                Row::new(LineInfo::new(15, 14, LineKind::Full)), // Approximately the same size
-                Row::new(LineInfo::new(29, 15, LineKind::Full)), // Biggest row
+                grid::Row::new(grid::LineInfo::new(0, 5, grid::LineKind::Full)),
+                grid::Row::new(grid::LineInfo::new(5, 10, grid::LineKind::Full)),
+                grid::Row::new(grid::LineInfo::new(15, 14, grid::LineKind::Full)), // Approximately the same size
+                grid::Row::new(grid::LineInfo::new(29, 15, grid::LineKind::Full)), // Biggest row
             ]),
             columns: SmallVecLine::from_vec(vec![]),
         };
@@ -331,10 +331,10 @@ mod tests {
         let grid = Grid {
             rows: SmallVecLine::from_vec(vec![]),
             columns: SmallVecLine::from_vec(vec![
-                Column::new(LineInfo::new(0, 5, LineKind::Full)), // Smallest column
-                Column::new(LineInfo::new(5, 6, LineKind::Full)), // Approximately the same size
-                Column::new(LineInfo::new(11, 10, LineKind::Full)),
-                Column::new(LineInfo::new(21, 15, LineKind::Full)),
+                grid::Column::new(grid::LineInfo::new(0, 5, grid::LineKind::Full)), // Smallest column
+                grid::Column::new(grid::LineInfo::new(5, 6, grid::LineKind::Full)), // Approximately the same size
+                grid::Column::new(grid::LineInfo::new(11, 10, grid::LineKind::Full)),
+                grid::Column::new(grid::LineInfo::new(21, 15, grid::LineKind::Full)),
             ]),
         };
 
@@ -352,10 +352,10 @@ mod tests {
         let grid = Grid {
             rows: SmallVecLine::from_vec(vec![]),
             columns: SmallVecLine::from_vec(vec![
-                Column::new(LineInfo::new(0, 5, LineKind::Full)),
-                Column::new(LineInfo::new(5, 10, LineKind::Full)),
-                Column::new(LineInfo::new(15, 14, LineKind::Full)), // Approximately the same size
-                Column::new(LineInfo::new(29, 15, LineKind::Full)), // Biggest column
+                grid::Column::new(grid::LineInfo::new(0, 5, grid::LineKind::Full)),
+                grid::Column::new(grid::LineInfo::new(5, 10, grid::LineKind::Full)),
+                grid::Column::new(grid::LineInfo::new(15, 14, grid::LineKind::Full)), // Approximately the same size
+                grid::Column::new(grid::LineInfo::new(29, 15, grid::LineKind::Full)), // Biggest column
             ]),
         };
 
@@ -377,12 +377,12 @@ mod tests {
         // Create a grid with some rows and columns
         let grid = Grid {
             rows: SmallVecLine::from_vec(vec![
-                Row::new(LineInfo::new(0, 5, LineKind::Empty)),
-                Row::new(LineInfo::new(5, 5, LineKind::Full)),
+                grid::Row::new(grid::LineInfo::new(0, 5, grid::LineKind::Empty)),
+                grid::Row::new(grid::LineInfo::new(5, 5, grid::LineKind::Full)),
             ]),
             columns: SmallVecLine::from_vec(vec![
-                Column::new(LineInfo::new(0, 5, LineKind::Empty)),
-                Column::new(LineInfo::new(5, 5, LineKind::Full)),
+                grid::Column::new(grid::LineInfo::new(0, 5, grid::LineKind::Empty)),
+                grid::Column::new(grid::LineInfo::new(5, 5, grid::LineKind::Full)),
             ]),
         };
 
@@ -424,10 +424,10 @@ mod tests {
     fn test_merge_lines() {
         // Create a vector of lines with varying lengths and kinds
         let lines = vec![
-            LineInfo::new(0, 5, LineKind::Empty),
-            LineInfo::new(5, 3, LineKind::Empty),
-            LineInfo::new(8, 10, LineKind::Full),
-            LineInfo::new(18, 2, LineKind::Full),
+            grid::LineInfo::new(0, 5, grid::LineKind::Empty),
+            grid::LineInfo::new(5, 3, grid::LineKind::Empty),
+            grid::LineInfo::new(8, 10, grid::LineKind::Full),
+            grid::LineInfo::new(18, 2, grid::LineKind::Full),
         ];
 
         // Merge lines smaller than the threshold (e.g., 4)
@@ -439,8 +439,8 @@ mod tests {
         assert_eq!(
             merged_lines,
             SmallVecLine::from_vec(vec![
-                LineInfo::new(0, 8, LineKind::Empty),
-                LineInfo::new(8, 12, LineKind::Full),
+                grid::LineInfo::new(0, 8, grid::LineKind::Empty),
+                grid::LineInfo::new(8, 12, grid::LineKind::Full),
             ])
         );
     }
@@ -496,12 +496,12 @@ mod tests {
 
         #[test]
         fn test_merge_small_lines_proptest(
-            lines in prop::collection::vec((0..100u32, 1..100u32, prop::sample::select(&[LineKind::Empty, LineKind::Full])), 1..100),
+            lines in prop::collection::vec((0..100u32, 1..100u32, prop::sample::select(&[grid::LineKind::Empty, grid::LineKind::Full])), 1..100),
             threshold in 1..100u32
         ) {
-            // Convert the generated lines into LineInfo structs
-            let lines: Vec<LineInfo> = lines.into_iter()
-                .map(|(start, length, kind)| LineInfo::new(start, length, kind))
+            // Convert the generated lines into grid::LineInfo structs
+            let lines: Vec<grid::LineInfo> = lines.into_iter()
+                .map(|(start, length, kind)| grid::LineInfo::new(start, length, kind))
                 .collect();
 
             // Merge the lines using the threshold
@@ -573,10 +573,10 @@ mod tests {
         let expected_grid = make_grid! {
             rows: [
                 (0, 5),
-                (5, 5, LineKind::Full),
+                (5, 5, grid::LineKind::Full),
             ],
             columns: [
-                (0, 10, LineKind::Full),
+                (0, 10, grid::LineKind::Full),
             ]
         };
 
@@ -720,10 +720,10 @@ mod tests {
         let expected_grid = make_grid! {
             rows: [
                 (0, 5),
-                (5, 5, LineKind::Full),
+                (5, 5, grid::LineKind::Full),
             ],
             columns: [
-                (0, 10, LineKind::Full),
+                (0, 10, grid::LineKind::Full),
             ]
         };
 
@@ -816,14 +816,22 @@ mod tests {
     // }
 
     // Define tests using macros
-    test_filter!(test_filtered_rows, filtered_rows, LineKind::Full);
-    test_filter!(test_filtered_columns, filtered_columns, LineKind::Full);
+    test_filter!(test_filtered_rows, filtered_rows, grid::LineKind::Full);
+    test_filter!(
+        test_filtered_columns,
+        filtered_columns,
+        grid::LineKind::Full
+    );
 
-    test_count!(test_count_rows_by_kind, count_rows_by_kind, LineKind::Full);
+    test_count!(
+        test_count_rows_by_kind,
+        count_rows_by_kind,
+        grid::LineKind::Full
+    );
     test_count!(
         test_count_columns_by_kind,
         count_columns_by_kind,
-        LineKind::Full
+        grid::LineKind::Full
     );
 
     // test_find_cells!(test_find_cells, &[1, 2, 3], &[1, 2, 3]);
@@ -887,7 +895,7 @@ mod tests {
 
     #[test]
     fn test_merge_small_lines_empty_input() {
-        let lines: Vec<LineInfo> = vec![];
+        let lines: Vec<grid::LineInfo> = vec![];
         let merged = Grid::merge_small_lines(lines, 1);
         assert!(merged.is_empty());
     }
@@ -896,15 +904,15 @@ mod tests {
     fn test_find_row() {
         let grid = Grid {
             rows: vec![
-                Row {
+                grid::Row {
                     y: 0,
                     height: 5,
-                    kind: LineKind::Empty,
+                    kind: grid::LineKind::Empty,
                 },
-                Row {
+                grid::Row {
                     y: 5,
                     height: 5,
-                    kind: LineKind::Full,
+                    kind: grid::LineKind::Full,
                 },
             ]
             .into(),
@@ -919,15 +927,15 @@ mod tests {
         let grid = Grid {
             rows: vec![].into(),
             columns: vec![
-                Column {
+                grid::Column {
                     x: 0,
                     width: 5,
-                    kind: LineKind::Empty,
+                    kind: grid::LineKind::Empty,
                 },
-                Column {
+                grid::Column {
                     x: 5,
                     width: 5,
-                    kind: LineKind::Full,
+                    kind: grid::LineKind::Full,
                 },
             ]
             .into(),
@@ -938,16 +946,16 @@ mod tests {
 
     #[test]
     fn test_line_trait_implementations() {
-        let line = LineInfo::new(0, 5, LineKind::Empty);
-        let row = Row::new(line.clone());
+        let line = grid::LineInfo::new(0, 5, grid::LineKind::Empty);
+        let row = grid::Row::new(line.clone());
         assert_eq!(row.y, 0);
         assert_eq!(row.height, 5);
-        assert_eq!(row.kind, LineKind::Empty);
+        assert_eq!(row.kind, grid::LineKind::Empty);
 
-        let column = Column::new(line);
+        let column = grid::Column::new(line);
         assert_eq!(column.x, 0);
         assert_eq!(column.width, 5);
-        assert_eq!(column.kind, LineKind::Empty);
+        assert_eq!(column.kind, grid::LineKind::Empty);
     }
 
     #[test]
@@ -971,7 +979,7 @@ mod tests {
 
         // Filter rows by kind (should be empty)
         let filtered: Vec<_> = grid
-            .filtered_rows(|row| row.kind == LineKind::Full)
+            .filtered_rows(|row| row.kind == grid::LineKind::Full)
             .collect();
         assert!(filtered.is_empty());
     }
@@ -984,7 +992,7 @@ mod tests {
 
         // Filter columns by kind (should be empty)
         let filtered: Vec<_> = grid
-            .filtered_columns(|col| col.kind == LineKind::Full)
+            .filtered_columns(|col| col.kind == grid::LineKind::Full)
             .collect();
         assert!(filtered.is_empty());
     }
@@ -1057,7 +1065,7 @@ mod tests {
             #[test]
             fn $name() {
                 let (start, length, kind, expected) = $value;
-                let line = LineInfo::new(start, length, kind);
+                let line = grid::LineInfo::new(start, length, kind);
                 assert_eq!(line, expected);
             }
         )*
@@ -1091,9 +1099,9 @@ mod tests {
 
         // Test line info creation with the new macro
         test_line_info! {
-            test_line_info_empty: (0, 5, LineKind::Empty, LineInfo { start: 0, length: 5, kind: LineKind::Empty }),
-            test_line_info_full: (10, 3, LineKind::Full, LineInfo { start: 10, length: 3, kind: LineKind::Full }),
-            test_line_info_zero_length: (0, 0, LineKind::Empty, LineInfo { start: 0, length: 0, kind: LineKind::Empty }),
+            test_line_info_empty: (0, 5, grid::LineKind::Empty, grid::LineInfo { start: 0, length: 5, kind: grid::LineKind::Empty }),
+            test_line_info_full: (10, 3, grid::LineKind::Full, grid::LineInfo { start: 10, length: 3, kind: grid::LineKind::Full }),
+            test_line_info_zero_length: (0, 0, grid::LineKind::Empty, grid::LineInfo { start: 0, length: 0, kind: grid::LineKind::Empty }),
         }
 
         // Test grid configurations with the new macro
@@ -1121,7 +1129,7 @@ mod tests {
         #[test]
         fn test_process_dimension_invalid() {
             let img = GrayImage::new(0, 0);
-            let result = Grid::process_dimension::<Row>(&img, 0, 0, 0.5, Grid::is_row_empty);
+            let result = Grid::process_dimension::<grid::Row>(&img, 0, 0, 0.5, Grid::is_row_empty);
             assert!(result.is_err());
         }
 
@@ -1153,19 +1161,19 @@ mod tests {
         #[test]
         fn test_merge_small_lines_edge_cases() {
             // Test empty input
-            let empty: Vec<LineInfo> = vec![];
+            let empty: Vec<grid::LineInfo> = vec![];
             let result = Grid::merge_small_lines(empty, 5);
             assert!(result.is_empty());
 
             // Test single line
-            let single = vec![LineInfo::new(0, 1, LineKind::Empty)];
+            let single = vec![grid::LineInfo::new(0, 1, grid::LineKind::Empty)];
             let result = Grid::merge_small_lines(single, 5);
             assert_eq!(result.len(), 1);
 
             // Test zero threshold
             let lines = vec![
-                LineInfo::new(0, 1, LineKind::Empty),
-                LineInfo::new(1, 1, LineKind::Full),
+                grid::LineInfo::new(0, 1, grid::LineKind::Empty),
+                grid::LineInfo::new(1, 1, grid::LineKind::Full),
             ];
             let result = Grid::merge_small_lines(lines, 0);
             assert_eq!(result.len(), 2);
@@ -1176,9 +1184,9 @@ mod tests {
             // Create a grid with rows of varying heights
             let grid = Grid {
                 rows: SmallVecLine::from_vec(vec![
-                    Row::new(LineInfo::new(0, 5, LineKind::Full)), // Smallest row
-                    Row::new(LineInfo::new(5, 10, LineKind::Full)),
-                    Row::new(LineInfo::new(15, 15, LineKind::Full)),
+                    grid::Row::new(grid::LineInfo::new(0, 5, grid::LineKind::Full)), // Smallest row
+                    grid::Row::new(grid::LineInfo::new(5, 10, grid::LineKind::Full)),
+                    grid::Row::new(grid::LineInfo::new(15, 15, grid::LineKind::Full)),
                 ]),
                 columns: SmallVecLine::from_vec(vec![]),
             };
@@ -1196,9 +1204,9 @@ mod tests {
             // Create a grid with rows of varying heights
             let grid = Grid {
                 rows: SmallVecLine::from_vec(vec![
-                    Row::new(LineInfo::new(0, 5, LineKind::Full)),
-                    Row::new(LineInfo::new(5, 10, LineKind::Full)),
-                    Row::new(LineInfo::new(15, 15, LineKind::Full)), // Biggest row
+                    grid::Row::new(grid::LineInfo::new(0, 5, grid::LineKind::Full)),
+                    grid::Row::new(grid::LineInfo::new(5, 10, grid::LineKind::Full)),
+                    grid::Row::new(grid::LineInfo::new(15, 15, grid::LineKind::Full)), // Biggest row
                 ]),
                 columns: SmallVecLine::from_vec(vec![]),
             };
@@ -1217,9 +1225,9 @@ mod tests {
             let grid = Grid {
                 rows: SmallVecLine::from_vec(vec![]),
                 columns: SmallVecLine::from_vec(vec![
-                    Column::new(LineInfo::new(0, 5, LineKind::Full)), // Smallest column
-                    Column::new(LineInfo::new(5, 10, LineKind::Full)),
-                    Column::new(LineInfo::new(15, 15, LineKind::Full)),
+                    grid::Column::new(grid::LineInfo::new(0, 5, grid::LineKind::Full)), // Smallest column
+                    grid::Column::new(grid::LineInfo::new(5, 10, grid::LineKind::Full)),
+                    grid::Column::new(grid::LineInfo::new(15, 15, grid::LineKind::Full)),
                 ]),
             };
 
@@ -1237,9 +1245,9 @@ mod tests {
             let grid = Grid {
                 rows: SmallVecLine::from_vec(vec![]),
                 columns: SmallVecLine::from_vec(vec![
-                    Column::new(LineInfo::new(0, 5, LineKind::Full)),
-                    Column::new(LineInfo::new(5, 10, LineKind::Full)),
-                    Column::new(LineInfo::new(15, 15, LineKind::Full)), // Biggest column
+                    grid::Column::new(grid::LineInfo::new(0, 5, grid::LineKind::Full)),
+                    grid::Column::new(grid::LineInfo::new(5, 10, grid::LineKind::Full)),
+                    grid::Column::new(grid::LineInfo::new(15, 15, grid::LineKind::Full)), // Biggest column
                 ]),
             };
 
@@ -1267,7 +1275,7 @@ mod tests {
                 threshold_ratio in 0.1f32..1.0f32
             ) {
                 let img = GrayImage::new(secondary_dim, primary_dim);
-                let result = Grid::process_dimension::<Row>(
+                let result = Grid::process_dimension::<grid::Row>(
                     &img,
                     primary_dim,
                     secondary_dim,
