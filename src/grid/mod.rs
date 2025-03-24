@@ -1,21 +1,25 @@
-use crate::{grid_like::GridLike, grid_subset::GridSubset};
-use image::*;
-use imageproc::contrast::adaptive_threshold;
-use imageproc::rect::Rect;
-use smallvec::SmallVec;
-use thiserror::Error;
-use tracing::*;
 pub mod components;
 pub mod config;
 pub mod constants;
 pub mod lines;
 pub mod traits;
 
+pub mod grid_like;
+pub mod grid_subset;
 pub use components::*;
 pub use config::*;
 pub use constants::*;
+pub use grid_like::*;
+pub use grid_subset::*;
 pub use lines::*;
 pub use traits::*;
+
+use image::*;
+use imageproc::contrast::adaptive_threshold;
+use imageproc::rect::Rect;
+use smallvec::SmallVec;
+use thiserror::Error;
+use tracing::*;
 
 #[derive(Error, Debug)]
 pub enum GridError {
@@ -101,149 +105,87 @@ impl Grid {
         (min, max)
     }
 
-    /// Shared function to filter rows or columns based on size and tolerance.
-    fn filter_lines_with_tolerance<T, F>(
+    pub fn select_lines_by_size<T, F>(
         lines: &[T],
         size: Option<u32>,
         tolerance: f32,
         get_size: F,
-    ) -> SmallVecLine<T>
+    ) -> SmallVecLine<usize>
     where
-        T: Clone,
         F: Fn(&T) -> u32,
     {
         if let Some(size) = size {
             let (min_size, max_size) = Self::calculate_bounds(size, tolerance);
-            Self::filter_lines(lines, |line| {
-                let line_size = get_size(line) as f32;
-                line_size < min_size || line_size > max_size
-            })
+            lines
+                .iter()
+                .enumerate()
+                .filter(|(_, line)| {
+                    let line_size = get_size(line) as f32;
+                    line_size >= min_size && line_size <= max_size
+                })
+                .map(|(index, _)| index)
+                .collect()
         } else {
-            lines.to_vec().into()
+            (0..lines.len()).collect()
         }
     }
-    /// Filters out rows of approximately the same size as the smallest row.
-    ///
-    /// # Arguments
-    /// * `tolerance` - The tolerance for determining if rows are of approximately the same size.
-    ///
-    /// # Returns
-    /// A new `Grid` with rows of approximately the same size as the smallest row removed.
-    pub fn filter_smallest_rows_with_tolerance(&self, tolerance: f32) -> Self {
-        let smallest_height = self.smallest_row_height();
-        let rows =
-            Self::filter_lines_with_tolerance(&self.rows, smallest_height, tolerance, |row| {
-                row.height
-            });
+    pub fn select_smallest_rows(&self) -> GridSubset {
+        let height = self.smallest_row_height().unwrap_or(0);
+        let selected_indices =
+            Self::select_lines_by_size(&self.rows, Some(height), DEFAULT_TOLERANCE, |r| r.height);
 
-        Grid {
-            rows,
-            columns: self.columns.clone(),
-        }
-    }
-
-    /// Filters out rows of approximately the same size as the biggest row.
-    ///
-    /// # Arguments
-    /// * `tolerance` - The tolerance for determining if rows are of approximately the same size.
-    ///
-    /// # Returns
-    /// A new `Grid` with rows of approximately the same size as the biggest row removed.
-    pub fn filter_biggest_rows_with_tolerance(&self, tolerance: f32) -> Self {
-        let biggest_height = self.biggest_row_height();
-        let rows =
-            Self::filter_lines_with_tolerance(&self.rows, biggest_height, tolerance, |row| {
-                row.height
-            });
-
-        Grid {
-            rows,
-            columns: self.columns.clone(),
-        }
-    }
-
-    /// Filters out columns of approximately the same size as the smallest column.
-    ///
-    /// # Arguments
-    /// * `tolerance` - The tolerance for determining if columns are of approximately the same size.
-    ///
-    /// # Returns
-    /// A new `Grid` with columns of approximately the same size as the smallest column removed.
-    pub fn filter_smallest_columns_with_tolerance(&self, tolerance: f32) -> Self {
-        let smallest_width = self.smallest_column_width();
-        let columns =
-            Self::filter_lines_with_tolerance(&self.columns, smallest_width, tolerance, |col| {
-                col.width
-            });
-
-        Grid {
-            rows: self.rows.clone(),
-            columns,
-        }
-    }
-
-    /// Filters out columns of approximately the same size as the biggest column.
-    ///
-    /// # Arguments
-    /// * `tolerance` - The tolerance for determining if columns are of approximately the same size.
-    ///
-    /// # Returns
-    /// A new `Grid` with columns of approximately the same size as the biggest column removed.
-    pub fn filter_biggest_columns_with_tolerance(&self, tolerance: f32) -> Self {
-        let biggest_width = self.biggest_column_width();
-        let columns =
-            Self::filter_lines_with_tolerance(&self.columns, biggest_width, tolerance, |col| {
-                col.width
-            });
-
-        Grid {
-            rows: self.rows.clone(),
-            columns,
-        }
-    }
-    /// Generic function to filter rows or columns based on a predicate.
-    ///
-    /// # Arguments
-    /// * `lines` - A slice of rows or columns to filter.
-    /// * `predicate` - A closure that determines whether a line should be included.
-    ///
-    /// # Returns
-    /// A `SmallVecLine` containing only the lines that satisfy the predicate.
-    fn filter_lines<T, F>(lines: &[T], predicate: F) -> SmallVecLine<T>
-    where
-        T: Clone,
-        F: Fn(&T) -> bool,
-    {
-        lines
+        // Collect references to the original grid's rows
+        let rows: SmallVecLine<&Row> = selected_indices
             .iter()
-            .filter(|line| predicate(line))
-            .cloned()
-            .collect()
-    }
-    /// Default tolerance for filtering rows or columns of approximately the same size.
-    const DEFAULT_TOLERANCE: f32 = 1.1;
-    /// Filters out the biggest rows and biggest columns in the grid.
-    ///
-    /// # Arguments
-    /// * `row_tolerance` - The tolerance for determining if rows are approximately the biggest.
-    /// * `col_tolerance` - The tolerance for determining if columns are approximately the biggest.
-    ///
-    /// # Returns
-    /// A new `Grid` with the biggest rows and biggest columns removed.
-    pub fn filter_biggest_rows_and_columns(&self, row_tolerance: f32, col_tolerance: f32) -> Grid {
-        // Step 1: Filter out the biggest rows
-        let filtered_grid = self
-            .filter_biggest_rows_with_tolerance(row_tolerance)
-            .filter_biggest_columns_with_tolerance(col_tolerance);
+            .map(|index| &self.rows[*index])
+            .collect();
 
-        // Return the filtered grid
-        filtered_grid
+        GridSubset::new(rows, self.columns.iter().collect())
+    }
+
+    pub fn select_biggest_rows(&self) -> GridSubset {
+        let height = self.biggest_row_height().unwrap_or(0);
+        let selected_indices =
+            Self::select_lines_by_size(&self.rows, Some(height), DEFAULT_TOLERANCE, |r| r.height);
+
+        // Collect references to the original grid's rows
+        let rows: SmallVecLine<&Row> = selected_indices
+            .iter()
+            .map(|index| &self.rows[*index])
+            .collect();
+
+        GridSubset::new(rows, self.columns.iter().collect())
+    }
+    pub fn select_smallest_columns(&self) -> GridSubset {
+        let width = self.smallest_column_width().unwrap_or(0);
+        let selected_indices =
+            Self::select_lines_by_size(&self.columns, Some(width), DEFAULT_TOLERANCE, |c| c.width);
+
+        let selected_columns: SmallVecLine<&Column> = selected_indices
+            .iter()
+            .map(|index| &self.columns[*index])
+            .collect();
+
+        GridSubset::new(self.rows.iter().collect(), selected_columns)
+    }
+
+    pub fn select_biggest_columns(&self) -> GridSubset {
+        let width = self.biggest_column_width().unwrap_or(0);
+        let selected_indices =
+            Self::select_lines_by_size(&self.columns, Some(width), DEFAULT_TOLERANCE, |c| c.width);
+
+        let selected_columns: SmallVecLine<&Column> = selected_indices
+            .iter()
+            .map(|index| &self.columns[*index])
+            .collect();
+
+        GridSubset::new(self.rows.iter().collect(), selected_columns)
     }
     /// Filters out cells where both the row and column are of kind `LineKind::Full`.
     ///
     /// # Returns
     /// A new `Grid` with the fullest cells removed.
-    pub fn filter_most_full_cells(&self) -> Grid {
+    pub fn select_most_full_cells(&self) -> Grid {
         // Step 1: Calculate the "fullness" score for each cell
         let mut cell_fullness = Vec::new();
 
@@ -298,41 +240,6 @@ impl Grid {
             rows: rows_to_keep,
             columns: columns_to_keep,
         }
-    }
-    /// Filters out the smallest rows in the grid.
-    ///
-    /// # Returns
-    /// A new `Grid` with the smallest rows removed.
-    pub fn filter_smallest_rows(&self) -> Self {
-        // Use the default tolerance to filter only the smallest rows
-        self.filter_smallest_rows_with_tolerance(Self::DEFAULT_TOLERANCE)
-    }
-
-    /// Filters out the biggest rows in the grid.
-    ///
-    /// # Returns
-    /// A new `Grid` with the biggest rows removed.
-    pub fn filter_biggest_rows(&self) -> Self {
-        // Use the default tolerance to filter only the biggest rows
-        self.filter_biggest_rows_with_tolerance(Self::DEFAULT_TOLERANCE)
-    }
-
-    /// Filters out the smallest columns in the grid.
-    ///
-    /// # Returns
-    /// A new `Grid` with the smallest columns removed.
-    pub fn filter_smallest_columns(&self) -> Self {
-        // Use the default tolerance to filter only the smallest columns
-        self.filter_smallest_columns_with_tolerance(Self::DEFAULT_TOLERANCE)
-    }
-
-    /// Filters out the biggest columns in the grid.
-    ///
-    /// # Returns
-    /// A new `Grid` with the biggest columns removed.
-    pub fn filter_biggest_columns(&self) -> Self {
-        // Use the default tolerance to filter only the biggest columns
-        self.filter_biggest_columns_with_tolerance(Self::DEFAULT_TOLERANCE)
     }
 
     /// Finds the smallest height among all rows in the grid.
@@ -815,6 +722,10 @@ impl GridLike for Grid {
     fn columns_iter(&self) -> impl Iterator<Item = &Column> {
         self.columns.iter()
     }
+
+    type Row = Row;
+
+    type Column = Column;
 }
 
 impl TryFrom<DynamicImage> for Grid {

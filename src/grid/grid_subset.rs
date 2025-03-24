@@ -1,13 +1,12 @@
-use crate::grid::{Column, Grid, Row, SmallVecLine};
-use std::ops::{Add, Sub};
+use crate::grid::{Column, Row, SmallVecLine};
 /// Represents a subset of a `Grid`, referencing specific rows and columns.
 /// This type allows for operations like combining or filtering subsets.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GridSubset<'a> {
     /// References to the rows in the parent `Grid`.
-    rows: SmallVecLine<&'a Row>,
+    pub rows: SmallVecLine<&'a Row>,
     /// References to the columns in the parent `Grid`.
-    columns: SmallVecLine<&'a Column>,
+    pub columns: SmallVecLine<&'a Column>,
 }
 
 impl<'a> GridSubset<'a> {

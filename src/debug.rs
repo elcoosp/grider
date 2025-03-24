@@ -29,6 +29,7 @@ use super::*;
 /// let drawing_config = GridDrawingConfig::default();
 /// debug::save_image_with_grid(&img, &grid, "output_with_grid.png", &drawing_config).unwrap();
 /// ```
+#[allow(unused)]
 pub fn save_image_with_grid(
     image: &DynamicImage,
     grid: &Grid,

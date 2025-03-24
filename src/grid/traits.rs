@@ -68,3 +68,16 @@ impl LineTrait for Column {
         }
     }
 }
+pub trait Len {
+    fn len(&self) -> usize;
+}
+impl Len for Column {
+    fn len(&self) -> usize {
+        self.width as usize
+    }
+}
+impl Len for Row {
+    fn len(&self) -> usize {
+        self.height as usize
+    }
+}

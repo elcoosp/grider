@@ -1,20 +1,7 @@
 //! This module provides functionality for processing images into grids of rows and columns.
 //! It uses the `image` and `imageproc` crates for image manipulation and `insta` for snapshot testing.
 
-/// Debug module for visualizing the grid on the image.
-///
-/// # Example
-/// ```
-/// use grider::{*, drawing::*};
-/// use image::DynamicImage;
-///
-/// // Replace with actual image loading
-/// let img: DynamicImage = image::open("tests/large.png").unwrap();
-/// let config = GridConfig::default();
-/// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
-///
-/// grider::debug::save_image_with_grid(&img, &grid, "output.png", &GridDrawingConfig::default());
-/// ```
+#[doc = include_str!(concat!("docs/", "debug.md"))]
 pub mod debug;
 /// This module provides functionality for drawing grids, cells, and grid lines on images.
 /// It is feature-gated under the `drawing` feature and requires the `image` and `imageproc` crates.
@@ -53,7 +40,5 @@ pub mod debug;
 pub mod drawing;
 
 pub mod grid;
-pub mod grid_like;
-pub mod grid_subset;
 
 pub use grid::*;
