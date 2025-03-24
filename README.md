@@ -9,20 +9,22 @@
 
 ## Table of Contents
 
-1. [Installation](#installation)
-2. [Usage](#usage)
-   - [Creating a Grid from an Image](#creating-a-grid-from-an-image)
-   - [Accessing Rows and Columns](#accessing-rows-and-columns)
-   - [Custom Configuration](#custom-configuration)
-   - [Debugging with Visual Grid](#debugging-with-visual-grid)
-3. [API Documentation](#api-documentation)
-   - [Structs](#structs)
-   - [Enums](#enums)
-   - [Functions](#functions)
-   - [Macros](#macros)
-4. [Examples](#examples)
-5. [Contributing](#contributing)
-6. [License](#license)
+- [Grider: Image Grid Processing for Rust 🖼️](#grider-image-grid-processing-for-rust-️)
+  - [Badges](#badges)
+  - [Table of Contents](#table-of-contents)
+  - [Installation](#installation)
+  - [Usage](#usage)
+    - [Creating a Grid from an Image](#creating-a-grid-from-an-image)
+    - [Accessing Rows and Columns](#accessing-rows-and-columns)
+    - [Custom Configuration](#custom-configuration)
+    - [Debugging with Visual Grid](#debugging-with-visual-grid)
+  - [API Documentation](#api-documentation)
+    - [Structs](#structs)
+    - [Enums](#enums)
+    - [Functions](#functions)
+    - [Macros](#macros)
+  - [Contributing](#contributing)
+  - [License](#license)
 
 ## Installation
 
@@ -121,11 +123,7 @@ grider::debug::save_image_with_grid(&img, &grid, "output_with_grid.png", &GridDr
 - **make_grid!**: Creates a grid from rows and columns with a convenient macro.
 - **make_line!**: Creates a row or column from a tuple of parameters.
 
-## Examples
-
-- **Basic Grid Extraction**: Demonstrates how to extract a grid from an image and print row and column information.
-- **Custom Configuration**: Shows how to adjust grid processing parameters for different image types.
-- **Debugging with Visual Grid**: Illustrates how to visualize the grid on the original image for debugging.
+---
 
 ## Contributing
 
