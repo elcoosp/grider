@@ -1,3 +1,4 @@
+#![feature(unsigned_is_multiple_of)]
 //! This program processes an image into a grid of rows and columns.
 //! It uses the `image` and `imageproc` crates for image manipulation.
 //!
@@ -78,7 +79,7 @@ mod tests {
     #[test]
     fn test_try_from_image_with_config() {
         let img = GrayImage::from_fn(100, 100, |x, y| {
-            if (x + y) % 2 == 0 {
+            if (x + y).is_multiple_of(2) {
                 Luma([255])
             } else {
                 Luma([0])
@@ -746,7 +747,7 @@ mod tests {
     pub fn create_test_image(width: u32, height: u32, pattern: &str) -> DynamicImage {
         let img = match pattern {
             "checkerboard" => GrayImage::from_fn(width, height, |x, y| {
-                if (x + y) % 2 == 0 {
+                if (x + y).is_multiple_of(2) {
                     Luma([255u8]) // White pixel
                 } else {
                     Luma([0u8]) // Black pixel
