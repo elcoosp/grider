@@ -1,4 +1,3 @@
-#![feature(unsigned_is_multiple_of)]
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use grider::{Grid, GridConfig};
 use image::{DynamicImage, GrayImage, Luma};
@@ -64,7 +63,7 @@ fn bench_image_sizes(c: &mut Criterion) {
         let config = GridConfig::default();
 
         group.bench_with_input(
-            BenchmarkId::new("size", format!("{}x{}", width, height)),
+            BenchmarkId::new("size", format!("{width}x{height}")),
             &img,
             |b, img| {
                 b.iter(|| {
@@ -144,7 +143,7 @@ fn bench_parallel_processing(c: &mut Criterion) {
 
         // Benchmark parallel processing
         group.bench_with_input(
-            BenchmarkId::new("parallel", format!("{}x{}", width, height)),
+            BenchmarkId::new("parallel", format!("{width}x{height}")),
             &img,
             |b, img| {
                 b.iter(|| {
@@ -157,7 +156,7 @@ fn bench_parallel_processing(c: &mut Criterion) {
 
         // Benchmark sequential processing
         group.bench_with_input(
-            BenchmarkId::new("sequential", format!("{}x{}", width, height)),
+            BenchmarkId::new("sequential", format!("{width}x{height}")),
             &img,
             |b, img| {
                 b.iter(|| {

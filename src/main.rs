@@ -1,4 +1,3 @@
-#![feature(unsigned_is_multiple_of)]
 //! This program processes an image into a grid of rows and columns.
 //! It uses the `image` and `imageproc` crates for image manipulation.
 //!
