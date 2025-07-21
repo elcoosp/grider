@@ -13,7 +13,7 @@ smallvec = { version = "1.13", features = ["serde"] }
 pretty_assertions = "1.4.1"
 anyhow = "1.0.95"
 proptest = "1.6.0"
-rand = "0.8.5"
+rand = "0.9.0"
 thiserror = "2.0.10"
 test-case = "3.3.1"
 tracing = "0.1.41"
