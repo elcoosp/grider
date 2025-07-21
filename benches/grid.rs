@@ -1,3 +1,4 @@
+#![feature(unsigned_is_multiple_of)]
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use grider::{Grid, GridConfig};
 use image::{DynamicImage, GrayImage, Luma};
@@ -7,35 +8,35 @@ use std::hint::black_box;
 fn create_test_image(width: u32, height: u32, pattern: &str) -> DynamicImage {
     let img = match pattern {
         "checkerboard" => GrayImage::from_fn(width, height, |x, y| {
-            if (x + y) % 2 == 0 {
+            if (x + y).is_multiple_of(2) {
                 Luma([255])
             } else {
                 Luma([0])
             }
         }),
         "horizontal_stripes" => GrayImage::from_fn(width, height, |_, y| {
-            if y % 2 == 0 {
+            if y.is_multiple_of(2) {
                 Luma([255])
             } else {
                 Luma([0])
             }
         }),
         "vertical_stripes" => GrayImage::from_fn(width, height, |x, _| {
-            if x % 2 == 0 {
+            if x.is_multiple_of(2) {
                 Luma([255])
             } else {
                 Luma([0])
             }
         }),
         "sparse" => GrayImage::from_fn(width, height, |x, y| {
-            if x % 10 == 0 && y % 10 == 0 {
+            if x.is_multiple_of(10) && y.is_multiple_of(10) {
                 Luma([0])
             } else {
                 Luma([255])
             }
         }),
         "dense" => GrayImage::from_fn(width, height, |x, y| {
-            if x % 3 == 0 || y % 3 == 0 {
+            if x.is_multiple_of(3) || y.is_multiple_of(3) {
                 Luma([0])
             } else {
                 Luma([255])
