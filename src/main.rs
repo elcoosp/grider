@@ -839,7 +839,7 @@ mod tests {
         if let Err(e) = &cells[0] {
             match e {
                 GridError::RowNotFound { y: 100 } => {}
-                _ => panic!("Unexpected error: {:?}", e),
+                _ => panic!("Unexpected error: {e:?}"),
             }
         }
     }
