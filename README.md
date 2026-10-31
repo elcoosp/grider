@@ -5,7 +5,6 @@
     A high-performance library for extracting, analyzing, and manipulating row and column grids from images.
   </p>
   <p>
-    <a href="https://github.com/elcoosp/grider/actions/workflows/ci.yml"><img src="https://github.com/elcoosp/grider/actions/workflows/ci.yml/badge.svg?style=flat-square" alt="CI"/></a>
     <a href="https://crates.io/crates/grider"><img src="https://img.shields.io/crates/v/grider?style=flat-square" alt="Crates.io"/></a>
     <a href="https://docs.rs/grider"><img src="https://img.shields.io/badge/docs.rs-grider-blue?style=flat-square" alt="Documentation"/></a>
     <a href="https://github.com/elcoosp/grider/blob/main/LICENSE"><img src="https://img.shields.io/crates/l/grider?style=flat-square" alt="License"/></a>
