@@ -1,32 +1,51 @@
-use drawing::*;
+//! Debug helpers for visualizing the grid on the image.
+//!
+//! # Examples
+//!
+//! ```
+//! use grider::drawing::GridDrawingConfig;
+//! use grider::{Grid, GridConfig};
+//! use image::DynamicImage;
+//!
+//! let img: DynamicImage = image::open("tests/large.png").unwrap();
+//! let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();
+//!
+//! grider::debug::save_image_with_grid(
+//!     &img,
+//!     &grid,
+//!     "output.png",
+//!     &GridDrawingConfig::default(),
+//! )
+//! .unwrap();
+//! ```
 
-use super::*;
+use image::DynamicImage;
+
+use crate::drawing::{Drawable, GridDrawingConfig};
+use crate::error::GridError;
+use crate::grid::Grid;
+
 /// Saves the image with the grid drawn on it.
 ///
-/// This function draws the grid, cells, and grid lines on the provided image
-/// and saves the result to the specified path.
-///
-/// # Arguments
-/// * `image` - The input image.
-/// * `grid` - The grid to draw.
-/// * `output_path` - The path to save the output image.
-/// * `config` - The drawing configuration.
+/// The grid lines, cells, and backgrounds are drawn according to `config`
+/// before the image is written to `output_path`.
 ///
 /// # Errors
-/// Returns [`GridError`] if drawing or saving fails.
+///
+/// Returns [`GridError::ImageConversionError`] if saving fails.
 ///
 /// # Examples
 ///
-/// ```rust
-/// use grider::{*, drawing::*};
+/// ```
+/// use grider::drawing::GridDrawingConfig;
+/// use grider::{Grid, GridConfig};
 /// use image::open;
 ///
 /// let img = open("tests/large.png").unwrap();
-/// let config = GridConfig::default();
-/// let grid = Grid::try_from_image_with_config(&img, config).unwrap();
+/// let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();
 ///
 /// let drawing_config = GridDrawingConfig::default();
-/// debug::save_image_with_grid(&img, &grid, "output_with_grid.png", &drawing_config).unwrap();
+/// grider::debug::save_image_with_grid(&img, &grid, "output_with_grid.png", &drawing_config).unwrap();
 /// ```
 pub fn save_image_with_grid(
     image: &DynamicImage,
@@ -35,8 +54,9 @@ pub fn save_image_with_grid(
     config: &GridDrawingConfig,
 ) -> Result<(), GridError> {
     let mut rgba_img = image.to_rgba8();
-    #[cfg(feature = "drawing")]
-    grid.draw(&mut rgba_img, config)?;
+    // Drawing is infallible (geometry is clipped to the image bounds); only
+    // the file write below can fail.
+    grid.draw(&mut rgba_img, config);
     rgba_img
         .save(output_path)
         .map_err(|e| GridError::ImageConversionError(e.to_string()))
