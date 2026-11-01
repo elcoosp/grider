@@ -1,52 +1,11 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+//! Criterion benchmarks for the grid extraction pipeline.
+
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use grider::testing::{Pattern, test_image};
 use grider::{Grid, GridConfig};
-use image::{DynamicImage, GrayImage, Luma};
 use std::hint::black_box;
 
-// Helper function to create test images of different patterns
-fn create_test_image(width: u32, height: u32, pattern: &str) -> DynamicImage {
-    let img = match pattern {
-        "checkerboard" => GrayImage::from_fn(width, height, |x, y| {
-            if (x + y).is_multiple_of(2) {
-                Luma([255])
-            } else {
-                Luma([0])
-            }
-        }),
-        "horizontal_stripes" => GrayImage::from_fn(width, height, |_, y| {
-            if y.is_multiple_of(2) {
-                Luma([255])
-            } else {
-                Luma([0])
-            }
-        }),
-        "vertical_stripes" => GrayImage::from_fn(width, height, |x, _| {
-            if x.is_multiple_of(2) {
-                Luma([255])
-            } else {
-                Luma([0])
-            }
-        }),
-        "sparse" => GrayImage::from_fn(width, height, |x, y| {
-            if x.is_multiple_of(10) && y.is_multiple_of(10) {
-                Luma([0])
-            } else {
-                Luma([255])
-            }
-        }),
-        "dense" => GrayImage::from_fn(width, height, |x, y| {
-            if x.is_multiple_of(3) || y.is_multiple_of(3) {
-                Luma([0])
-            } else {
-                Luma([255])
-            }
-        }),
-        _ => GrayImage::from_pixel(width, height, Luma([255])), // Default to all white
-    };
-    DynamicImage::ImageLuma8(img)
-}
-
-// Benchmark different image sizes
+/// Benchmarks extraction over a range of image sizes.
 fn bench_image_sizes(c: &mut Criterion) {
     let mut group = c.benchmark_group("image_sizes");
     let sizes = [
@@ -57,9 +16,8 @@ fn bench_image_sizes(c: &mut Criterion) {
         (4000, 4000),
     ];
 
-    for size in sizes.iter() {
-        let (width, height) = *size;
-        let img = create_test_image(width, height, "checkerboard");
+    for (width, height) in sizes {
+        let img = test_image(width, height, Pattern::Checkerboard);
         let config = GridConfig::default();
 
         group.bench_with_input(
@@ -67,7 +25,7 @@ fn bench_image_sizes(c: &mut Criterion) {
             &img,
             |b, img| {
                 b.iter(|| {
-                    black_box(Grid::try_from_image_with_config(img, config.clone()).unwrap());
+                    black_box(Grid::try_from_image_with_config(img, config).unwrap());
                 });
             },
         );
@@ -75,37 +33,41 @@ fn bench_image_sizes(c: &mut Criterion) {
     group.finish();
 }
 
-// Benchmark different image patterns
+/// Benchmarks extraction over the standard image patterns.
 fn bench_patterns(c: &mut Criterion) {
     let mut group = c.benchmark_group("patterns");
     let patterns = [
-        "checkerboard",
-        "horizontal_stripes",
-        "vertical_stripes",
-        "sparse",
-        "dense",
+        Pattern::Checkerboard,
+        Pattern::HorizontalStripes,
+        Pattern::VerticalStripes,
+        Pattern::Sparse,
+        Pattern::Dense,
     ];
-    let size = (1000, 1000); // Fixed size for pattern comparison
+    let (width, height) = (1000, 1000);
 
-    for pattern in patterns.iter() {
-        let img = create_test_image(size.0, size.1, pattern);
+    for pattern in patterns {
+        let img = test_image(width, height, pattern);
         let config = GridConfig::default();
 
-        group.bench_with_input(BenchmarkId::new("pattern", pattern), &img, |b, img| {
-            b.iter(|| {
-                black_box(Grid::try_from_image_with_config(img, config.clone()).unwrap());
-            });
-        });
+        group.bench_with_input(
+            BenchmarkId::new("pattern", format!("{pattern:?}")),
+            &img,
+            |b, img| {
+                b.iter(|| {
+                    black_box(Grid::try_from_image_with_config(img, config).unwrap());
+                });
+            },
+        );
     }
     group.finish();
 }
 
-// Benchmark different configurations
+/// Benchmarks different configuration shapes.
 fn bench_configs(c: &mut Criterion) {
     let mut group = c.benchmark_group("configurations");
-    let img = create_test_image(1000, 1000, "checkerboard");
+    let img = test_image(1000, 1000, Pattern::Checkerboard);
 
-    let configs = vec![
+    let configs = [
         ("small_block_sequential", GridConfig::new(4, 0.5, false)),
         ("small_block_parallel", GridConfig::new(4, 0.5, true)),
         ("large_block_sequential", GridConfig::new(24, 0.8, false)),
@@ -115,54 +77,46 @@ fn bench_configs(c: &mut Criterion) {
     for (name, config) in configs {
         group.bench_with_input(BenchmarkId::new("config", name), &img, |b, img| {
             b.iter(|| {
-                black_box(Grid::try_from_image_with_config(img, config.clone()).unwrap());
+                black_box(Grid::try_from_image_with_config(img, config).unwrap());
             });
         });
     }
     group.finish();
 }
 
-// Benchmark parallel vs sequential processing
+/// Benchmarks parallel against sequential processing.
 fn bench_parallel_processing(c: &mut Criterion) {
     let mut group = c.benchmark_group("parallel_vs_sequential");
     let sizes = [(500, 500), (1000, 1000), (2000, 2000)];
 
-    for size in sizes.iter() {
-        let (width, height) = *size;
-        let img = create_test_image(width, height, "dense");
+    for (width, height) in sizes {
+        let img = test_image(width, height, Pattern::Dense);
 
         let parallel_config = GridConfig {
             enable_parallel: true,
             ..GridConfig::default()
         };
-
         let sequential_config = GridConfig {
             enable_parallel: false,
             ..GridConfig::default()
         };
 
-        // Benchmark parallel processing
         group.bench_with_input(
             BenchmarkId::new("parallel", format!("{width}x{height}")),
             &img,
             |b, img| {
                 b.iter(|| {
-                    black_box(
-                        Grid::try_from_image_with_config(img, parallel_config.clone()).unwrap(),
-                    );
+                    black_box(Grid::try_from_image_with_config(img, parallel_config).unwrap());
                 });
             },
         );
 
-        // Benchmark sequential processing
         group.bench_with_input(
             BenchmarkId::new("sequential", format!("{width}x{height}")),
             &img,
             |b, img| {
                 b.iter(|| {
-                    black_box(
-                        Grid::try_from_image_with_config(img, sequential_config.clone()).unwrap(),
-                    );
+                    black_box(Grid::try_from_image_with_config(img, sequential_config).unwrap());
                 });
             },
         );
@@ -170,15 +124,15 @@ fn bench_parallel_processing(c: &mut Criterion) {
     group.finish();
 }
 
-// Benchmark threshold block sizes
+/// Benchmarks the adaptive threshold block sizes.
 fn bench_threshold_blocks(c: &mut Criterion) {
     let mut group = c.benchmark_group("threshold_blocks");
-    let img = create_test_image(1000, 1000, "dense");
+    let img = test_image(1000, 1000, Pattern::Dense);
     let block_sizes = [4, 8, 12, 16, 24, 32];
 
-    for block_size in block_sizes.iter() {
+    for block_size in block_sizes {
         let config = GridConfig {
-            threshold_block_size: *block_size,
+            threshold_block_size: block_size,
             ..GridConfig::default()
         };
 
@@ -187,7 +141,7 @@ fn bench_threshold_blocks(c: &mut Criterion) {
             &img,
             |b, img| {
                 b.iter(|| {
-                    black_box(Grid::try_from_image_with_config(img, config.clone()).unwrap());
+                    black_box(Grid::try_from_image_with_config(img, config).unwrap());
                 });
             },
         );
