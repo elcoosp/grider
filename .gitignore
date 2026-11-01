@@ -1,2 +1,10 @@
 /target
-.profraw
+/coverage
+/lcov.info
+*.profdata
+*.profraw
+output_with_grid.png
+output.png
+*_with_grid.png
+/tests/snapshots/*.snap.new
+Cargo.lock.bak
