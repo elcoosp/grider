@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/logo.png" alt="Grider Logo" width="120"/>
+  <img src="docs/logo.png" alt="Grider Logo" width="300"/>
   <p>
     <strong>Image Grid Processing for Rust</strong><br/>
     A high-performance library for extracting, analyzing, and manipulating row and column grids from images.
