@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/logo.png" alt="Grider Logo" width="300"/>
+  <img src="docs/logo.png" alt="Grider Logo" width="120"/>
   <p>
     <strong>Image Grid Processing for Rust</strong><br/>
     A high-performance library for extracting, analyzing, and manipulating row and column grids from images.
@@ -7,11 +7,24 @@
   <p>
     <a href="https://crates.io/crates/grider"><img src="https://img.shields.io/crates/v/grider?style=flat-square" alt="Crates.io"/></a>
     <a href="https://docs.rs/grider"><img src="https://img.shields.io/badge/docs.rs-grider-blue?style=flat-square" alt="Documentation"/></a>
+    <a href="https://github.com/elcoosp/grider/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/elcoosp/grider/ci.yml?branch=main&style=flat-square&label=CI" alt="CI"/></a>
     <a href="https://github.com/elcoosp/grider/blob/main/LICENSE"><img src="https://img.shields.io/crates/l/grider?style=flat-square" alt="License"/></a>
   </p>
 </div>
 
 ---
+
+## Highlights
+
+- **One-line extraction**: `Grid::try_from_image_with_config(&img, config)` returns every row and
+  column band of the image, tagged as `Empty` (background) or `Full` (content).
+- **Fast by construction**: zero-copy pixel scans, run-length encoding over precomputed emptiness
+  flags, and `rayon`-parallel line scanning across both axes.
+- **Ergonomic API**: builders for `GridConfig` and `GridDrawingConfig`, iterators over cells,
+  kind-based filters, in-place `retain`, serde support, and visual debug overlays.
+- **Quality enforced**: `unsafe` forbidden, missing docs denied, clippy **pedantic** clean with
+  *zero* `allow` attributes, and coverage gates (100 % functions, 100 % lines modulo llvm-cov's
+  duplicate-instantiation accounting artifacts) enforced in CI.
 
 ## Installation
 
@@ -19,7 +32,7 @@ Add `grider` to your `Cargo.toml` dependencies:
 
 ```toml
 [dependencies]
-grider = "0.1"
+grider = "0.2"
 ```
 
 Then, import it into your Rust project:
@@ -32,8 +45,6 @@ use grider::*;
 
 ### Creating a Grid from an Image
 
-Easily parse an image and extract its grid structure using the default configuration.
-
 ```rust
 use grider::{Grid, GridConfig};
 use image::open;
@@ -45,42 +56,66 @@ let grid = Grid::try_from_image_with_config(&img, config).expect("Failed to crea
 
 ### Accessing Rows and Columns
 
-Iterate over the extracted grid elements to inspect their coordinates and properties.
-
 ```rust
 for row in grid.rows() {
-    println!("Row at y: {}", row.y);
+    println!("Row at y: {} ({:?})", row.y, row.kind);
 }
 
 for column in grid.columns() {
     println!("Column at x: {}", column.x);
 }
+
+// Every intersection of the grid:
+for cell in grid.iter_cells() {
+    let rect = cell.rect();
+    println!("cell {}x{} ({}x{})", rect.left(), rect.top(), rect.width(), rect.height());
+}
 ```
 
 ### Custom Configuration
 
-Fine-tune the grid extraction process by adjusting block size, merge thresholds, and parallel processing.
+Fine-tune the grid extraction with the builder:
 
 ```rust
-let config = GridConfig::new(
-    15,    // Threshold block size
-    0.9,   // Merge threshold ratio
-    false, // Disable parallel processing
-);
+let config = GridConfig::builder()
+    .threshold_block_size(15)  // adaptive threshold radius (min 3)
+    .threshold_delta(0)        // offset subtracted from the local mean
+    .merge_threshold_ratio(0.9)
+    .parallel(false)
+    .build();
 let grid = Grid::try_from_image_with_config(&img, config).expect("Failed to create grid");
 ```
 
 > [!TIP]
-> **Debugging with Visual Grid**  
-> You can visually verify the extracted grid by overlaying it on the original image. This is invaluable for tuning your `GridConfig`.
+> **Debugging with a visual overlay**
+> Overlay the extracted grid on the original image — invaluable while tuning your `GridConfig`.
+>
 > ```rust
+> use grider::drawing::GridDrawingConfig;
+> # use grider::{Grid, GridConfig};
+> # use image::open;
+> # let img = open("tests/large.png").unwrap();
+> # let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();
 > grider::debug::save_image_with_grid(
->     &img, 
->     &grid, 
->     "output_with_grid.png", 
->     &GridDrawingConfig::default()
-> );
+>     &img,
+>     &grid,
+>     "output_with_grid.png",
+>     &GridDrawingConfig::default(),
+> )
+> .unwrap();
 > ```
+
+### Command line
+
+The binary offers the same extraction pipeline for quick inspection:
+
+```bash
+# Extract the grid and save <image>_with_grid.png next to the input
+grider tests/large.png
+
+# Custom configuration, JSON output to stdout (no overlay is written)
+grider tests/large.png --block-size 15 --delta 2 --merge-ratio 0.9 --no-parallel --json
+```
 
 ## API Reference
 
@@ -88,37 +123,65 @@ let grid = Grid::try_from_image_with_config(&img, config).expect("Failed to crea
 
 | Struct | Description |
 | :--- | :--- |
-| **`Grid`** | Represents the extracted grid, containing lists of `Row` and `Column` elements. |
-| **`Row`** | Represents a horizontal grid line. Contains `y` (coordinate), `height`, and `kind`. |
-| **`Column`** | Represents a vertical grid line. Contains `x` (coordinate), `width`, and `kind`. |
-| **`GridConfig`** | Configuration parameters for grid extraction (block size, merge ratio, parallelization). |
-| **`GridDrawingConfig`** | Configuration parameters for rendering the debug overlay. |
+| **`Grid`** | The extracted grid: `SmallVecLine<Row>` + `SmallVecLine<Column>` with a rich query API. |
+| **`Row`** / **`Column`** | A horizontal/vertical band: start coordinate, size and `LineKind`. |
+| **`Cell`** | The intersection of a `Row` and a `Column` (`rect()` gives the covered rectangle). |
+| **`GridConfig`** | Extraction settings with `builder()` and `validate()`. |
+| **`GridDrawingConfig`** | Overlay rendering settings with `builder()` and color providers. |
 
 ### Enums
 
 | Enum | Variants | Description |
 | :--- | :--- | :--- |
-| **`LineKind`** | `Empty`, `Full` | Represents the type of a line (row or column) based on its content density. |
+| **`LineKind`** | `Empty`, `Full` | Content density of a line (with `is_empty()` / `is_full()` helpers). |
+| **`GridError`** | `#[non_exhaustive]` | Invalid dimensions/config, missing lines, image conversion failures. |
 
 ### Key Functions
 
 | Function | Description |
 | :--- | :--- |
 | `Grid::try_from_image_with_config` | Creates a grid from an image using a custom configuration. |
-| `Grid::rows` / `Grid::columns` | Returns an iterator over all rows or columns in the grid. |
-| `Grid::filtered_rows` / `Grid::filtered_columns` | Returns an iterator over rows/columns that match a given predicate. |
-| `Grid::count_rows_by_kind` / `Grid::count_columns_by_kind` | Counts the number of rows or columns matching a specific `LineKind`. |
-| `Grid::find_cells` | Finds grid cells based on specified row and column indices. |
+| `Grid::iter_cells` / `Grid::cell` | Iterate all cells / index-based cell lookup. |
+| `Grid::find_cells` / `Grid::find_row` / `Grid::find_column` | Coordinate-based lookups. |
+| `Grid::filtered_rows` / `Grid::filtered_columns` | Iterator over lines matching a predicate. |
+| `Grid::rows_by_kind` / `Grid::count_rows_by_kind` | Kind-based access and counting (same for columns). |
+| `Grid::filter_smallest/biggest_rows/columns[_with_tolerance]` | Remove structural lines by size. |
+| `Grid::retain_rows` / `Grid::retain_columns` / `Grid::keep_kind` | In-place / copy kind filters. |
+| `Grid::dimensions` | Overall `(width, height)` extent of the grid. |
+
+### Pipeline functions
+
+The detection internals are public in [`grider::detection`](https://docs.rs/grider):
+`is_row_empty`, `is_column_empty`, `run_length_encode`, `collect_lines`,
+`merge_small_lines`, `process_dimension` (with `Grid::`-level compatibility wrappers).
 
 ### Macros
 
 | Macro | Description |
 | :--- | :--- |
-| **`make_grid!`** | Conveniently constructs a `Grid` from a list of rows and columns. |
-| **`make_line!`** | Quickly creates a `Row` or `Column` from a tuple of parameters. |
+| **`make_grid!`** | Constructs a `Grid` from lists of row/column tuples. |
+| **`make_line!`** | Quickly creates a `Row` or `Column` from a tuple. |
 
----
+## Feature flags
+
+| Feature | Default | Description |
+| :--- | :--- | :--- |
+| `serde` | ✅ | `Serialize`/`Deserialize` for all data types, JSON in the CLI. |
+| `drawing` | ✅ | Grid drawing support and the debug overlay helpers. |
+| `test-utils` | — | Shared image fixtures for tests and benchmarks (`grider::testing`). |
+
+## Development
+
+```bash
+cargo test --features test-utils            # run the test suite
+cargo clippy --all-targets --all-features -- -D warnings   # pedantic-clean, zero allows
+cargo llvm-cov --all-features --workspace \
+  --fail-under-functions 100 --fail-under-lines 99.8 --fail-under-regions 99
+cargo bench --features test-utils           # criterion benchmarks
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines and
+[docs/BRAINSTORM.md](docs/BRAINSTORM.md) for the design notes behind the 0.2 release.
 
 > [!NOTE]
-> For detailed contribution guidelines, please refer to the [CONTRIBUTING.md](CONTRIBUTING.md) file.  
 > This project is distributed under the terms of the MIT License. See [LICENSE](LICENSE) for details.
