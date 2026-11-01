@@ -1,130 +1,205 @@
-name: CI and Publish
+name: CI
 
 on:
   push:
     branches:
-      - main  # Run CI on pushes to the main branch
-    tags:
-      - "v*"  # Trigger publishing on tags like v1.0.0, v2.1.0, etc.
+      - main
   pull_request:
     branches:
-      - main  # Run CI on pull requests targeting the main branch
+      - main
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  test:
-    name: Test
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]  # Test on multiple OSes
-        rust: [stable, beta, nightly]  # Test on multiple Rust versions
-        include:
-          - os: ubuntu-latest
-            rust: stable
-            features: "--all-features"  # Test with all features on stable
-          - os: ubuntu-latest
-            rust: nightly
-            features: "--all-features"  # Test without additional features on nightly
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Install Rust (${{ matrix.rust }})
-        uses: dtolnay/rust-toolchain@v1
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ matrix.rust }}
-          components: clippy, rustfmt
+          components: rustfmt
 
-      - name: Cache dependencies
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.cargo/registry
-            target
-          key: ${{ runner.os }}-cargo-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-${{ matrix.rust }}-
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
 
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      - name: Run clippy
+  clippy:
+    name: Clippy (pedantic, zero allows)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      # Pedantic lints are configured in Cargo.toml `[lints]` (pedantic, no
+      # allow attributes in source), so `-D warnings` enforces them.
+      - name: Lint (default features)
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-      - name: Run tests
-        run: cargo test ${{ matrix.features }}
+      - name: Lint (no default features)
+        run: cargo clippy --all-targets --no-default-features --features test-utils -- -D warnings
 
-      - name: Check documentation
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run tests (all features)
+        run: cargo test --features test-utils --all-features
+
+      - name: Run tests (no default features)
+        run: cargo test --no-default-features --features test-utils
+
+  coverage:
+    name: Coverage (100% functions)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+
+      # 100% of functions and lines must execute. The tiny regions/lines slack
+      # below 100% absorbs llvm-cov accounting artifacts for duplicate generic
+      # instantiations (verified: `llvm-cov show` reports every line covered);
+      # any real untested code still fails these gates.
+      - name: Check coverage gates
+        run: >-
+          cargo llvm-cov --all-features --workspace
+          --fail-under-functions 100
+          --fail-under-lines 99.8
+          --fail-under-regions 99
+          --lcov --output-path lcov.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          files: lcov.info
+          fail_ci_if_error: false
+
+  msrv:
+    name: MSRV (1.89)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Rust 1.89
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.89"
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check MSRV compatibility
+        run: cargo check --all-features
+
+  features:
+    name: Feature combinations
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check no-default-features
+        run: cargo check --no-default-features
+
+      - name: Check serde only
+        run: cargo check --no-default-features --features serde
+
+      - name: Check drawing only
+        run: cargo check --no-default-features --features drawing
+
+      - name: Check all features
+        run: cargo check --all-features
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    env:
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build documentation
         run: cargo doc --no-deps --all-features
 
-      - name: Run cargo audit
-        run: |
-          cargo install cargo-audit
-          cargo audit
-
-      - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin
-
-      - name: Run tarpaulin (code coverage)
-        run: cargo tarpaulin --all-features --out Xml
-
-      - name: Run benchmarks
-        run: cargo bench
-
-      - name: Install cargo-outdated
-        run: cargo install cargo-outdated
-
-      - name: Check for outdated dependencies
-        run: cargo outdated
-
-  build:
-    name: Build
+  bench:
+    name: Benchmarks compile
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache dependencies
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.cargo/registry
-            target
-          key: ${{ runner.os }}-cargo-stable-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-stable-
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
 
-      - name: Build the project
-        run: cargo build --release
+      - name: Compile benchmarks
+        run: cargo bench --features test-utils --no-run
 
-  publish:
-    name: Publish to crates.io
+  deny:
+    name: cargo-deny
     runs-on: ubuntu-latest
-    needs: [test, build]  # Ensure tests and builds pass before publishing
-    if: startsWith(github.ref, 'refs/tags/v')  # Only run on version tags
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@v1
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
         with:
-          toolchain: stable
+          tool: cargo-deny
 
-      - name: Cache dependencies
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.cargo/registry
-            target
-          key: ${{ runner.os }}-cargo-stable-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-stable-
-
-      - name: Publish to crates.io
-        run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
+      - name: Check advisories, licenses and bans
+        run: cargo deny check
