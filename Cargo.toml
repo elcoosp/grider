@@ -1,36 +1,76 @@
 [package]
 name = "grider"
-version = "0.1.0"
-edition = "2021"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.89"
+description = "A high-performance library for extracting, analyzing, and manipulating row and column grids from images."
+license = "MIT"
+repository = "https://github.com/elcoosp/grider"
+homepage = "https://github.com/elcoosp/grider"
+documentation = "https://docs.rs/grider"
+readme = "README.md"
+keywords = ["image", "grid", "table", "detection", "rows"]
+categories = ["multimedia::images", "computer-vision"]
+exclude = [".github", "benches", "docs", "renovate.json"]
+
 [dependencies]
-image = "0.25"
-imageproc = "0.27"
-insta = { version = "1.42.0", features = ["yaml", "redactions"] }
-serde = { version = "1.0", features = ["derive"], optional = true }
-serde_derive = { version = "1.0", optional = true }
-rayon = "1"
-smallvec = { version = "1.13", features = ["serde"] }
-pretty_assertions = "1.4.1"
-anyhow = "1.0.95"
-proptest = "1.6.0"
-rand = "0.10.0"
-thiserror = "2.0.10"
-test-case = "3.3.1"
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-clap = { version = "4.5.26", features = ["derive"] }
+image = "0.25.10"
+imageproc = "0.27.0"
+rayon = "1.12.0"
+smallvec = { version = "1.16.4", features = ["serde"] }
+thiserror = "2.0.21"
+tracing = "0.1.44"
+anyhow = "1.0.104"
+clap = { version = "4.6.7", features = ["derive"] }
+serde = { version = "1.0.229", features = ["derive"], optional = true }
+serde_json = { version = "1.0.154", optional = true }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
 [dev-dependencies]
-criterion = "0.8"
+insta = { version = "1.49.0", features = ["yaml", "redactions"] }
+proptest = "1.12.0"
+rand = "0.10.3"
+test-case = "3.4.0"
+pretty_assertions = "1.4.1"
+criterion = "0.8.2"
+assert_cmd = "2.2.2"
+predicates = "3.1.4"
 
 [[bench]]
 name = "grid"
 harness = false
 
 [features]
-debug = ["drawing"]
+default = ["serde", "drawing"]
+# Serialize and deserialize all public data types.
+serde = ["dep:serde", "dep:serde_json"]
+# Grid drawing / debug overlay support.
 drawing = []
-default = ["serde"]
-serde = [
-    "dep:serde",
-    "dep:serde_derive",
-] # Enable serde and serde_derive when the "serde" feature is active
+# Shared test fixtures for tests and benchmarks (not part of the default API).
+test-utils = []
+
+[[bin]]
+name = "grider"
+path = "src/main.rs"
+
+# Only build the feature-dependent integration tests when their feature is on.
+[[test]]
+name = "drawing"
+required-features = ["drawing"]
+
+[[test]]
+name = "serde"
+required-features = ["serde"]
+
+# Workspace-wide lint policy: pedantic clippy everywhere, no allows in code.
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
