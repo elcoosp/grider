@@ -185,3 +185,123 @@ fn line_kinds_survive_merge() {
             .all(|line| line.kind == LineKind::Full || line.kind == LineKind::Empty)
     );
 }
+
+proptest! {
+    /// The streaming adaptive mean threshold must reproduce
+    /// `imageproc::contrast::adaptive_threshold` bit-for-bit on arbitrary
+    /// images, radii and deltas — the guarantee that keeps the default
+    /// pipeline's output identical across the optimization.
+    #[test]
+    fn adaptive_mean_matches_imageproc(
+        width in 1..40u32,
+        height in 1..40u32,
+        radius in 1..9u32,
+        delta in -60i32..60,
+        seed in 0..1000u64,
+    ) {
+        let count = (width * height) as usize;
+        let mut state = seed;
+        let pixels: Vec<u8> = (0..count)
+            .map(|_| {
+                // xorshift-ish deterministic mix, full u8 range.
+                state = state.wrapping_mul(6_364_136_223_846_793_005)
+                    .wrapping_add(1_442_695_040_888_963_407);
+                u8::try_from((state >> 33) & 0xFF).unwrap_or(0)
+            })
+            .collect();
+        let img = GrayImage::from_raw(width, height, pixels).expect("valid raw buffer");
+        let mine = grider::binarize::adaptive_mean_threshold(&img, radius, delta, false);
+        let reference = imageproc::contrast::adaptive_threshold(&img, radius, delta);
+        prop_assert_eq!(mine.as_raw(), reference.as_raw());
+    }
+
+    /// The streaming Sauvola threshold must match a naive per-pixel reference
+    /// implementation exactly, including every edge of the window.
+    #[test]
+    fn sauvola_matches_naive_reference(
+        width in 1..25u32,
+        height in 1..25u32,
+        radius in 1..7u32,
+        k in -0.4f32..1.0,
+        seed in 0..1000u64,
+    ) {
+        let (width_u, height_u) = (width as usize, height as usize);
+        let mut state = seed ^ 0x9E37_79B9_7F4A_7C15;
+        let pixels: Vec<u8> = (0..width_u * height_u)
+            .map(|_| {
+                state = state.wrapping_mul(6_364_136_223_846_793_005)
+                    .wrapping_add(1_442_695_040_888_963_407);
+                u8::try_from((state >> 33) & 0xFF).unwrap_or(0)
+            })
+            .collect();
+        let img = GrayImage::from_raw(width, height, pixels).expect("valid raw buffer");
+        let mine = grider::binarize::sauvola_threshold(&img, radius, k, false);
+        let raw = img.as_raw();
+        let mut expected = Vec::with_capacity(width_u * height_u);
+        let radius = radius as usize;
+        for y in 0..height_u {
+            for x in 0..width_u {
+                let y_low = y.saturating_sub(radius);
+                let y_high = (y + radius).min(height_u - 1);
+                let x_low = x.saturating_sub(radius);
+                let x_high = (x + radius).min(width_u - 1);
+                let mut sum = 0.0f64;
+                let mut sum_sq = 0.0f64;
+                for wy in y_low..=y_high {
+                    for wx in x_low..=x_high {
+                        let value = f64::from(raw[wy * width_u + wx]);
+                        sum += value;
+                        sum_sq += value * value;
+                    }
+                }
+                let area =
+                    u32::try_from(y_high - y_low + 1).unwrap_or(u32::MAX);
+                let area = f64::from(area)
+                    * f64::from(u32::try_from(x_high - x_low + 1).unwrap_or(u32::MAX));
+                let mean = sum / area;
+                let variance = (sum_sq / area - mean * mean).max(0.0);
+                let std = variance.sqrt();
+                let threshold =
+                    mean * (1.0 + f64::from(k) * (std / grider::SAUVOLA_DYNAMIC_RANGE - 1.0));
+                expected.push(if f64::from(raw[y * width_u + x]) > threshold {
+                    255
+                } else {
+                    0
+                });
+            }
+        }
+        prop_assert_eq!(mine.as_raw(), &expected);
+    }
+
+    /// The fused emptiness scan must agree with the per-line predicates on
+    /// arbitrary binarized images, and parallelism must change nothing.
+    #[test]
+    fn scan_flags_match_predicates(
+        width in 1..50u32,
+        height in 1..50u32,
+        density in 0.05f64..0.95,
+        seed in 0..1000u64,
+    ) {
+        let count = (width * height) as usize;
+        let mut state = seed | 1;
+        let mut raw = Vec::with_capacity(count);
+        for _ in 0..count {
+            state = state.wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            let draw = f64::from(u32::try_from((state >> 11) % 1000).unwrap_or(0)) / 1000.0;
+            raw.push(if draw < density { 0 } else { 255 });
+        }
+        let img = GrayImage::from_raw(width, height, raw).expect("valid raw buffer");
+        let flags = grider::detection::scan_line_flags(&img, false);
+        let parallel = grider::detection::scan_line_flags(&img, true);
+        prop_assert_eq!(&flags, &parallel);
+        for (y, empty) in flags.rows.iter().enumerate() {
+            let y = u32::try_from(y).unwrap_or(u32::MAX);
+            prop_assert_eq!(*empty, grider::detection::is_row_empty(&img, y, width));
+        }
+        for (x, empty) in flags.columns.iter().enumerate() {
+            let x = u32::try_from(x).unwrap_or(u32::MAX);
+            prop_assert_eq!(*empty, grider::detection::is_column_empty(&img, x, height));
+        }
+    }
+}
