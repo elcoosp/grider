@@ -18,8 +18,14 @@
 
 - **One-line extraction**: `Grid::try_from_image_with_config(&img, config)` returns every row and
   column band of the image, tagged as `Empty` (background) or `Full` (content).
-- **Fast by construction**: zero-copy pixel scans, run-length encoding over precomputed emptiness
-  flags, and `rayon`-parallel line scanning across both axes.
+- **Fast by construction**: binarization runs on a streaming sliding-window integral image
+  (1.6–3.1× faster than the previous `imageproc`-based path, bit-for-bit identical output), the
+  emptiness scan is a single fused cache-friendly pass, and both steps parallelize over row bands
+  with work-size gating so small images never pay thread-pool overhead. See
+  [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+- **SOTA binarization options**: the adaptive mean threshold (Bradley & Roth) or
+  [`Binarization::Sauvola`](https://doi.org/10.1016/S0031-3203(99)00055-2) for degraded documents —
+  both `O(width × height)` regardless of the window radius, with `O(width × radius)` extra memory.
 - **Ergonomic API**: builders for `GridConfig` and `GridDrawingConfig`, iterators over cells,
   kind-based filters, in-place `retain`, serde support, and visual debug overlays.
 - **Quality enforced**: `unsafe` forbidden, missing docs denied, clippy **pedantic** clean with
@@ -86,6 +92,15 @@ let config = GridConfig::builder()
 let grid = Grid::try_from_image_with_config(&img, config).expect("Failed to create grid");
 ```
 
+Scanning degraded or unevenly lit documents? Switch the binarization to
+Sauvola:
+
+```rust
+use grider::GridConfig;
+
+let config = GridConfig::builder().sauvola(0.34).build();
+```
+
 > [!TIP]
 > **Debugging with a visual overlay**
 > Overlay the extracted grid on the original image — invaluable while tuning your `GridConfig`.
@@ -115,6 +130,9 @@ grider tests/large.png
 
 # Custom configuration, JSON output to stdout (no overlay is written)
 grider tests/large.png --block-size 15 --delta 2 --merge-ratio 0.9 --no-parallel --json
+
+# Sauvola binarization for degraded documents
+grider scan.png --binarization sauvola --sauvola-k 0.34 --json
 ```
 
 ## API Reference
@@ -141,6 +159,8 @@ grider tests/large.png --block-size 15 --delta 2 --merge-ratio 0.9 --no-parallel
 | Function | Description |
 | :--- | :--- |
 | `Grid::try_from_image_with_config` | Creates a grid from an image using a custom configuration. |
+| `Grid::try_from_gray_with_config` | Same, directly from a `GrayImage` (no conversion, no copy). |
+| `Grid::try_from_binarized` | Creates a grid from an already binarized image (skips binarization). |
 | `Grid::iter_cells` / `Grid::cell` | Iterate all cells / index-based cell lookup. |
 | `Grid::find_cells` / `Grid::find_row` / `Grid::find_column` | Coordinate-based lookups. |
 | `Grid::filtered_rows` / `Grid::filtered_columns` | Iterator over lines matching a predicate. |
@@ -153,7 +173,10 @@ grider tests/large.png --block-size 15 --delta 2 --merge-ratio 0.9 --no-parallel
 
 The detection internals are public in [`grider::detection`](https://docs.rs/grider):
 `is_row_empty`, `is_column_empty`, `run_length_encode`, `collect_lines`,
-`merge_small_lines`, `process_dimension` (with `Grid::`-level compatibility wrappers).
+`merge_small_lines`, `process_dimension`, `scan_line_flags`, `lines_from_flags`
+(with `Grid::`-level compatibility wrappers), as are the binarizers in
+[`grider::binarize`](https://docs.rs/grider): `adaptive_mean_threshold` (bit-for-bit
+identical to `imageproc::contrast::adaptive_threshold`) and `sauvola_threshold`.
 
 ### Macros
 
@@ -177,7 +200,7 @@ cargo test --features test-utils            # run the test suite
 cargo clippy --all-targets --all-features -- -D warnings   # pedantic-clean, zero allows
 cargo llvm-cov --all-features --workspace \
   --fail-under-functions 100 --fail-under-lines 99.8 --fail-under-regions 99
-cargo bench --features test-utils           # criterion benchmarks
+cargo bench --features test-utils           # criterion benchmarks (see docs/BENCHMARKS.md)
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines and
