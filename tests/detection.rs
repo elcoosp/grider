@@ -237,6 +237,7 @@ fn threshold_delta_shifts_detection() {
         threshold_delta: 30,
         merge_threshold_ratio: 0.8,
         enable_parallel: false,
+        binarization: grider::Binarization::AdaptiveMean,
     };
     let grid = Grid::try_from_image_with_config(&dynamic, permissive).unwrap();
     assert!(
@@ -250,6 +251,7 @@ fn threshold_delta_shifts_detection() {
         threshold_delta: -30,
         merge_threshold_ratio: 0.8,
         enable_parallel: false,
+        binarization: grider::Binarization::AdaptiveMean,
     };
     let grid = Grid::try_from_image_with_config(&dynamic, strict).unwrap();
     assert!(
