@@ -30,7 +30,7 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 insta = { version = "1.49.0", features = ["yaml", "redactions"] }
 proptest = "1.12.0"
 rand = "0.10.3"
-test-case = "3.4.0"
+test-case = "3.4.1"
 pretty_assertions = "1.4.1"
 criterion = "0.8.2"
 assert_cmd = "2.2.2"
