@@ -185,3 +185,46 @@ fn tempfile_dir() -> std::path::PathBuf {
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }
+
+#[test]
+fn sauvola_k_flag_implies_sauvola_binarization() {
+    // Exercises the `--sauvola-k` handling path (sauvola without an explicit
+    // --binarization flag).
+    let dir = tempfile_dir();
+    let input = dir.join("input.png");
+    std::fs::copy(fixture(), &input).unwrap();
+
+    grider()
+        .args([fixture(), "--sauvola-k", "0.3", "--json"])
+        .assert()
+        .success()
+        .stdout(contains("\"rows\""));
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn binarization_flag_selects_sauvola_with_default_k() {
+    // Exercises the explicit `--binarization sauvola` branch (default k).
+    grider()
+        .args([fixture(), "--binarization", "sauvola", "--json"])
+        .assert()
+        .success()
+        .stdout(contains("\"rows\""));
+}
+
+#[test]
+fn mean_binarization_flag_is_accepted() {
+    grider()
+        .args([fixture(), "--binarization", "mean", "--json"])
+        .assert()
+        .success()
+        .stdout(contains("\"rows\""));
+}
+
+#[test]
+fn invalid_binarization_flag_fails() {
+    grider()
+        .args([fixture(), "--binarization", "wilhelm"])
+        .assert()
+        .failure();
+}
