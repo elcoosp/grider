@@ -82,6 +82,143 @@ pub fn is_column_empty(img: &GrayImage, x: u32, height: u32) -> bool {
     (0..height as usize).all(|y| raw[y * stride + x as usize] == u8::MAX)
 }
 
+/// Emptiness flags of every scan line of both axes, from one fused pass.
+///
+/// [`scan_line_flags`] produces one by walking the image once: every pixel
+/// that differs from the background increments both its row and its column
+/// counter, so a line is background exactly when its counter is zero. This
+/// replaces a row scan plus a cache-hostile strided column scan.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct LineFlags {
+    /// Emptiness of each row, indexed by `y` (`true` = background only).
+    pub rows: Vec<bool>,
+    /// Emptiness of each column, indexed by `x` (`true` = background only).
+    pub columns: Vec<bool>,
+}
+
+/// Counts the pixels of one band of rows that differ from the background,
+/// accumulating per-row totals into `row_counts` and per-column totals into
+/// `column_counts`.
+///
+/// `raw` holds `row_counts.len()` consecutive rows of `width` pixels; the
+/// column counters span the whole image width, so parallel bands each fill
+/// their own partial counters that the caller reduces afterwards.
+fn scan_band_counts(raw: &[u8], width: usize, row_counts: &mut [u32], column_counts: &mut [u32]) {
+    for (index, row) in raw.chunks_exact(width).enumerate() {
+        let mut non_background = 0_u32;
+        for (x, &pixel) in row.iter().enumerate() {
+            if pixel != u8::MAX {
+                non_background += 1;
+                column_counts[x] += 1;
+            }
+        }
+        row_counts[index] = non_background;
+    }
+}
+
+/// Turns non-background counts into emptiness flags.
+fn flags_from_counts(counts: &[u32]) -> Vec<bool> {
+    counts.iter().map(|&count| count == 0).collect()
+}
+
+/// Computes the emptiness flags of every row and column of a binarized image.
+///
+/// A scan line is *empty* when all its pixels are white (`255`, the
+/// background produced by the [`crate::binarize`] algorithms). The flags feed
+/// directly into [`run_length_encode`] and [`lines_from_flags`], and match
+/// [`is_row_empty`] / [`is_column_empty`] pixel-for-pixel on binarized input.
+///
+/// With `parallel = true` the image is split into row bands processed on the
+/// rayon pool; the result is identical to the sequential walk.
+///
+/// # Examples
+///
+/// ```
+/// use grider::detection::scan_line_flags;
+/// use image::{GrayImage, Luma};
+///
+/// let img = GrayImage::from_raw(2, 2, vec![255, 255, 255, 0]).unwrap();
+/// let flags = scan_line_flags(&img, false);
+/// assert_eq!(flags.rows, vec![true, false]);
+/// assert_eq!(flags.columns, vec![true, false]);
+/// ```
+#[must_use]
+pub fn scan_line_flags(img: &GrayImage, parallel: bool) -> LineFlags {
+    let width = img.width() as usize;
+    let height = img.height() as usize;
+    if width == 0 || height == 0 {
+        return LineFlags {
+            rows: vec![true; height],
+            columns: vec![true; width],
+        };
+    }
+    let raw = img.as_raw();
+    // The fused scan is bandwidth bound; parallel bands only pay off when
+    // every thread gets a substantial slice of the image.
+    if !parallel || !crate::binarize::parallel_worthwhile(width * height, 524_288) {
+        let mut row_counts = vec![0_u32; height];
+        let mut column_counts = vec![0_u32; width];
+        scan_band_counts(raw, width, &mut row_counts, &mut column_counts);
+        return LineFlags {
+            rows: flags_from_counts(&row_counts),
+            columns: flags_from_counts(&column_counts),
+        };
+    }
+
+    let bands = crate::binarize::thread_count();
+    let bands = bands.min(height);
+    let rows_per_band = height.div_ceil(bands);
+    let (row_counts, column_counts) = (0..bands)
+        .into_par_iter()
+        .map(|band| {
+            let start = band * rows_per_band;
+            let end = (start + rows_per_band).min(height);
+            let mut rows = vec![0_u32; end - start];
+            let mut columns = vec![0_u32; width];
+            scan_band_counts(
+                &raw[start * width..end * width],
+                width,
+                &mut rows,
+                &mut columns,
+            );
+            (rows, columns)
+        })
+        .reduce(
+            || (Vec::new(), vec![0_u32; width]),
+            |mut left, right| {
+                left.0.extend_from_slice(&right.0);
+                for (x, count) in right.1.iter().enumerate() {
+                    left.1[x] += count;
+                }
+                left
+            },
+        );
+    LineFlags {
+        rows: flags_from_counts(&row_counts),
+        columns: flags_from_counts(&column_counts),
+    }
+}
+
+/// Projects emptiness flags through the run-length encoding and merge steps.
+///
+/// This is the shared core of [`process_dimension`] and of the
+/// [`crate::Grid`] extraction pipeline: consecutive flags become runs, runs
+/// smaller than `merge_threshold_ratio × average_size` merge into their
+/// neighbour, and the survivors are projected into `T` via [`LineTrait`].
+#[must_use]
+pub fn lines_from_flags<T: LineTrait + Send>(
+    flags: &[bool],
+    merge_threshold_ratio: f32,
+) -> SmallVecLine<T> {
+    let lines = run_length_encode(flags);
+    let average_size = calculate_average_line_size(&lines);
+    let merge_threshold = merge_threshold_for(average_size, merge_threshold_ratio);
+    merge_small_lines(lines, merge_threshold)
+        .into_iter()
+        .map(T::new)
+        .collect()
+}
+
 /// Converts a sequence of per-scan-line emptiness flags into [`LineInfo`] runs.
 ///
 /// This is the pure run-length encoding step of the pipeline: consecutive
@@ -271,12 +408,7 @@ pub(crate) fn process_dimension_unchecked<T: LineTrait + Send>(
             .collect()
     };
 
-    let lines = run_length_encode(&flags);
-    let average_size = calculate_average_line_size(&lines);
-    let merge_threshold = merge_threshold_for(average_size, merge_threshold_ratio);
-    let merged = merge_small_lines(lines, merge_threshold);
-
-    merged.into_iter().map(T::new).collect()
+    lines_from_flags(&flags, merge_threshold_ratio)
 }
 
 /// Computes the merge threshold from an average run size and a ratio.
@@ -285,7 +417,9 @@ pub(crate) fn process_dimension_unchecked<T: LineTrait + Send>(
 /// yields `0` (nothing merges), an out-of-range product saturates to
 /// `u32::MAX`. The computation happens in `f64` (lossless for `u32` inputs)
 /// and the integer conversion is performed through string parsing because
-/// `f64 -> u32` casts would silently truncate.
+/// `f64 -> u32` casts would silently truncate. The function runs once per
+/// axis per extraction, so the parsing cost is irrelevant next to the
+/// pixel-level work.
 #[must_use]
 fn merge_threshold_for(average_size: u32, ratio: f32) -> u32 {
     let scaled = f64::from(average_size) * f64::from(ratio);
@@ -317,8 +451,9 @@ pub const MIN_BLOCK_SIZE: u32 = MIN_THRESHOLD_BLOCK_SIZE;
 #[cfg(test)]
 mod tests {
     use super::{
-        calculate_average_line_size, is_column_empty, is_row_empty, merge_small_lines,
-        merge_threshold_for, process_dimension, run_length_encode,
+        LineFlags, calculate_average_line_size, is_column_empty, is_row_empty, lines_from_flags,
+        merge_small_lines, merge_threshold_for, process_dimension, run_length_encode,
+        scan_line_flags,
     };
     use crate::lines::{LineInfo, LineKind, LineTrait, Row};
     use image::GrayImage;
@@ -326,6 +461,112 @@ mod tests {
     fn image_from(width: u32, height: u32, rows: &[&[u8]]) -> GrayImage {
         let flat: Vec<u8> = rows.iter().flat_map(|row| row.iter().copied()).collect();
         GrayImage::from_raw(width, height, flat).expect("valid raw buffer")
+    }
+
+    #[test]
+    fn scan_line_flags_finds_empty_rows_and_columns() {
+        let img = image_from(
+            3,
+            4,
+            &[&[255, 255, 255], &[255, 0, 255], &[255, 0, 255], &[0, 0, 0]],
+        );
+        let flags = scan_line_flags(&img, false);
+        assert_eq!(flags.rows, vec![true, false, false, false]);
+        // Every column crosses the black bottom row, so none is background.
+        assert_eq!(flags.columns, vec![false, false, false]);
+    }
+
+    #[test]
+    fn scan_line_flags_parallel_matches_sequential() {
+        let img = image_from(
+            5,
+            9,
+            &[
+                &[255, 255, 255, 255, 255],
+                &[0, 0, 0, 0, 0],
+                &[0, 0, 0, 0, 0],
+                &[0, 0, 0, 0, 0],
+                &[255, 255, 255, 255, 255],
+                &[0, 0, 0, 0, 0],
+                &[0, 0, 0, 0, 0],
+                &[255, 255, 255, 255, 255],
+                &[255, 255, 255, 255, 255],
+            ],
+        );
+        assert_eq!(scan_line_flags(&img, false), scan_line_flags(&img, true));
+    }
+
+    #[test]
+    fn scan_line_flags_handles_degenerate_dimensions() {
+        let empty = GrayImage::new(0, 0);
+        assert_eq!(
+            scan_line_flags(&empty, false),
+            LineFlags {
+                rows: Vec::new(),
+                columns: Vec::new()
+            }
+        );
+        let no_width = GrayImage::new(0, 3);
+        assert_eq!(
+            scan_line_flags(&no_width, false),
+            LineFlags {
+                rows: vec![true, true, true],
+                columns: Vec::new()
+            }
+        );
+        let no_height = GrayImage::new(3, 0);
+        assert_eq!(
+            scan_line_flags(&no_height, true),
+            LineFlags {
+                rows: Vec::new(),
+                columns: vec![true, true, true]
+            }
+        );
+    }
+
+    #[test]
+    fn scan_line_flags_covers_single_pixel_bands() {
+        // A one-row image forces the parallel banding to shrink to one band.
+        let img = image_from(2, 1, &[&[0, 255]]);
+        let flags = scan_line_flags(&img, true);
+        assert_eq!(flags.rows, vec![false]);
+        assert_eq!(flags.columns, vec![false, true]);
+    }
+
+    #[test]
+    fn scan_flags_agree_with_the_per_line_predicates() {
+        // Any grayscale image: counting non-background pixels must agree with
+        // the predicate-based emptiness checks.
+        let img = image_from(
+            4,
+            3,
+            &[&[255, 0, 10, 255], &[255, 255, 255, 255], &[7, 255, 255, 0]],
+        );
+        let flags = scan_line_flags(&img, false);
+        for (y, empty) in flags.rows.iter().enumerate() {
+            assert_eq!(
+                *empty,
+                is_row_empty(&img, u32::try_from(y).unwrap(), 4),
+                "row {y}"
+            );
+        }
+        for (x, empty) in flags.columns.iter().enumerate() {
+            assert_eq!(
+                *empty,
+                is_column_empty(&img, u32::try_from(x).unwrap(), 3),
+                "column {x}"
+            );
+        }
+    }
+
+    #[test]
+    fn lines_from_flags_runs_the_manual_pipeline() {
+        let flags = vec![true, false, false, true];
+        let rows = lines_from_flags::<Row>(&flags, 0.8);
+        let expected = merge_small_lines(run_length_encode(&flags), merge_threshold_for(1, 0.8));
+        let expected: Vec<_> = expected.into_iter().map(Row::new).collect();
+        assert_eq!(rows.as_slice(), expected.as_slice());
+        assert!(lines_from_flags::<Row>(&[], 0.8).is_empty());
     }
 
     #[test]
