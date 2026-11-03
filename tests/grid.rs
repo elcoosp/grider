@@ -74,6 +74,7 @@ mod construction {
             merge_threshold_ratio: 0.7,
             threshold_delta: 0,
             enable_parallel: true,
+            binarization: grider::Binarization::AdaptiveMean,
         };
         let result = Grid::try_from_image_with_config(&img, config);
         assert!(result.is_ok());
@@ -171,6 +172,7 @@ mod construction {
             merge_threshold_ratio: 0.5,
             threshold_delta: 0,
             enable_parallel: false,
+            binarization: grider::Binarization::AdaptiveMean,
         };
         let grid = Grid::try_from_image_with_config(&dynamic_img, config).unwrap();
         assert_yaml_snapshot!("grid_processing_small_image", grid);
@@ -202,12 +204,14 @@ mod construction {
                 merge_threshold_ratio: 0.3,
                 threshold_delta: 0,
                 enable_parallel: false,
+                binarization: grider::Binarization::AdaptiveMean,
             },
             GridConfig {
                 threshold_block_size: 10,
                 merge_threshold_ratio: 0.8,
                 threshold_delta: 0,
                 enable_parallel: true,
+                binarization: grider::Binarization::AdaptiveMean,
             },
         ];
 
