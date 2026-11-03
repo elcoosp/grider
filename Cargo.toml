@@ -1,6 +1,6 @@
 [package]
 name = "grider"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.89"
 description = "A high-performance library for extracting, analyzing, and manipulating row and column grids from images."
@@ -38,6 +38,10 @@ predicates = "3.1.4"
 
 [[bench]]
 name = "grid"
+harness = false
+
+[[bench]]
+name = "pipeline"
 harness = false
 
 [features]
