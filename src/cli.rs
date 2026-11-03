@@ -21,11 +21,20 @@ use std::time::Instant;
 use tracing::debug;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::config::GridConfig;
+use crate::config::{GridConfig, SAUVOLA_DEFAULT_K};
 #[cfg(feature = "drawing")]
 use crate::drawing::GridDrawingConfig;
 use crate::grid::Grid;
 use crate::lines::LineKind;
+
+/// Binarization method applied before line detection.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+pub enum CliBinarization {
+    /// Adaptive mean threshold (Bradley & Roth, 2005) — the default.
+    Mean,
+    /// Sauvola threshold for degraded documents.
+    Sauvola,
+}
 
 /// Command-line arguments for the grid processing program.
 #[derive(Parser, Debug)]
@@ -42,6 +51,12 @@ pub struct Cli {
     /// Ratio of the average line size under which lines are merged ([0, 1]).
     #[arg(long)]
     pub merge_ratio: Option<f32>,
+    /// Binarization method: `mean` (default) or `sauvola`.
+    #[arg(long)]
+    pub binarization: Option<CliBinarization>,
+    /// Sauvola sensitivity parameter `k` (implies `--binarization sauvola`).
+    #[arg(long)]
+    pub sauvola_k: Option<f32>,
     /// Disable parallel processing.
     #[arg(long = "no-parallel")]
     pub no_parallel: bool,
@@ -144,6 +159,14 @@ pub fn run(cli: &Cli) -> Result<()> {
     if let Some(merge_ratio) = cli.merge_ratio {
         builder = builder.merge_threshold_ratio(merge_ratio);
     }
+    if let Some(sauvola_k) = cli.sauvola_k {
+        builder = builder.sauvola(sauvola_k);
+    }
+    if cli.binarization == Some(CliBinarization::Sauvola) {
+        builder = builder.binarization(crate::config::Binarization::Sauvola {
+            k: crate::config::Binarization::sanitize_k(cli.sauvola_k.unwrap_or(SAUVOLA_DEFAULT_K)),
+        });
+    }
     if cli.no_parallel {
         builder = builder.parallel(false);
     }
@@ -193,13 +216,31 @@ fn init_tracing() {
 
 #[cfg(test)]
 mod tests {
-    use super::{Cli, default_output_path};
+    use super::{Cli, CliBinarization, default_output_path};
     use clap::CommandFactory;
     use std::path::Path;
 
     #[test]
     fn cli_parses_successfully() {
         Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn binarization_flags_parse() {
+        use clap::Parser;
+        let cli = Cli::parse_from([
+            "grider",
+            "img.png",
+            "--binarization",
+            "sauvola",
+            "--sauvola-k",
+            "0.34",
+        ]);
+        assert_eq!(cli.binarization, Some(CliBinarization::Sauvola));
+        assert_eq!(cli.sauvola_k, Some(0.34));
+        let cli = Cli::parse_from(["grider", "img.png", "--binarization", "mean"]);
+        assert_eq!(cli.binarization, Some(CliBinarization::Mean));
+        assert_eq!(cli.sauvola_k, None);
     }
 
     #[test]
