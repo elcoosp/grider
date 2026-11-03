@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.3.0] - 2026-11-03
+
+### Added
+- `binarize` module: streaming sliding-window integral-image binarization
+  (`O(width × height)` time, `O(width × radius)` memory)
+- `Binarization::Sauvola` method (Sauvola & Pietikäinen 2000 via integral
+  images, Shafait et al. 2008) for degraded documents, with
+  `GridConfig::builder().sauvola(k)` and the `--binarization sauvola`
+  / `--sauvola-k` CLI flags
+- `Grid::try_from_gray_with_config` for direct `GrayImage` input
+- `Grid::try_from_binarized` to skip binarization when the input is already
+  binary (4.4× faster than the full path)
+- `detection::scan_line_flags` / `detection::LineFlags` / `detection::lines_from_flags`:
+  fused single-pass row+column emptiness scan
+- `docs/BENCHMARKS.md` with before/after criterion numbers
+
+### Changed
+- [**breaking**] `GridConfig` gained a `binarization` field (serde
+  backward-compatible through `#[serde(default)]`); struct literals must add
+  the field or use `..Default::default()`
+- Binarization rewritten on a streaming integral ring: 1.6–3.1× faster than
+  `imageproc::contrast::adaptive_threshold` with bit-for-bit identical output
+  (property-tested), and parallelism is now work-size gated so small images
+  never pay rayon coordination overhead
+- Row/column emptiness detection replaced by one fused cache-friendly pass
+  instead of a row scan plus a strided column scan
+- Zero-copy grayscale borrowing: already-gray `DynamicImage` inputs are no
+  longer copied before binarization
+
+### Performance
+- End-to-end extraction 1.5–3.1× faster across all sizes and patterns
+  (2.17× at 1000², 2.55× at 4000², 3.09× at 100²)
+- Full numbers and methodology in `docs/BENCHMARKS.md`
+
 ## [0.2.0] - 2026-11-01
 
 ### Added
