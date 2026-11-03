@@ -36,6 +36,16 @@
 //!     .build();
 //! ```
 //!
+//! The binarization step is configurable too — the default adaptive mean
+//! threshold is bit-for-bit identical to `imageproc`, while
+//! [`Binarization::Sauvola`] targets degraded document images:
+//!
+//! ```
+//! use grider::GridConfig;
+//!
+//! let config = GridConfig::builder().sauvola(0.34).build();
+//! ```
+//!
 //! # Filtering and querying
 //!
 //! ```
@@ -77,6 +87,15 @@
 //! | `drawing` | yes | Grid drawing support and the [`debug`] overlay helpers. |
 //! | `test-utils` | no | Shared image fixtures for tests and benchmarks. |
 //!
+//! # Performance
+//!
+//! The pipeline is `O(width × height)` regardless of the threshold window
+//! radius: binarization runs on a streaming sliding-window integral image
+//! (Bradley & Roth, 2005; memory `O(width × radius)`), the emptiness scan is
+//! a single cache-friendly pass computing row and column flags together, and
+//! both steps parallelize over row bands. See `docs/BENCHMARKS.md` for
+//! measured numbers.
+//!
 //! # Error handling
 //!
 //! All fallible operations return [`GridError`], a `#[non_exhaustive]` error
@@ -87,6 +106,8 @@
 //! `deny(missing_docs)` and pedantic clippy, with no `allow` attributes
 //! anywhere in the codebase.
 
+/// Binarization algorithms (integral-image adaptive mean and Sauvola).
+pub mod binarize;
 /// Command-line interface of the `grider` binary.
 pub mod cli;
 /// Configuration for grid processing.
@@ -112,10 +133,11 @@ pub mod macros;
 pub mod testing;
 
 pub use crate::config::{
-    DEFAULT_MERGE_THRESHOLD_RATIO, DEFAULT_THRESHOLD_BLOCK_SIZE, DEFAULT_THRESHOLD_DELTA,
-    GridConfig, GridConfigBuilder, MIN_THRESHOLD_BLOCK_SIZE,
+    Binarization, DEFAULT_MERGE_THRESHOLD_RATIO, DEFAULT_THRESHOLD_BLOCK_SIZE,
+    DEFAULT_THRESHOLD_DELTA, GridConfig, GridConfigBuilder, MIN_THRESHOLD_BLOCK_SIZE,
+    SAUVOLA_DEFAULT_K, SAUVOLA_DYNAMIC_RANGE,
 };
-pub use crate::detection::SmallVecLine;
+pub use crate::detection::{LineFlags, SmallVecLine, lines_from_flags, scan_line_flags};
 pub use crate::error::GridError;
 pub use crate::grid::Grid;
 pub use crate::lines::{Cell, Column, LineInfo, LineKind, LineTrait, Row, clamp_to_i32};
