@@ -1,14 +1,13 @@
 //! The [`Grid`] type: rows and columns extracted from an image.
 
 use image::{DynamicImage, GenericImageView, GrayImage};
-use imageproc::contrast::adaptive_threshold;
 use tracing::{debug, error, trace};
 
 use crate::config::GridConfig;
 use crate::detection::{
     SmallVecLine, calculate_average_line_size, collect_lines, is_column_empty, is_row_empty,
-    merge_small_lines, process_dimension as process_dimension_pipeline,
-    process_dimension_unchecked,
+    lines_from_flags, merge_small_lines, process_dimension as process_dimension_pipeline,
+    scan_line_flags,
 };
 use crate::error::GridError;
 use crate::lines::{Cell, Column, LineInfo, LineKind, LineTrait, Row};
@@ -40,6 +39,11 @@ const DEFAULT_TOLERANCE: f32 = 0.1;
 impl Grid {
     /// Creates a new `Grid` from an image with custom configuration.
     ///
+    /// The image is converted to 8-bit grayscale when needed (already-gray
+    /// images are borrowed without copying), binarized with the configured
+    /// [`crate::Binarization`] method, and scanned for content and background
+    /// runs on both axes.
+    ///
     /// # Examples
     ///
     /// ```
@@ -53,7 +57,9 @@ impl Grid {
     ///
     /// # Errors
     ///
-    /// Returns [`GridError::InvalidDimensions`] when the image is empty.
+    /// Returns [`GridError::InvalidDimensions`] when the image is empty and
+    /// [`GridError::InvalidConfig`] when the configuration is rejected by
+    /// [`GridConfig::validate`].
     pub fn try_from_image_with_config(
         image: &DynamicImage,
         config: GridConfig,
@@ -66,54 +72,114 @@ impl Grid {
             return Err(GridError::InvalidDimensions { width, height });
         }
 
-        let img = image.to_luma8();
-        let binarized_img =
-            adaptive_threshold(&img, config.threshold_block_size, config.threshold_delta);
-
-        let (rows, columns) = Self::process_lines(&binarized_img, config);
-        Ok(Grid { rows, columns })
-    }
-
-    /// Processes rows and columns of a binarized image, in parallel when the
-    /// configuration allows it.
-    ///
-    /// Infallible: the caller has already validated that the image is
-    /// non-empty, which is the only failure mode of the pipeline.
-    fn process_lines(
-        img: &GrayImage,
-        config: GridConfig,
-    ) -> (SmallVecLine<Row>, SmallVecLine<Column>) {
-        debug!("Processing lines with parallel={}", config.enable_parallel);
-        let (width, height) = img.dimensions();
-        let rows =
-            || Self::process_dimension_of::<Row>(img, height, width, &config, Self::is_row_empty);
-        let columns = || {
-            Self::process_dimension_of::<Column>(img, width, height, &config, Self::is_column_empty)
-        };
-
-        if config.enable_parallel {
-            rayon::join(rows, columns)
+        if let Some(gray) = image.as_luma8() {
+            Ok(Self::extract(gray, &config))
         } else {
-            (rows(), columns())
+            let gray = image.to_luma8();
+            Ok(Self::extract(&gray, &config))
         }
     }
 
-    /// Runs the detection pipeline for one axis.
-    fn process_dimension_of<T: LineTrait + Send>(
-        img: &GrayImage,
-        primary_dim: u32,
-        secondary_dim: u32,
-        config: &GridConfig,
-        is_empty_fn: impl Fn(&GrayImage, u32, u32) -> bool + Sync,
-    ) -> SmallVecLine<T> {
-        process_dimension_unchecked(
-            img,
-            primary_dim,
-            secondary_dim,
-            config.merge_threshold_ratio,
-            is_empty_fn,
-            config.enable_parallel,
-        )
+    /// Creates a new `Grid` directly from a grayscale image.
+    ///
+    /// This is the zero-conversion counterpart of
+    /// [`Grid::try_from_image_with_config`] for callers that already hold a
+    /// [`GrayImage`] (common in computer-vision pipelines): no dynamic-image
+    /// wrapper and no grayscale copy are involved.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use grider::{Grid, GridConfig};
+    /// use image::{GrayImage, Luma};
+    ///
+    /// let gray = GrayImage::from_pixel(50, 50, Luma([255]));
+    /// let grid = Grid::try_from_gray_with_config(&gray, GridConfig::default()).unwrap();
+    /// assert!(grid.is_empty() || grid.row_count() > 0);
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GridError::InvalidDimensions`] when the image is empty and
+    /// [`GridError::InvalidConfig`] when the configuration is rejected.
+    pub fn try_from_gray_with_config(
+        image: &GrayImage,
+        config: GridConfig,
+    ) -> Result<Self, GridError> {
+        trace!("Processing grayscale image with config: {config:?}");
+        config.validate()?;
+        let (width, height) = image.dimensions();
+        if width == 0 || height == 0 {
+            error!("Invalid image dimensions: width={width}, height={height}");
+            return Err(GridError::InvalidDimensions { width, height });
+        }
+        Ok(Self::extract(image, &config))
+    }
+
+    /// Creates a new `Grid` from an already binarized image.
+    ///
+    /// Binarization is the most expensive step of the pipeline; callers that
+    /// binarize themselves (Otsu, their own Sauvola variant, a scanner SDK…)
+    /// skip it entirely. Background must be white (`255`), content black
+    /// (`0`) — the same convention as [`crate::binarize`]. Only the merge
+    /// and parallelism settings of `config` are used; the threshold
+    /// parameters are ignored.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use grider::{Grid, GridConfig};
+    /// use image::{GrayImage, Luma};
+    ///
+    /// let mut binary = GrayImage::from_pixel(20, 20, Luma([255]));
+    /// for x in 0..20 {
+    ///     binary.put_pixel(x, 10, Luma([0]));
+    /// }
+    /// // Keep every run: the default merge ratio would fold the lone 1px
+    /// // rule into its background neighbours.
+    /// let config = GridConfig::builder().merge_threshold_ratio(0.0).build();
+    /// let grid = Grid::try_from_binarized(&binary, config).unwrap();
+    /// assert_eq!(grid.count_rows_by_kind(grider::LineKind::Full), 1);
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GridError::InvalidDimensions`] when the image is empty and
+    /// [`GridError::InvalidConfig`] when the configuration is rejected.
+    pub fn try_from_binarized(image: &GrayImage, config: GridConfig) -> Result<Self, GridError> {
+        trace!("Processing binarized image with config: {config:?}");
+        config.validate()?;
+        let (width, height) = image.dimensions();
+        if width == 0 || height == 0 {
+            error!("Invalid image dimensions: width={width}, height={height}");
+            return Err(GridError::InvalidDimensions { width, height });
+        }
+        let flags = scan_line_flags(image, config.enable_parallel);
+        debug!(
+            "Binarized scan produced {} row flags and {} column flags",
+            flags.rows.len(),
+            flags.columns.len()
+        );
+        Ok(Self {
+            rows: lines_from_flags(&flags.rows, config.merge_threshold_ratio),
+            columns: lines_from_flags(&flags.columns, config.merge_threshold_ratio),
+        })
+    }
+
+    /// Runs the full binarize-then-scan pipeline on a validated, non-empty
+    /// grayscale image.
+    fn extract(gray: &GrayImage, config: &GridConfig) -> Self {
+        let binarized = crate::binarize::binarize(gray, config);
+        let flags = scan_line_flags(&binarized, config.enable_parallel);
+        debug!(
+            "Scan produced {} row flags and {} column flags",
+            flags.rows.len(),
+            flags.columns.len()
+        );
+        Self {
+            rows: lines_from_flags(&flags.rows, config.merge_threshold_ratio),
+            columns: lines_from_flags(&flags.columns, config.merge_threshold_ratio),
+        }
     }
 
     /// Returns an iterator over all rows in the grid.
@@ -786,7 +852,7 @@ impl TryFrom<&DynamicImage> for Grid {
 
 #[cfg(test)]
 mod tests {
-    use image::DynamicImage;
+    use image::{DynamicImage, GrayImage};
 
     use crate::config::GridConfig;
     use crate::detection::SmallVecLine;
@@ -953,6 +1019,157 @@ mod tests {
         let reference = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();
         assert_eq!(Grid::try_from(&img).unwrap(), reference);
         assert_eq!(Grid::try_from(img.clone()).unwrap(), reference);
+    }
+
+    #[test]
+    fn gray_entry_point_matches_the_dynamic_path() {
+        let dynamic = structured_test_image(25, 25);
+        let gray = dynamic.to_luma8();
+        assert_eq!(
+            Grid::try_from_gray_with_config(&gray, GridConfig::default()).unwrap(),
+            Grid::try_from_image_with_config(&dynamic, GridConfig::default()).unwrap()
+        );
+    }
+
+    #[test]
+    fn gray_entry_point_rejects_degenerate_input() {
+        let empty = GrayImage::new(0, 4);
+        assert_eq!(
+            Grid::try_from_gray_with_config(&empty, GridConfig::default()),
+            Err(GridError::InvalidDimensions {
+                width: 0,
+                height: 4
+            })
+        );
+        let config = GridConfig {
+            merge_threshold_ratio: 2.0,
+            ..GridConfig::default()
+        };
+        let img = GrayImage::from_pixel(4, 4, image::Luma([255]));
+        assert!(Grid::try_from_gray_with_config(&img, config).is_err());
+    }
+
+    #[test]
+    fn rgb_images_take_the_conversion_path() {
+        // Non-gray DynamicImage variants have no borrowable luma buffer and
+        // must go through to_luma8.
+        let luma = structured_test_image(25, 25);
+        let rgb = DynamicImage::ImageRgb8(luma.to_rgb8());
+        let expected = Grid::try_from_image_with_config(&luma, GridConfig::default()).unwrap();
+        assert_eq!(
+            Grid::try_from_image_with_config(&rgb, GridConfig::default()).unwrap(),
+            expected
+        );
+    }
+
+    #[test]
+    fn binarized_entry_point_matches_the_full_pipeline() {
+        let gray = structured_test_image(25, 25).to_luma8();
+        let config = GridConfig::default();
+        let binarized = crate::binarize::binarize(&gray, &config);
+        assert_eq!(
+            Grid::try_from_binarized(&binarized, config).unwrap(),
+            Grid::try_from_gray_with_config(&gray, config).unwrap()
+        );
+        // The merge ratio still applies on the binarized path.
+        let no_merge = GridConfig {
+            merge_threshold_ratio: 0.0,
+            ..GridConfig::default()
+        };
+        let unmerged = Grid::try_from_binarized(&binarized, no_merge).unwrap();
+        assert!(
+            unmerged.row_count()
+                >= Grid::try_from_binarized(&binarized, config)
+                    .unwrap()
+                    .row_count()
+        );
+    }
+
+    #[test]
+    fn binarized_entry_point_rejects_degenerate_input() {
+        let empty = GrayImage::new(4, 0);
+        assert_eq!(
+            Grid::try_from_binarized(&empty, GridConfig::default()),
+            Err(GridError::InvalidDimensions {
+                width: 4,
+                height: 0
+            })
+        );
+    }
+
+    #[test]
+    fn sauvola_end_to_end_extracts_a_grid() {
+        // A synthetic table: four horizontal rules plus vertical rules that
+        // only span the middle band, so the top and bottom rows are pure
+        // background.
+        let mut gray = GrayImage::from_pixel(40, 40, image::Luma([255]));
+        for y in [8, 16, 24, 32] {
+            for x in 0..40 {
+                gray.put_pixel(x, y, image::Luma([0]));
+            }
+        }
+        for x in [8, 16, 24, 32] {
+            for y in 12..29 {
+                gray.put_pixel(x, y, image::Luma([0]));
+            }
+        }
+        let config = GridConfig::builder()
+            .sauvola(0.2)
+            .merge_threshold_ratio(0.0)
+            .build();
+        let grid = Grid::try_from_gray_with_config(&gray, config).unwrap();
+        // Runs, not pixel rows: the rules at y=8 and y=32 stay 1px runs while
+        // the vertical-rule band y=12..28 forms one 17px Full run.
+        let full_rows: Vec<_> = grid.rows_by_kind(LineKind::Full).collect();
+        assert_eq!(
+            full_rows.len(),
+            3,
+            "sauvola must see the rule bands: {grid:?}"
+        );
+        assert_eq!(full_rows[0].y, 8);
+        assert_eq!(full_rows[1].y, 12);
+        assert_eq!(full_rows[2].y, 32);
+        assert_eq!(
+            grid.count_rows_by_kind(LineKind::Empty),
+            4,
+            "sauvola must keep the background bands: {grid:?}"
+        );
+
+        // The Sauvola pipeline equals manual binarization + scan.
+        let manual = crate::binarize::binarize(&gray, &config);
+        assert_eq!(Grid::try_from_binarized(&manual, config).unwrap(), grid);
+    }
+
+    #[test]
+    fn degenerate_dimensions_log_through_a_subscriber() {
+        // The `error!` branches run their lazy formatting only when a
+        // dispatcher is installed; exercise them under a scoped subscriber.
+        let subscriber = tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::TRACE)
+            .finish();
+        tracing::subscriber::with_default(subscriber, || {
+            let flat = GrayImage::new(3, 0);
+            assert_eq!(
+                Grid::try_from_binarized(&flat, GridConfig::default()),
+                Err(GridError::InvalidDimensions {
+                    width: 3,
+                    height: 0
+                })
+            );
+            let thin = GrayImage::new(0, 3);
+            assert_eq!(
+                Grid::try_from_gray_with_config(&thin, GridConfig::default()),
+                Err(GridError::InvalidDimensions {
+                    width: 0,
+                    height: 3
+                })
+            );
+            // Successful runs reach the post-guard `debug!` formatting, which
+            // only executes under a dispatcher.
+            let img = GrayImage::from_pixel(2, 2, image::Luma([255]));
+            let _ = Grid::try_from_binarized(&img, GridConfig::default()).unwrap();
+            let _ = Grid::try_from_gray_with_config(&img, GridConfig::default()).unwrap();
+        });
     }
 
     #[test]
