@@ -122,7 +122,7 @@ jobs:
       - name: Install Rust 1.89
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: "1.89"
+          toolchain: "1.99"
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
