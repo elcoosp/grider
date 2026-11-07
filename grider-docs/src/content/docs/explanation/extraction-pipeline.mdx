@@ -1,0 +1,79 @@
+---
+title: The extraction pipeline
+description: How Grider turns pixels into rows and columns — binarization, the fused emptiness scan, run-length encoding and merging.
+type: explanation
+---
+
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+Grider reads an image and returns a [`Grid`](/reference/grid/) of rows and columns. This page explains what happens between the two — the stages, the data that flows between them, and why each stage is shaped the way it is. All functions mentioned here are public and documented in the [pipeline reference](/reference/pipeline/).
+
+## Overview
+
+```
+DynamicImage / GrayImage
+        │
+        ▼
+   [1] Binarization        adaptive mean (Bradley & Roth) or Sauvola
+        │  GrayImage, background = white (255), content = black (0)
+        ▼
+   [2] scan_line_flags     one fused pass, row + column flags together
+        │  LineFlags { rows: Vec<bool>, columns: Vec<bool> }
+        ▼
+   [3] run_length_encode   booleans → LineInfo runs per axis
+        │  Vec<LineInfo> { start, length, kind }
+        ▼
+   [4] merge_small_lines   runs shorter than ratio × average merge into their neighbour
+        │  SmallVecLine<LineInfo>
+        ▼
+   [5] lines_from_flags    runs → Row / Column via LineTrait
+        │
+        ▼
+       Grid { rows, columns }
+```
+
+## Stage 1 — Binarization
+
+The pipeline first reduces every pixel to background/content. Two algorithms share one property: `O(width × height)` time regardless of the window radius.
+
+- **Adaptive mean** (Bradley & Roth, 2005) — a pixel is background when it is at least as bright as the mean of its window minus `threshold_delta`. Grider's streaming sliding-window integral image produces output bit-for-bit identical to `imageproc::contrast::adaptive_threshold` while using `O(width × radius)` memory instead of `O(width × height)`.
+- **Sauvola** (Sauvola & Pietikäinen, 2000) — the local threshold follows the mean and the standard deviation of the window, which copes with uneven illumination on degraded documents.
+
+Both steps parallelize over row bands, with work-size gating so small images never pay thread-pool overhead.
+
+## Stage 2 — The fused emptiness scan
+
+Older versions scanned rows, then scanned columns strided across memory — the second pass was cache-hostile. Since 0.3, `scan_line_flags` walks the image once and accumulates per-row and per-column content counts in the same pass, then thresholds the counts into `LineFlags`. The scan measures around 0.4 ns per pixel and is bandwidth-bound on typical machines.
+
+## Stage 3 — Run-length encoding
+
+Per axis, the boolean flags compress into runs: `run_length_encode` turns `true`/`false` sequences into `LineInfo { start, length, kind }` records, where `kind` is `Empty` for background runs and `Full` for content runs.
+
+## Stage 4 — Merging
+
+Real grids contain hairline gaps and sub-pixel seams that split one logical band into many runs. `merge_small_lines` glues any run shorter than `merge_threshold_ratio × average_run_size` into the run being built, left to right. The merged output always covers the same total extent as the input — no pixel ever disappears or duplicates. Lower `merge_threshold_ratio` when legitimate thin bands disappear; raise it when one band still splits.
+
+## Stage 5 — Conversion to typed lines
+
+`lines_from_flags` converts each merged run into a `Row` or a `Column` through the `LineTrait` factory trait (`start` → `y`/`x`, `length` → `height`/`width`). The result is a `Grid` backed by `SmallVecLine` collections with an inline capacity of 32, so grids up to 32 lines per axis allocate nothing beyond the struct.
+
+## Why the entry points differ
+
+The three `Grid` constructors skip stages you do not need:
+
+| Entry point | Skips | Measured cost (1000² Dense fixture) |
+| :--- | :--- | ---: |
+| `try_from_image_with_config` on an RGB image | nothing | 4.98 ms (color conversion dominates) |
+| `try_from_image_with_config` on a `Luma8` image | the conversion — zero-copy gray borrow | 1.70 ms |
+| `try_from_gray_with_config` | the dynamic-image wrapper | 1.72 ms |
+| `try_from_binarized` | the whole binarization stage | 386 µs (**4.4× faster**) |
+
+<Aside kind="tip">
+    If your images are already binary, `try_from_binarized` gives you the full grid at a fraction of the
+    cost. If you control the source, keep images `Luma8` until extraction.
+</Aside>
+
+## Next steps
+
+<LinkCard title="Performance" description="The measured end-to-end and per-stage numbers." href="/explanation/performance/" />
+<LinkCard title="Pipeline functions" description="Every public function of the detection module." href="/reference/pipeline/" />
