@@ -1,0 +1,78 @@
+---
+title: Performance
+description: Where the speed comes from — measured end-to-end and per-stage benchmarks, complexity and memory behavior.
+type: explanation
+---
+
+import { LinkCard, Aside } from '@astrojs/starlight/components';
+
+Grider is built to make grid extraction the cheap part of your pipeline. This page summarizes the measured numbers and the design decisions behind them. All figures below come from the criterion suites in `benches/` of the repository (`cargo bench --features test-utils`), measured on a 2-vCPU x86-64 Linux machine with `sample_size = 20`, comparing the 0.2 pipeline against the 0.3 pipeline with `--save-baseline`. Every change is statistically significant (`p = 0.00 < 0.05`); the median ratio is reported.
+
+## End-to-end extraction by image size
+
+`Grid::try_from_image_with_config`, Checkerboard pattern, default config:
+
+| Size | 0.2 | 0.3 | Speed-up |
+| :--- | ---: | ---: | ---: |
+| 100 × 100 | 84.7 µs | 28.5 µs | **3.09×** |
+| 500 × 500 | 1.052 ms | 594 µs | **1.87×** |
+| 1000 × 1000 | 3.800 ms | 1.744 ms | **2.17×** |
+| 2000 × 2000 | 14.96 ms | 6.855 ms | **2.22×** |
+| 4000 × 4000 | 66.38 ms | 26.10 ms | **2.55×** |
+
+The speed-up holds across patterns: Checkerboard 2.15×, HorizontalStripes 2.24×, VerticalStripes 2.29×, Sparse 2.76×, Dense 2.22× (all at 1000 × 1000).
+
+## Where the time goes
+
+### Binarization
+
+| Image | `imageproc::adaptive_threshold` | `grider` sequential | `grider` parallel | `grider` Sauvola |
+| :--- | ---: | ---: | ---: | ---: |
+| 1000 × 1000 | 3.765 ms | 1.912 ms (**1.97×**) | 1.429 ms (**2.63×**) | 3.777 ms |
+| 4000 × 4000 | 65.36 ms | 30.90 ms (**2.12×**) | 20.81 ms (**3.14×**) | 61.94 ms |
+
+Sauvola costs about the same as the old adaptive mean while providing the state-of-the-art local threshold for degraded documents — the adaptive mean itself became 2–3× faster in the same release.
+
+### Fused emptiness scan
+
+| Image | Sequential | Parallel |
+| :--- | ---: | ---: |
+| 1000 × 1000 | 382 µs (~0.38 ns/px) | 379 µs |
+| 4000 × 4000 | 6.52 ms (~0.41 ns/px) | 5.08 ms |
+
+On a 2-vCPU machine the scan is bandwidth bound, so parallelism pays only at very large sizes; the work-size heuristics fall back to the sequential path when rayon coordination would cost more than it saves.
+
+### Entry points
+
+| Entry point | Time (1000² Dense, default config) | Notes |
+| :--- | ---: | :--- |
+| `try_from_image_with_config` (Luma8) | 1.701 ms | zero-copy gray borrow |
+| `try_from_image_with_config` (RGB) | 4.982 ms | color conversion dominates |
+| `try_from_gray_with_config` | 1.721 ms | no dynamic-image wrapper |
+| `try_from_binarized` | 386 µs | skips binarization — **4.4× vs. the full path** |
+
+## Memory
+
+The adaptive mean binarizer streams two window bands instead of materializing a whole integral image — peak extra memory is `O(width × radius)` instead of `O(width × height)`:
+
+| Image | Whole integral image (`u32`) | Streaming ring (`f64`) |
+| :--- | ---: | ---: |
+| 1000 × 1000, r = 12 | ~4 MB | ~104 KB |
+| 4000 × 4000, r = 12 | ~64 MB | ~1.7 MB |
+| 4000 × 4000, r = 64 | ~64 MB | ~8.3 MB |
+
+## Practical takeaways
+
+- Prefer `Luma8` input — RGB conversion costs more than the whole extraction.
+- Prefer `try_from_binarized` when your images are already binary.
+- Leave parallelism on for images above a few megapixels; disable it (`--no-parallel` / `.parallel(false)`) for small images or reproducible runs.
+
+<Aside kind="note">
+    Reproduce the comparison on your own machine:
+    `cargo bench --features test-utils -- --save-baseline before` on 0.2, `--save-baseline after`
+    on 0.3, then `--baseline before` for the comparison.
+</Aside>
+
+## Next steps
+
+<LinkCard title="The extraction pipeline" description="The design behind these numbers, stage by stage." href="/explanation/extraction-pipeline/" />
