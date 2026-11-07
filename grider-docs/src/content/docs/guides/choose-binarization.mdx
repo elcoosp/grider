@@ -1,0 +1,91 @@
+---
+title: Choose a binarization method
+description: Decide between the adaptive mean threshold for clean input and Sauvola for degraded documents, in the library and the CLI.
+type: how-to
+---
+
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+This guide helps you pick the binarization that Grider applies before line detection, and shows how to switch between the two methods in code and on the command line.
+
+## Prerequisites
+
+- Grider 0.3 or newer (Sauvola shipped in 0.3.0)
+- An image whose extraction quality depends on illumination or contrast
+
+## Decide by input quality
+
+| Input | Method | Why |
+| :--- | :--- | :--- |
+| Screenshots, scans of clean pages, synthetic patterns | `AdaptiveMean` (default) | Fastest path; bit-for-bit identical to `imageproc::contrast::adaptive_threshold` |
+| Degraded documents, uneven illumination, low contrast | `Sauvola { k }` | The local threshold follows the mean **and** the standard deviation of the window, which copes with dark spots and shadows |
+
+Both methods run in `O(width × height)` regardless of the window radius, with `O(width × radius)` extra memory.
+
+## Switch in the library
+
+The default stays the adaptive mean:
+
+```rust
+use grider::{Binarization, GridConfig};
+
+let mean = GridConfig::default();
+assert_eq!(mean.binarization, Binarization::AdaptiveMean);
+```
+
+Select Sauvola with a sensitivity `k`:
+
+```rust
+use grider::GridConfig;
+
+let config = GridConfig::builder().sauvola(0.34).build();
+```
+
+## Choose k
+
+`k` tunes how strongly the threshold reacts to local contrast. The literature typically uses values between `0.1` and `0.5`; `0.2` is the default of the reference `scikit-image` implementation and Grider's fallback for non-finite values (`SAUVOLA_DEFAULT_K`).
+
+| k | Behaviour |
+| :--- | :--- |
+| `0.1` | More permissive — keeps faint content, accepts more noise |
+| `0.2` | Balanced default |
+| `0.34` and up | More selective — favors clearly contrasted content on degraded scans |
+
+<Aside kind="note">
+    [`GridConfig::threshold_delta`](/reference/grid-config/) has no effect on Sauvola — it only applies to
+    the adaptive mean method.
+</Aside>
+
+## Switch in the CLI
+
+```bash
+# Sauvola binarization for degraded documents
+grider scan.png --binarization sauvola --sauvola-k 0.34 --json
+```
+
+Passing `--sauvola-k` implies `--binarization sauvola`, so this is equivalent:
+
+```bash
+grider scan.png --sauvola-k 0.34 --json
+```
+
+## Expect different segmentation
+
+The two methods segment differently on the same input — that is the point. On the repository's `tests/large.png` screenshot fixture, the adaptive mean starts with two short `Empty` rows, while Sauvola with `k = 0.34` groups the top of the page into one large `Empty` band:
+
+```json
+{
+  "rows": [
+    { "y": 0, "height": 243, "kind": "Empty" },
+    { "y": 243, "height": 91, "kind": "Empty" },
+    { "y": 334, "height": 179, "kind": "Full" }
+  ]
+}
+```
+
+Use the overlay (`grider scan.png --binarization sauvola`) to compare candidates on your own image, then keep the setting that matches the bands you see.
+
+## Next steps
+
+<LinkCard title="Binarization reference" description="Both algorithms, all constants and the binarize module functions." href="/reference/binarization/" />
+<LinkCard title="Configure extraction" description="The other knobs of GridConfig, with clamping and validation rules." href="/guides/configure-extraction/" />
