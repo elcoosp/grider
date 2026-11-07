@@ -1,0 +1,33 @@
+{
+	"config": {
+		"default": true,
+		"MD013": false,
+		"MD033": {
+			"allowed_elements": [
+				"Tabs",
+				"TabItem",
+				"Steps",
+				"Aside",
+				"Card",
+				"CardGrid",
+				"LinkCard",
+				"FileTree",
+				"Badge"
+			]
+		},
+		"MD041": false,
+		"MD024": {
+			"siblings_only": true
+		},
+		"MD040": false,
+		"no-hard-tabs": true,
+		"MD026": {
+			"punctuation": ".,;:"
+		}
+	},
+	"ignores": [
+		"**/node_modules/**",
+		"**/dist/**",
+		"**/.astro/**"
+	]
+}
