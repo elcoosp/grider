@@ -1,0 +1,29 @@
+/*
+	Grider docs — brand accent derived from the project logo.
+
+	The grider logo (docs/logo.png) is a brushed-steel 3D glyph. Its dominant
+	dark anchor is a cool steel gray: the darkest 2 000 opaque pixels average
+	rgb(8, 8, 9)–rgb(77, 78, 80) with hues around 210–240° at very low
+	saturation. The accent below keeps that steel hue (~205–211°) while raising
+	the saturation enough to stay clearly distinguishable from body text.
+
+	It deliberately does not reuse Starlight's default accent (hsl(224, 100%, 60%)
+	in dark mode / hsl(234, 90%, 60%) in light mode).
+
+	WCAG 2.1 contrast (computed, see docs/decisions/0007-accent-color.md):
+	- light: accent on white 6.14:1 (AA for text), accent-high 8.32:1 (AAA)
+	- dark:  accent on hsl(224, 10%, 10%) 6.39:1 (AA), accent-high 12.24:1 (AAA)
+*/
+
+:root,
+:root[data-theme='dark'] {
+	--sl-color-accent-low: hsl(205, 35%, 16%);
+	--sl-color-accent: hsl(204, 45%, 58%);
+	--sl-color-accent-high: hsl(204, 55%, 82%);
+}
+
+:root[data-theme='light'] {
+	--sl-color-accent-low: hsl(210, 42%, 93%);
+	--sl-color-accent: hsl(211, 45%, 40%);
+	--sl-color-accent-high: hsl(211, 50%, 32%);
+}
