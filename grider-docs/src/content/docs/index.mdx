@@ -1,0 +1,89 @@
+---
+title: Grider
+description: High-performance row and column grid extraction from images, as a Rust library and a CLI.
+template: splash
+hero:
+  title: Grider
+  tagline: Extract the row and column grid of an image — the skeleton of tables, spreadsheets and document layouts — with one line of Rust or one terminal command.
+  image:
+    file: ../../assets/docs-overlay.png
+    alt: "Schematic grid visualization produced by grider on a document screenshot: light gray cell bands crossed by red row lines and blue column lines."
+  actions:
+    - text: Extract your first grid
+      link: /tutorials/extract-your-first-grid/
+      icon: right-arrow
+    - text: Installation
+      link: /guides/install/
+      icon: download
+    - text: API reference
+      link: /reference/grid/
+      icon: document
+---
+
+import { Card, CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
+
+Grider reads an image, binarizes it with an adaptive threshold, detects the runs of background and content scan lines on both axes, and returns them as a [`Grid`](/reference/grid/) of [`Row`](/reference/lines-and-cells/)s and `Column`s — every band tagged `Empty` (background) or `Full` (content).
+
+```toml
+[dependencies]
+grider = "0.3"
+```
+
+```rust
+use grider::{Grid, GridConfig};
+use image::open;
+
+let img = open("path/to/image.png").expect("Failed to open image");
+let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).expect("Failed to create grid");
+
+for row in grid.rows() {
+        println!("Row at y: {} ({:?})", row.y, row.kind);
+}
+```
+
+<Aside kind="tip">
+        The `drawing` feature renders this visualization of the detected grid with one call to
+        [`debug::save_image_with_grid`](/reference/drawing/) — the figure above shows the real output of the
+        `grider` command-line tool on a screenshot fixture.
+</Aside>
+
+## Why Grider
+
+- **One-line extraction** — [`Grid::try_from_image_with_config`](/reference/grid/) returns every row and
+        column band of the image, tagged `Empty` or `Full`.
+- **Fast by construction** — binarization runs on a streaming sliding-window integral image
+        (1.6–3.1× faster than the previous `imageproc`-based path, bit-for-bit identical output), the
+        emptiness scan is one fused cache-friendly pass, and both steps parallelize over row bands with
+        work-size gating. See [Performance](/explanation/performance/).
+- **Two binarizers** — the adaptive mean threshold (Bradley & Roth) for clean input, or
+        [Sauvola](/guides/choose-binarization/) for degraded documents, both `O(width × height)` regardless
+        of the window radius.
+- **Ergonomic API** — builders for `GridConfig` and `GridDrawingConfig`, iterators over cells,
+        kind-based filters, in-place `retain`, serde support, and visual debug overlays.
+
+## Choose your path
+
+<CardGrid stagger>
+        <Card title="Learn">
+                Follow the [first-grid tutorial](/tutorials/extract-your-first-grid/) to extract, inspect and
+                draw a grid from scratch.
+        </Card>
+        <Card title="Solve a task">
+                The [how-to guides](/guides/install/) cover configuration, binarization choice, filtering,
+                drawing, JSON serialization and the CLI.
+        </Card>
+        <Card title="Look something up">
+                The [reference section](/reference/grid/) documents every public type, function, macro, error
+                variant and CLI flag.
+        </Card>
+        <Card title="Understand the design">
+                The [concept pages](/explanation/extraction-pipeline/) explain the pipeline stages and where
+                the performance comes from.
+        </Card>
+</CardGrid>
+
+## Where to next
+
+- Run the binary on your own images: [Use the CLI](/guides/use-the-cli/).
+- Fine-tune detection on difficult input: [Configure extraction](/guides/configure-extraction/).
+- Browse the source: [github.com/elcoosp/grider](https://github.com/elcoosp/grider).
