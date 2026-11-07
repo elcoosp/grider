@@ -1,0 +1,86 @@
+---
+title: Pipeline functions
+description: The public detection internals — flags scanning, run-length encoding, line merging and per-dimension processing.
+type: reference
+---
+
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+The internals of the extraction pipeline are public in the `detection` module, and `Grid` re-exposes the most useful ones as [associated functions](/reference/grid/). Compose them when you need a custom pipeline; otherwise call `Grid::try_from_image_with_config` once.
+
+## Emptiness predicates
+
+| Function | Signature | Behavior |
+| :--- | :--- | :--- |
+| `is_row_empty` | `(img: &GrayImage, y: u32, width: u32) -> bool` | `true` when scan line `y` contains only background pixels |
+| `is_column_empty` | `(img: &GrayImage, x: u32, height: u32) -> bool` | `true` when scan line `x` contains only background pixels |
+
+Both treat white (`255`) as background after binarization.
+
+## LineFlags
+
+```rust
+pub struct LineFlags {
+    pub rows: Vec<bool>,
+    pub columns: Vec<bool>,
+}
+```
+
+Emptiness of every row (indexed by `y`) and every column (indexed by `x`); `true` means background only.
+
+## scan_line_flags
+
+```rust
+pub fn scan_line_flags(img: &GrayImage, parallel: bool) -> LineFlags
+```
+
+Computes row and column flags together in a **single fused, cache-friendly pass** (~0.4 ns/pixel on the benchmark machine). With `parallel: true` the work spreads over row bands; the heuristics fall back to the sequential path when rayon coordination would cost more than it saves.
+
+## Run-length encoding and merging
+
+| Function | Signature | Behavior |
+| :--- | :--- | :--- |
+| `run_length_encode` | `(flags: &[bool]) -> Vec<LineInfo>` | Encodes runs of `true` (`Empty`) and `false` (`Full`) into `LineInfo` runs |
+| `calculate_average_line_size` | `(lines: &[LineInfo]) -> u32` | Average run length; `0` for an empty slice |
+| `merge_small_lines` | `(lines: Vec<LineInfo>, threshold: u32) -> SmallVecLine<LineInfo>` | Glues runs shorter than `threshold` into their neighbour, left to right; the merged runs always cover the same total extent as the input |
+| `lines_from_flags` | `(flags: &[bool], merge_threshold_ratio: f32) -> SmallVecLine<T>` | Encode, average, compute the merge threshold from the ratio, merge, and convert to `T: LineTrait + Send` |
+
+The pipeline derives the merge threshold as `merge_threshold_for(average_size, ratio)` — runs shorter than `ratio × average` merge into their neighbour. The merge keeps the kind of the run being built, and merged runs cover the same total extent as the input:
+
+```rust
+use grider::detection::merge_small_lines;
+use grider::{LineInfo, LineKind};
+
+let lines = vec![
+    LineInfo::new(0, 5, LineKind::Empty),
+    LineInfo::new(5, 3, LineKind::Empty),
+    LineInfo::new(8, 10, LineKind::Full),
+];
+let merged = merge_small_lines(lines, 4);
+assert_eq!(merged.len(), 2);
+```
+
+## collect_lines and process_dimension
+
+| Function | Signature | Behavior |
+| :--- | :--- | :--- |
+| `collect_lines` | `(img, primary_dim, secondary_dim, is_empty_fn) -> Vec<LineInfo>` | Collects the initial (unmerged) runs of one axis. `is_empty_fn` is called once per scan line with `(image, line_index, secondary_dimension)`, allowing custom definitions of empty |
+| `process_dimension` | `(img, primary_dim, secondary_dim, merge_threshold_ratio, is_empty_fn) -> Result<SmallVecLine<T>, GridError>` | Full per-axis pipeline — flags, encode, merge, convert — for `T: LineTrait + Send`; fails with [`InvalidDimensions`](/reference/errors/) on a zero dimension |
+
+<Aside kind="note">
+    The built-in `is_row_empty` / `is_column_empty` predicates implement the standard behavior. Pass a
+    custom closure to `collect_lines` or `process_dimension` when you need, for example, a grey-level
+    tolerance.
+</Aside>
+
+## Constants
+
+| Constant | Value | Meaning |
+| :--- | :--- | :--- |
+| `DEFAULT_SMALLVEC_SIZE` | `32` | Inline capacity of the `SmallVecLine` collections that back [`Grid`](/reference/grid/) |
+| `MIN_BLOCK_SIZE` | `3` | Alias of `MIN_THRESHOLD_BLOCK_SIZE` |
+
+## Next steps
+
+<LinkCard title="The extraction pipeline" description="How these functions compose end to end." href="/explanation/extraction-pipeline/" />
+<LinkCard title="Binarization" description="The stage that feeds these functions." href="/reference/binarization/" />

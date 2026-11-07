@@ -1,0 +1,38 @@
+---
+title: Feature flags
+description: What the serde, drawing and test-utils cargo features gate, and how the CLI behaves without them.
+type: reference
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+Grider compiles three cargo features. Two are on by default; `test-utils` exists for development only.
+
+## The flags
+
+| Feature | Default | Gates |
+| :--- | :--- | :--- |
+| `serde` | enabled | `Serialize`/`Deserialize` for all public data types, and JSON output in the CLI |
+| `drawing` | enabled | The [`drawing`](/reference/drawing/) module, the `Drawable` trait, and the [`debug::save_image_with_grid`](/reference/drawing/) helpers |
+| `test-utils` | disabled | The `grider::testing` module with shared image fixtures (`Pattern`, `test_image`, `gray_test_image`) for tests and benchmarks |
+
+## Customize a build
+
+```bash
+# Minimal build — no JSON, no drawing:
+cargo add grider --no-default-features
+
+# Add only serde back:
+cargo add grider --no-default-features --features serde
+```
+
+## CLI behavior without features
+
+| Missing feature | CLI behavior |
+| :--- | :--- |
+| `serde` | `--json` prints `Skipping JSON output: built without the 'serde' feature`; the run still exits `0` |
+| `drawing` | The overlay step prints `Skipping overlay '…': built without the 'drawing' feature`; the run still exits `0` |
+
+## Next steps
+
+<LinkCard title="Installation" description="How to select features with cargo." href="/guides/install/" />

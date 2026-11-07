@@ -1,0 +1,64 @@
+---
+title: CLI
+description: The grider command — arguments, every option with its default, outputs and exit codes.
+type: reference
+---
+
+import { LinkCard, Aside } from '@astrojs/starlight/components';
+
+The `grider` binary (built by the same crate) runs the library pipeline from a terminal. `grider --help` prints the canonical flag list; the table below adds defaults and behavior.
+
+## Arguments
+
+| Argument | Type | Meaning |
+| :--- | :--- | :--- |
+| `<IMAGE_PATH>` (positional) | path | Path to the input image file |
+
+## Options
+
+| Flag | Type | Default | Meaning |
+| :--- | :--- | :--- | :--- |
+| `--block-size` | `u32` | `12` | Adaptive threshold block size (minimum `3`) |
+| `--delta` | `i32` | `0` | Offset subtracted from the local mean during adaptive thresholding |
+| `--merge-ratio` | `f32` | `0.8` | Ratio of the average line size under which lines merge (`[0, 1]`) |
+| `--binarization` | `mean` \| `sauvola` | `mean` | Binarization method applied before detection |
+| `--sauvola-k` | `f32` | `0.2` | Sauvola sensitivity `k`; implies `--binarization sauvola` |
+| `--no-parallel` | flag | off | Disable parallel processing |
+| `-o`, `--output` | path | `<image>_with_grid.png` next to the input | Where to save the overlay image |
+| `--json` | flag | off | Print the grid as JSON instead of saving an overlay |
+| `-q`, `--quiet` | flag | off | Suppress human-readable summaries |
+| `-h`, `--help` | flag | — | Print help (`-h` prints a summary) |
+| `-V`, `--version` | flag | — | Print version |
+
+## Output behavior
+
+- **Default**: a timing summary, the grid summary, kind counts, then the overlay file path.
+- **`--json`**: pretty JSON of the whole grid on stdout; no overlay file is written.
+- **`--quiet`**: no summary lines; pairs with `--json` for machine-only output.
+
+```ansi
+Extracted grid in 7.22ms
+Grid { rows: 16, columns: 19 }
+Full rows: 7, empty rows: 9, full columns: 9, empty columns: 10
+Saving overlay to tests/large_with_grid.png
+```
+
+## Exit codes and logging
+
+| Case | Exit code | Output |
+| :--- | :--- | :--- |
+| Success | `0` | As above |
+| Failure (unreadable image, failed extraction, unwritable overlay) | `1` | `error: …` with the `Caused by:` chain |
+
+The binary initializes a `tracing` subscriber from `RUST_LOG`; `RUST_LOG=debug grider img.png` logs the parsed arguments.
+
+<Aside kind="note">
+    Two outputs are feature-gated: without `serde`, JSON printing prints
+    `Skipping JSON output: built without the 'serde' feature`; without `drawing`, the overlay step
+    prints `Skipping overlay '…': built without the 'drawing' feature`. Both still exit `0`.
+</Aside>
+
+## Next steps
+
+<LinkCard title="Use the CLI" description="Task recipes — overlays, JSON, logging, failures." href="/guides/use-the-cli/" />
+<LinkCard title="GridConfig" description="The library-side counterpart of the tuning flags." href="/reference/grid-config/" />

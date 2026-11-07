@@ -1,0 +1,63 @@
+---
+title: Errors
+description: Every GridError variant, its fields and its Display output, plus wildcard-match guidance.
+type: reference
+---
+
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+All errors that [`Grid`](/reference/grid/) operations produce. The enum derives `Error`, `Debug`, `PartialEq`, `Eq`, `Clone` (via `thiserror`) and is `#[non_exhaustive]` — new variants may arrive in minor releases, so downstream `match` arms include a wildcard.
+
+## Variants :badge[non_exhaustive]{variant="caution"}
+
+| Variant | Fields | Display output |
+| :--- | :--- | :--- |
+| `InvalidDimensions` | `width: u32`, `height: u32` | `Invalid image dimensions: width={width}, height={height}` |
+| `RowNotFound` | `y: u32` | `Row not found at y={y}` |
+| `ColumnNotFound` | `x: u32` | `Column not found at x={x}` |
+| `InvalidConfig` | `reason: String` | `Invalid configuration: {reason}` |
+| `ImageConversionError` | `String` | `Failed to convert image: {0}` |
+
+## When each variant occurs
+
+| Variant | Raised by |
+| :--- | :--- |
+| `InvalidDimensions` | Extracting from an image with zero width or zero height; `detection::process_dimension` with a zero dimension |
+| `RowNotFound` / `ColumnNotFound` | [`Grid::find_cells`](/reference/grid/) with a `y`/`x` coordinate where no band starts |
+| `InvalidConfig` | [`GridConfig::validate`](/reference/grid-config/) on a zero block size, a non-finite or out-of-range merge ratio, or a non-finite Sauvola `k` |
+| `ImageConversionError` | `debug::save_image_with_grid` when the output file cannot be written |
+
+## Constructor
+
+```rust
+pub fn invalid_config(reason: impl Into<String>) -> Self
+```
+
+Builds `GridError::InvalidConfig` from any string-ish value:
+
+```rust
+use grider::GridError;
+
+let error = GridError::invalid_config("block size must be > 0");
+assert_eq!(error.to_string(), "Invalid configuration: block size must be > 0");
+```
+
+## Handling in practice
+
+```rust
+match result {
+    Ok(grid) => println!("{grid}"),
+    Err(GridError::InvalidDimensions { width, height }) => eprintln!("empty image {width}x{height}"),
+    Err(e) => eprintln!("extraction failed: {e}"),
+}
+```
+
+<Aside kind="caution">
+    Because the enum is `#[non_exhaustive]`, matching every current variant without a wildcard arm does
+    not compile outside the crate — keep a catch-all arm.
+</Aside>
+
+## Next steps
+
+<LinkCard title="Grid" description="The fallible operations that return these errors." href="/reference/grid/" />
+<LinkCard title="GridConfig" description="The validation rules behind InvalidConfig." href="/reference/grid-config/" />

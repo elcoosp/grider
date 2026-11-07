@@ -1,0 +1,124 @@
+---
+title: Grid
+description: The Grid type — construction from images, iterators, kind-based access, filtering, coordinate lookups and compatibility wrappers.
+type: reference
+---
+
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+`Grid` is the extracted result of the pipeline: every row and column band of an image, tagged [`Empty` or `Full`](/reference/lines-and-cells/). Use this page to find any method of the type.
+
+## Definition
+
+```rust
+pub struct Grid {
+    pub rows: SmallVecLine<Row>,
+    pub columns: SmallVecLine<Column>,
+}
+```
+
+- The two fields are public and hold the lines in `SmallVecLine` collections (a small-vector type with an inline capacity of `32`, see `detection::DEFAULT_SMALLVEC_SIZE`).
+- Derives: `Debug`, `PartialEq`, `Clone` — plus `Serialize`/`Deserialize` with the `serde` feature.
+- Implements `Display`, printing a compact summary such as `Grid { rows: 16, columns: 19 }`.
+- Lines store their position (`Row::y` / `Column::x`), extent (`height` / `width`) and [`LineKind`](/reference/lines-and-cells/).
+
+## Construction
+
+| Function | Signature | Behavior |
+| :--- | :--- | :--- |
+| `try_from_image_with_config` | `(&DynamicImage, GridConfig) -> Result<Self, GridError>` | Full pipeline from any image; already-gray inputs borrow zero-copy |
+| `try_from_gray_with_config` | `(&GrayImage, GridConfig) -> Result<Self, GridError>` | Same pipeline directly from a `GrayImage` — no conversion, no copy |
+| `try_from_binarized` | `(&GrayImage, GridConfig) -> Result<Self, GridError>` | Skips binarization; on the benchmark fixture this is **4.4× faster** than the full path |
+
+```rust
+use grider::{Grid, GridConfig};
+use image::open;
+
+let img = open("tests/large.png").expect("Failed to open image");
+let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).expect("Failed to create grid");
+```
+
+All three validate the image (zero width or height fails with [`GridError::InvalidDimensions`](/reference/errors/)) and the configuration.
+
+## Iterate and count
+
+| Method | Returns | Notes |
+| :--- | :--- | :--- |
+| `rows()` | `impl Iterator<Item = &Row>` | Every row, top to bottom |
+| `columns()` | `impl Iterator<Item = &Column>` | Every column, left to right |
+| `rows_slice()` / `columns_slice()` | `&[Row]` / `&[Column]` | Borrow the backing storage |
+| `row_count()` / `column_count()` | `usize` | Number of lines |
+| `is_empty()` | `bool` | No lines on either axis |
+| `iter_cells()` | `impl Iterator<Item = Cell>` | Every intersection, row-major |
+| `cell(row_index, column_index)` | `Option<Cell>` | Index-based cell lookup |
+| `dimensions()` | `(u32, u32)` | Largest `column.end()`, largest `row.end()`; `0` per empty axis |
+
+## Kind-based access
+
+| Method | Returns |
+| :--- | :--- |
+| `rows_by_kind(kind)` | `impl Iterator<Item = &Row>` |
+| `columns_by_kind(kind)` | `impl Iterator<Item = &Column>` |
+| `count_rows_by_kind(kind)` | `usize` |
+| `count_columns_by_kind(kind)` | `usize` |
+| `keep_kind(kind)` | New `Grid` with only that [`LineKind`](/reference/lines-and-cells/) on both axes |
+
+## Predicate and in-place filtering
+
+| Method | Behavior |
+| :--- | :--- |
+| `filtered_rows(predicate)` | Iterator over rows matching a predicate |
+| `filtered_columns(predicate)` | Iterator over columns matching a predicate |
+| `retain_rows(predicate)` | Removes non-matching rows in place — the allocation-free counterpart of the copy filters |
+| `retain_columns(predicate)` | Same for columns |
+
+## Size filters
+
+Every method returns a new `Grid` and leaves the original untouched. The no-tolerance variants compare sizes with a built-in default tolerance of `0.1`.
+
+| Method | Removes |
+| :--- | :--- |
+| `filter_smallest_rows()` / `filter_smallest_rows_with_tolerance(t)` | Rows at the minimum height |
+| `filter_biggest_rows()` / `filter_biggest_rows_with_tolerance(t)` | Rows at the maximum height — headers and footers |
+| `filter_smallest_columns()` / `filter_smallest_columns_with_tolerance(t)` | Columns at the minimum width |
+| `filter_biggest_columns()` / `filter_biggest_columns_with_tolerance(t)` | Columns at the maximum width |
+
+Size accessors: `smallest_row_height()`, `biggest_row_height()`, `smallest_column_width()`, `biggest_column_width()` — each `Option<u32>`, `None` on an empty axis.
+
+## Coordinate lookups
+
+| Method | Lookup | Result |
+| :--- | :--- | :--- |
+| `find_row(y)` | Row starting at `y` | `Option<&Row>` |
+| `find_column(x)` | Column starting at `x` | `Option<&Column>` |
+| `find_cells(row_positions, column_positions)` | `&[u32]` y- and x-coordinates | Iterator of `Result<Cell, GridError>` |
+
+`find_cells` yields [`RowNotFound`](/reference/errors/) / `ColumnNotFound` errors for coordinates where no band starts:
+
+```rust
+let cells = grid.find_cells(&[1, 2, 3], &[4, 5, 6]);
+for cell in cells {
+    match cell {
+        Ok(c) => println!("Found cell at row {}, column {}", c.row.y, c.column.x),
+        Err(e) => eprintln!("Error finding cell: {e}"),
+    }
+}
+```
+
+## Pipeline compatibility wrappers
+
+`Grid` re-exposes the detection internals as associated functions, so one import serves both levels (see the [pipeline reference](/reference/pipeline/) for semantics):
+
+| Associated function | Delegates to |
+| :--- | :--- |
+| `Grid::is_row_empty(img, y, width)` | `detection::is_row_empty` |
+| `Grid::is_column_empty(img, x, height)` | `detection::is_column_empty` |
+| `Grid::collect_lines(img, primary_dim, secondary_dim, is_empty_fn)` | `detection::collect_lines` |
+| `Grid::process_dimension(img, primary_dim, secondary_dim, ratio, is_empty_fn)` | `detection::process_dimension` |
+| `Grid::merge_small_lines(lines, threshold)` | `detection::merge_small_lines` |
+| `Grid::calculate_average_line_size(lines)` | `detection::calculate_average_line_size` |
+
+## Next steps
+
+<LinkCard title="Lines and cells" description="Row, Column, Cell, LineInfo, LineKind and the LineTrait factory trait." href="/reference/lines-and-cells/" />
+<LinkCard title="Filter grid lines" description="Recipes that combine these methods." href="/guides/filter-lines/" />

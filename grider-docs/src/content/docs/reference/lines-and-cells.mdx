@@ -1,0 +1,108 @@
+---
+title: Lines and cells
+description: The line primitives — LineKind, LineInfo, Row, Column, Cell, the LineTrait factory trait and clamp_to_i32.
+type: reference
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+A grid is composed of horizontal `Row`s and vertical `Column`s. Both are projections of the same run of `LineInfo` produced by the detection pipeline, unified by the `LineTrait` factory trait. All types derive `Debug`, `PartialEq`, `Eq`, `Clone`, `Copy`, `Hash` (except `Cell`, which borrows) and `Serialize`/`Deserialize` with the `serde` feature.
+
+## LineKind
+
+The content density of a line.
+
+| Variant | Meaning | Helper |
+| :--- | :--- | :--- |
+| `Empty` | The line contains only background pixels | `is_empty()` |
+| `Full` | The line contains content | `is_full()` |
+
+## LineInfo
+
+Raw information about a run of consecutive scan lines sharing a kind.
+
+| Field | Type | Meaning |
+| :--- | :--- | :--- |
+| `start` | `u32` | Start position of the run along the scanned axis |
+| `length` | `u32` | Number of consecutive scan lines in the run |
+| `kind` | `LineKind` | Kind of the run |
+
+Constructor: `LineInfo::new(start, length, kind)`.
+
+## Row
+
+A horizontal band of the grid.
+
+| Field | Type | Meaning |
+| :--- | :--- | :--- |
+| `y` | `u32` | `y` coordinate where the row starts |
+| `height` | `u32` | Height of the row in pixels |
+| `kind` | `LineKind` | Kind of the row |
+
+Method: `end() -> u32` — `y + height`, saturating.
+
+## Column
+
+A vertical band of the grid.
+
+| Field | Type | Meaning |
+| :--- | :--- | :--- |
+| `x` | `u32` | `x` coordinate where the column starts |
+| `width` | `u32` | Width of the column in pixels |
+| `kind` | `LineKind` | Kind of the column |
+
+Method: `end() -> u32` — `x + width`, saturating.
+
+## Cell
+
+The intersection of a `Row` and a `Column`.
+
+| Field | Type | Meaning |
+| :--- | :--- | :--- |
+| `row` | `&Row` | The row defining the vertical extent |
+| `column` | `&Column` | The column defining the horizontal extent |
+
+Method: `rect() -> Rect` — the covered rectangle on the image (an `imageproc::rect::Rect`). Cells compare by value, not by identity:
+
+```rust
+use grider::{make_grid, LineInfo};
+
+let grid = make_grid!(rows: [(0, 10)], columns: [(5, 15)]);
+let cell = grid.cell(0, 0).expect("single cell grid");
+let rect = cell.rect();
+assert_eq!((rect.left(), rect.top()), (5, 0));
+assert_eq!((rect.width(), rect.height()), (15, 10));
+```
+
+## LineTrait
+
+A factory trait implemented by `Row` and `Column`, letting the detection pipeline convert generic `LineInfo` runs into the matching orientation-specific type:
+
+```rust
+use grider::{Column, LineInfo, LineKind, LineTrait, Row};
+
+let line_info = LineInfo::new(0, 100, LineKind::Full);
+let row = Row::new(line_info);
+let column = Column::new(line_info);
+
+assert_eq!(row.y, 0);
+assert_eq!(column.x, 0);
+```
+
+| Implementor | `new(LineInfo)` produces |
+| :--- | :--- |
+| `Row` | `y = start`, `height = length`, `kind = kind` |
+| `Column` | `x = start`, `width = length`, `kind = kind` |
+
+## clamp_to_i32
+
+```rust
+pub fn clamp_to_i32(value: u32) -> i32
+```
+
+Clamps a `u32` coordinate into the `i32` range expected by `imageproc`, mapping overflow onto `i32::MAX`. Coordinates beyond `i32::MAX` cannot occur for images that fit in memory, but the clamp keeps the conversion total and panic free.
+
+## Next steps
+
+<LinkCard title="Grid" description="The type that stores these primitives and queries them." href="/reference/grid/" />
+<LinkCard title="Macros" description="make_line! and make_grid! build these types concisely in tests." href="/reference/macros/" />

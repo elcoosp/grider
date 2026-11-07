@@ -1,0 +1,69 @@
+---
+title: Macros
+description: make_line! and make_grid! — concise constructors for rows, columns and whole grids.
+type: reference
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+The two exported macros build line primitives and whole grids from tuples, which keeps test fixtures readable. Both are available through `grider::*`.
+
+## make_line!
+
+Creates a `Row` or `Column` from a tuple. The kind defaults to `LineKind::Empty` when omitted.
+
+| Form | Expands to |
+| :--- | :--- |
+| `make_line!(Row, ($y, $height, $kind))` | Row at `y` with `height` and the given kind |
+| `make_line!(Row, ($y, $height))` | Row with `LineKind::Empty` |
+| `make_line!(Column, ($x, $width, $kind))` | Column at `x` with `width` and the given kind |
+| `make_line!(Column, ($x, $width))` | Column with `LineKind::Empty` |
+
+```rust
+use grider::*;
+
+// With LineKind::Full
+let row = make_line!(Row, (0, 10, LineKind::Full));
+assert_eq!(row.y, 0);
+assert_eq!(row.height, 10);
+assert_eq!(row.kind, LineKind::Full);
+
+// Without LineKind (defaults to LineKind::Empty)
+let row = make_line!(Row, (10, 20));
+assert_eq!(row.y, 10);
+assert_eq!(row.height, 20);
+assert_eq!(row.kind, LineKind::Empty);
+```
+
+## make_grid!
+
+Creates a [`Grid`](/reference/grid/) from lists of row and column tuples. A trailing comma after each tuple is optional.
+
+```rust
+use grider::{make_grid, LineKind};
+
+let grid = make_grid!(
+    rows: [
+        (0, 10),                  // Row at y=0, height=10, LineKind::Empty
+        (10, 20, LineKind::Full), // Row at y=10, height=20, LineKind::Full
+    ],
+    columns: [
+        (0, 5),                   // Column at x=0, width=5, LineKind::Empty
+        (5, 15, LineKind::Full),  // Column at x=5, width=15, LineKind::Full
+    ]
+);
+
+assert_eq!(grid.rows.len(), 2);
+assert_eq!(grid.columns.len(), 2);
+```
+
+Notes:
+
+- An omitted `LineKind` defaults to `LineKind::Empty`.
+- The resulting `Grid` stores rows and columns in `SmallVecLine` collections.
+- `make_grid!` composes with every query method — the macros exist so tests can construct exact grids without an image.
+
+## Next steps
+
+<LinkCard title="Lines and cells" description="The types these macros construct." href="/reference/lines-and-cells/" />
+<LinkCard title="Grid" description="Query the constructed grids." href="/reference/grid/" />

@@ -1,0 +1,105 @@
+---
+title: Drawing API
+description: GridDrawingConfig with defaults, the builder, color providers, the Drawable trait and the debug overlay helper.
+type: reference
+---
+
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+The `drawing` module (gated by the default `drawing` feature) renders grids, cells, and grid lines on images. `GridDrawingConfig` controls the appearance; the `Drawable` trait draws on an `RgbaImage`.
+
+## GridDrawingConfig
+
+| Field | Type | Default | Meaning |
+| :--- | :--- | :--- | :--- |
+| `padding` | `u32` | `0` | Inset between cells and grid lines, applied to every cell rectangle |
+| `row_color` | `Rgba<u8>` | `Rgba([255, 0, 0, 255])` | Horizontal band color |
+| `column_color` | `Rgba<u8>` | `Rgba([0, 0, 255, 255])` | Vertical band color |
+| `cell_background_color` | `Rgba<u8>` | `Rgba([200, 200, 200, 255])` | Cell fill |
+| `row_color_provider` | `Option<Box<dyn Fn(usize) -> Rgba<u8>>>` | `None` | Per-row color by index; overrides `row_color` |
+| `column_color_provider` | `Option<Box<dyn Fn(usize) -> Rgba<u8>>>` | `None` | Per-column color by index; overrides `column_color` |
+| `line_thickness` | `u32` | `2` | Band thickness in pixels (clamped to at least `1`) |
+
+`GridDrawingConfig` implements `Debug`; the providers render as `<function>`.
+
+## Builder
+
+| Method | Sets |
+| :--- | :--- |
+| `padding(v: u32)` | Cell inset |
+| `row_color(v: Rgba<u8>)` | Horizontal band color |
+| `column_color(v: Rgba<u8>)` | Vertical band color |
+| `cell_background_color(v: Rgba<u8>)` | Cell fill |
+| `row_color_provider(v: Box<dyn Fn(usize) -> Rgba<u8>>)` | Per-row color provider |
+| `column_color_provider(v: Box<dyn Fn(usize) -> Rgba<u8>>)` | Per-column color provider |
+| `line_thickness(v: u32)` | Band thickness, minimum `1` |
+
+```rust
+use grider::drawing::GridDrawingConfig;
+use image::Rgba;
+
+let config = GridDrawingConfig::builder()
+    .padding(1)
+    .cell_background_color(Rgba([0, 0, 0, 255]))
+    .row_color_provider(Box::new(|index| Rgba([index as u8, 0, 0, 255])))
+    .build();
+assert_eq!(config.padding, 1);
+```
+
+## Color resolution
+
+| Method | Behavior |
+| :--- | :--- |
+| `row_color_at(index) -> Rgba<u8>` | Returns the provider result when set, otherwise `row_color` |
+| `column_color_at(index) -> Rgba<u8>` | Returns the provider result when set, otherwise `column_color` |
+
+## Drawable
+
+```rust
+pub trait Drawable {
+    fn draw(&self, image: &mut RgbaImage, config: &GridDrawingConfig);
+}
+```
+
+Implemented by `Cell`, `Row`, `Column` and [`Grid`](/reference/grid/). Drawing is infallible by construction: every band and rectangle is clipped to the image bounds.
+
+Drawing semantics:
+
+- `Row` draws a horizontal band of `line_thickness` pixels centered on its `end()` (bottom edge).
+- `Column` draws a vertical band of the same thickness centered on its `end()` (right edge).
+- `Cell` fills its rectangle, inset by `padding` on each side.
+- `Grid` draws every cell first, then every row band, then every column band — the result covers the original image pixels and visualizes the grid geometry.
+
+## debug module
+
+```rust
+pub fn save_image_with_grid(
+    image: &DynamicImage,
+    grid: &Grid,
+    output_path: &str,
+    config: &GridDrawingConfig,
+) -> Result<(), GridError>
+```
+
+Converts the image to `RgbaImage`, draws the grid with `config`, and writes the file. Returns [`GridError::ImageConversionError`](/reference/errors/) when saving fails.
+
+```rust
+use grider::drawing::GridDrawingConfig;
+use grider::{Grid, GridConfig};
+use image::open;
+
+let img = open("tests/large.png").unwrap();
+let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();
+
+grider::debug::save_image_with_grid(&img, &grid, "output_with_grid.png", &GridDrawingConfig::default())
+    .unwrap();
+```
+
+<Aside kind="note">
+    The command-line binary calls this function with the default config on every run unless you pass
+    `--json` or build without the `drawing` feature.
+</Aside>
+
+## Next steps
+
+<LinkCard title="Draw grids and cells" description="Recipes for providers, thickness and padding." href="/guides/draw-overlays/" />
