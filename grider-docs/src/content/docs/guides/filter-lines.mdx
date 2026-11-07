@@ -1,0 +1,105 @@
+---
+title: Filter grid lines
+description: Remove structural rows and columns by size, keep kinds, retain in place and look lines and cells up by coordinate.
+type: how-to
+---
+
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+This guide shows you how to turn a raw extraction into the subset of lines you actually care about: dropping header and footer bands, keeping only content, filtering by predicate, and looking rows, columns and cells up by coordinate.
+
+## Prerequisites
+
+- A [`Grid`](/reference/grid/) extracted with `Grid::try_from_image_with_config` or constructed with `make_grid!`
+
+## Remove structural lines by size
+
+Page headers, footers and margins show up as oversized `Full` bands. The `filter_*` family removes the smallest or biggest rows or columns, returning a new `Grid` and leaving the original untouched:
+
+```rust
+// Filter out structural lines (headers/footers) by size…
+let grid = grid.filter_biggest_rows();
+// …or drop noise-size bands.
+let grid = grid.filter_smallest_rows();
+```
+
+The same methods exist for columns: `filter_smallest_columns()` and `filter_biggest_columns()`.
+
+<Aside kind="note">
+    Without an explicit tolerance the filters compare sizes with a built-in default tolerance of `0.1`
+    (10 %). The `_with_tolerance` variants let you widen or narrow that margin:
+    `filter_biggest_rows_with_tolerance(0.25)` removes every row whose height is within 25 % of the
+    biggest row.
+</Aside>
+
+## Keep only one kind
+
+`keep_kind` copies the grid and drops every line of the other kind — a common step before visiting cells:
+
+```rust
+use grider::LineKind;
+
+let full = grid.keep_kind(LineKind::Full);
+
+// Visit every intersection of the remaining lines.
+for cell in full.iter_cells() {
+    let rect = cell.rect();
+    println!("cell at {}x{}", rect.left(), rect.top());
+}
+```
+
+For counting or iterating without allocation, use the accessor family: `rows_by_kind`, `columns_by_kind`, `count_rows_by_kind` and `count_columns_by_kind`:
+
+```rust
+use grider::LineKind;
+
+let content_rows = grid.count_rows_by_kind(LineKind::Full);
+```
+
+## Filter by predicate
+
+`filtered_rows` and `filtered_columns` return iterators over lines that match any predicate you write:
+
+```rust
+for row in grid.filtered_rows(|row| row.height >= 20) {
+    println!("tall row at y={} ({}px)", row.y, row.height);
+}
+```
+
+To modify the grid in place instead of copying, use `retain_rows` and `retain_columns`:
+
+```rust
+use grider::{make_grid, LineKind};
+
+let mut grid = make_grid!(rows: [(0, 5), (5, 5, LineKind::Full)], columns: [(0, 2)]);
+grid.retain_rows(|row| row.kind == LineKind::Full);
+assert_eq!(grid.rows.len(), 1);
+```
+
+## Look up lines and cells by coordinate
+
+Coordinates map directly to lines when a band starts exactly there:
+
+| Method | Lookup | Result |
+| :--- | :--- | :--- |
+| `find_row(y)` | Row starting at `y` | `Option<&Row>` |
+| `find_column(x)` | Column starting at `x` | `Option<&Column>` |
+| `cell(row_index, column_index)` | By index | `Option<Cell>` |
+| `find_cells(row_positions, column_positions)` | By `y`/`x` coordinate lists | Iterator of `Result<Cell, GridError>` |
+
+```rust
+let cells = grid.find_cells(&[1, 2, 3], &[4, 5, 6]);
+for cell in cells {
+    match cell {
+        Ok(c) => println!("Found cell at row {}, column {}", c.row.y, c.column.x),
+        Err(e) => eprintln!("Error finding cell: {e}"),
+    }
+}
+```
+
+`find_cells` reports a [`GridError::RowNotFound`](/reference/errors/) or `ColumnNotFound` for coordinates where no band starts.
+
+## Next steps
+
+<LinkCard title="Grid reference" description="Every method of Grid, including the size accessors and compatibility wrappers." href="/reference/grid/" />
+<LinkCard title="Draw grids and cells" description="Visualize the filtered result with custom colors." href="/guides/draw-overlays/" />
