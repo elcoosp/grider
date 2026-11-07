@@ -1,0 +1,97 @@
+---
+title: Configure extraction
+description: Tune the detection pipeline with GridConfig — threshold window, delta, merge ratio, parallelism — and validate custom values.
+type: how-to
+---
+
+import { Aside, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This guide shows you how to steer the extraction pipeline with [`GridConfig`](/reference/grid-config/) — which knobs move detection in which direction, how invalid values are handled, and when to reach for each one.
+
+## Prerequisites
+
+- Grider added to a Rust project ([Installation](/guides/install/))
+- An image whose grid extraction needs adjusting
+
+## Use the builder
+
+`GridConfig::builder()` starts from the defaults and overrides one field at a time:
+
+```rust
+use grider::GridConfig;
+
+let config = GridConfig::builder()
+    .threshold_block_size(15) // adaptive threshold radius (min 3)
+    .threshold_delta(0) // offset subtracted from the local mean
+    .merge_threshold_ratio(0.9)
+    .parallel(false)
+    .build();
+
+let grid = Grid::try_from_image_with_config(&img, config).expect("Failed to create grid");
+```
+
+## Pick the right knob
+
+Use this table to move from symptom to setting:
+
+| Symptom | Knob | Direction |
+| :--- | :--- | :--- |
+| Content bands merge with their neighbors | `merge_threshold_ratio` | Lower it (for example `0.5`) so fewer small runs merge |
+| Hairline gaps split one logical band into many | `merge_threshold_ratio` | Raise it (for example `0.9`) |
+| The window ignores fine detail | `threshold_block_size` | Lower it (minimum `3`) |
+| Background noise counts as content | `threshold_delta` | Lower it (negative values make the threshold stricter) |
+| Faint content disappears | `threshold_delta` | Raise it (positive values are more permissive) |
+| Reproducible single-threaded runs | `parallel(false)` | Disable parallelism |
+
+The full field list with types, defaults and clamping rules lives in the [`GridConfig` reference](/reference/grid-config/).
+
+## Understand the clamping contract
+
+Constructors and builders sanitize values, so a build never fails:
+
+- `threshold_block_size` clamps up to `3` (the value is a *radius* — the comparison window is `2 × size + 1` pixels wide).
+- `merge_threshold_ratio` clamps into `[0.0, 1.0]`; `NaN` maps onto the default `0.8`.
+- `Binarization::sauvola(k)` replaces non-finite `k` with the default `0.2`.
+
+```rust
+use grider::GridConfig;
+
+let config = GridConfig::new(1, 2.5, true);
+assert_eq!(config.threshold_block_size, 3); // clamped up
+assert_eq!(config.merge_threshold_ratio, 1.0); // clamped down
+```
+
+## Validate hand-built values
+
+Values that bypass the builder — struct literals or deserialization — can be out of range. Call `validate()` before extraction:
+
+```rust
+use grider::GridConfig;
+
+assert!(GridConfig::default().validate().is_ok());
+assert!(GridConfig { threshold_block_size: 0, ..GridConfig::default() }.validate().is_err());
+```
+
+`validate()` reports the first problem it finds as a [`GridError::InvalidConfig`](/reference/errors/): a zero block size, a non-finite or out-of-range merge ratio, or a non-finite Sauvola `k`.
+
+## Verify your changes with an overlay
+
+Tune the config by looking at the visualization it produces — one call per candidate configuration:
+
+```rust
+use grider::debug::save_image_with_grid;
+use grider::drawing::GridDrawingConfig;
+
+save_image_with_grid(&img, &grid, "output_with_grid.png", &GridDrawingConfig::default())
+    .expect("Failed to save overlay");
+```
+
+<Aside kind="tip">
+    Run the same loop from the terminal instead: `grider scan.png --block-size 15 --delta 2 --merge-ratio 0.9`
+    rewrites `scan_with_grid.png` on every run, so you compare candidates without recompiling.
+</Aside>
+
+## Next steps
+
+<LinkCard title="Choose a binarization method" description="Switch to Sauvola for degraded or unevenly lit documents." href="/guides/choose-binarization/" />
+<LinkCard title="GridConfig reference" description="Every field, constant and builder method with defaults." href="/reference/grid-config/" />
