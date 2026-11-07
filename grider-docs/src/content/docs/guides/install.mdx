@@ -1,0 +1,78 @@
+---
+title: Installation
+description: Add Grider to a Rust project or install the command-line binary, with MSRV and feature-flag notes.
+type: how-to
+---
+
+import { Tabs, TabItem, Aside, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This guide gets the Grider library into a Rust project and the `grider` binary onto your `PATH`.
+
+## Prerequisites
+
+- Rust 1.89 or newer — Grider sets `rust-version = "1.89"` in its manifest. Check yours with `rustc --version`.
+- Network access to [crates.io](https://crates.io/crates/grider).
+
+## Install the library
+
+<Tabs>
+    <TabItem label="cargo add">
+        ```bash
+        cargo add grider
+        ```
+    </TabItem>
+    <TabItem label="Cargo.toml">
+        ```toml
+        [dependencies]
+        grider = "0.3"
+        ```
+    </TabItem>
+</Tabs>
+
+Then import the crate in your code:
+
+```rust
+use grider::*;
+```
+
+The prelude-style glob import exposes the main types: [`Grid`](/reference/grid/), [`GridConfig`](/reference/grid-config/), [`Row`](/reference/lines-and-cells/), `Column`, [`Cell`](/reference/lines-and-cells/), [`LineKind`](/reference/lines-and-cells/), [`GridError`](/reference/errors/), the `Binarization` enum and the `make_grid!` / `make_line!` macros.
+
+## Install the CLI binary
+
+The same crate builds a command-line binary with the same extraction pipeline:
+
+```bash
+cargo install grider
+```
+
+Verify the installation:
+
+```bash
+grider --version
+```
+
+<Aside kind="note">
+    Pass `--locked` to `cargo install` if you want the dependency versions the release was tested
+    with: `cargo install grider --locked`.
+</Aside>
+
+## Choose your feature flags
+
+Two features are on by default; you only touch them when you shrink the build or need test fixtures:
+
+| Feature | Default | Purpose | Reference |
+| :--- | :--- | :--- | :--- |
+| `serde` | enabled | `Serialize`/`Deserialize` for all data types, JSON output in the CLI | [Feature flags](/reference/feature-flags/) |
+| `drawing` | enabled | Grid drawing and the `debug` overlay helpers | [Drawing API](/reference/drawing/) |
+| `test-utils` | disabled | Shared image fixtures for tests and benchmarks | [Feature flags](/reference/feature-flags/) |
+
+```bash
+# Everything except serde and drawing:
+cargo add grider --no-default-features
+# Test fixtures only, for development:
+cargo add grider --features test-utils
+```
+
+## Next steps
+
+<LinkCard title="Extract your first grid" description="The step-by-step tutorial from an empty project to a drawn grid." href="/tutorials/extract-your-first-grid/" />
