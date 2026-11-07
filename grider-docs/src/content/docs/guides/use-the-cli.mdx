@@ -1,0 +1,100 @@
+---
+title: Use the CLI
+description: Extract grids from the terminal — outputs, binarization flags, JSON, quiet mode, logging and exit codes.
+type: how-to
+---
+
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+This guide covers the `grider` binary end to end: default behavior, every flag, the JSON output, logging and exit codes.
+
+## Prerequisites
+
+- The binary installed: `cargo install grider`
+
+## Extract and save the default overlay
+
+Point the binary at an image. It extracts the grid, prints a summary, and saves `<image>_with_grid.png` next to the input file:
+
+```bash
+grider tests/large.png
+```
+
+```ansi
+Extracted grid in 7.22ms
+Grid { rows: 16, columns: 19 }
+Full rows: 7, empty rows: 9, full columns: 9, empty columns: 10
+Saving overlay to tests/large_with_grid.png
+```
+
+Rename the output with `-o`/`--output`:
+
+```bash
+grider tests/large.png --output result/grid.png
+```
+
+## Configure the extraction
+
+The flags map one-to-one onto [`GridConfig`](/reference/grid-config/) fields:
+
+```bash
+# Custom configuration
+grider tests/large.png --block-size 15 --delta 2 --merge-ratio 0.9 --no-parallel --json
+
+# Sauvola binarization for degraded documents
+grider scan.png --binarization sauvola --sauvola-k 0.34 --json
+```
+
+`--sauvola-k` implies `--binarization sauvola`, so the second command also works without the explicit `--binarization` flag. The complete flag table, including defaults, lives in the [CLI reference](/reference/cli/).
+
+## Get machine-readable output
+
+`--json` prints the whole grid as pretty JSON to stdout and skips the overlay:
+
+```bash
+grider tests/large.png --json --quiet
+```
+
+```json
+{
+  "rows": [
+    { "y": 0, "height": 11, "kind": "Empty" },
+    { "y": 11, "height": 18, "kind": "Empty" },
+    { "y": 29, "height": 17, "kind": "Empty" }
+  ]
+}
+```
+
+Add `-q`/`--quiet` to suppress the human-readable summary — without it, the summary shares stdout with the JSON.
+
+## Log diagnostics
+
+The binary initializes a `tracing` subscriber from `RUST_LOG`. Turn on debug logging to see the parsed arguments:
+
+```bash
+RUST_LOG=debug grider tests/large.png --quiet
+```
+
+## Handle failures
+
+The binary maps errors onto exit code `1` (`ExitCode::FAILURE`) and prints the error chain. Opening a missing file produces:
+
+```ansi
+error: Failed to open image
+
+Caused by:
+    No such file or directory (os error 2)
+```
+
+Successful runs exit with code `0`.
+
+<Aside kind="note">
+    Features gate two outputs. Built without `serde`, the binary prints
+    `Skipping JSON output: built without the 'serde' feature`. Built without `drawing`, it prints
+    `Skipping overlay '…': built without the 'drawing' feature`. Both still exit `0`.
+</Aside>
+
+## Next steps
+
+<LinkCard title="CLI reference" description="The complete flag and behavior table." href="/reference/cli/" />
+<LinkCard title="Serialize grids to JSON" description="The JSON shape and serde round-trips in the library." href="/guides/serialize-grids/" />
