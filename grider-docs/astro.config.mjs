@@ -1,6 +1,9 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import astroTakumi from 'astro-takumi';
+import fs from 'node:fs';
+import { makeRender } from './src/og-render.mjs';
 import starlightLinksValidator from 'starlight-links-validator';
 import starlightImageZoom from 'starlight-image-zoom';
 import starlightHeadingBadges from 'starlight-heading-badges';
@@ -12,17 +15,32 @@ import starlightLlmsTxt from 'starlight-llms-txt';
 // repository; adjust it when deploying elsewhere (see docs/decisions/0006-*.md).
 const SITE = 'https://elcoosp.github.io/grider/';
 
+const __logoB64 = fs.readFileSync("./src/assets/logo.png").toString("base64");
+const __render = makeRender({
+  logoDataUrl: "data:image/png;base64," + __logoB64,
+  accentHex: "#743e3e",
+  accentHexA12: "#743e3e1a",
+  domain: "grider-docs.vercel.app",
+  projectName: "Grider",
+});
+
 export default defineConfig({
-        site: SITE,
+	vite: {
+		ssr: { external: ["jsdom", "astro-takumi"] },
+	},
+  site: 'https://grider-docs.vercel.app',
         integrations: [
                 starlight({
+			routeMiddleware: "./src/routeData.ts",
+                        expressiveCode: {
+                        	themes: ['github-light', 'github-dark'],
+                        },
                         title: 'Grider',
                         description:
                                 'High-performance row and column grid extraction from images, as a Rust library and a CLI.',
-                        logo: {
-                                light: './src/assets/logo-light.png',
-                                dark: './src/assets/logo-dark.png',
-                        },
+
+                        logo: { src: './src/assets/logo.png' },
+                        favicon: '/favicon.png',
                         customCss: ['./src/styles/custom.css'],
                         defaultLocale: 'en',
                         // The docs collection provides src/content/docs/404.md; the built-in
@@ -117,5 +135,16 @@ export default defineConfig({
                                 },
                         ],
                 }),
-        ],
+        
+		astroTakumi({
+			options: {
+				domBackend: "linkedom",
+				fonts: [fs.readFileSync("./node_modules/@fontsource/roboto/files/roboto-latin-400-normal.woff2")],
+				width: 1200,
+				height: 630,
+				format: "png",
+			},
+			render: __render,
+		}),
+	],
 });
