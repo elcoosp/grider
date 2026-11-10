@@ -46,7 +46,7 @@ jobs:
         id: git-cliff
         with:
           config: cliff.toml
-          args: --latest --strip all
+          args: "--latest --strip all --config-url https://raw.githubusercontent.com/elcoosp/docs-toolkit/main/git-cliff/cliff.toml"
         env:
           GITHUB_REPO: ${{ github.repository }}
 
