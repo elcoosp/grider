@@ -4,7 +4,7 @@ description: Every GridError variant, its fields and its Display output, plus wi
 type: reference
 ---
 
-import { Aside, LinkCard } from '@astrojs/starlight/components';
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
 
 All errors that [`Grid`](/reference/grid/) operations produce. The enum derives `Error`, `Debug`, `PartialEq`, `Eq`, `Clone` (via `thiserror`) and is `#[non_exhaustive]` — new variants may arrive in minor releases, so downstream `match` arms include a wildcard.
 
@@ -29,28 +29,22 @@ All errors that [`Grid`](/reference/grid/) operations produce. The enum derives 
 
 ## Constructor
 
-```rust
-pub fn invalid_config(reason: impl Into<String>) -> Self
-```
+<Code lang="rust" code={`pub fn invalid_config(reason: impl Into<String>) -> Self`} />
 
 Builds `GridError::InvalidConfig` from any string-ish value:
 
-```rust
-use grider::GridError;
+<Code lang="rust" code={`use grider::GridError;
 
 let error = GridError::invalid_config("block size must be > 0");
-assert_eq!(error.to_string(), "Invalid configuration: block size must be > 0");
-```
+assert_eq!(error.to_string(), "Invalid configuration: block size must be > 0");`} />
 
 ## Handling in practice
 
-```rust
-match result {
+<Code lang="rust" code={`match result {
     Ok(grid) => println!("{grid}"),
     Err(GridError::InvalidDimensions { width, height }) => eprintln!("empty image {width}x{height}"),
     Err(e) => eprintln!("extraction failed: {e}"),
-}
-```
+}`} />
 
 <Aside kind="caution">
     Because the enum is `#[non_exhaustive]`, matching every current variant without a wildcard arm does

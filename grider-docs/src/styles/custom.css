@@ -1,3 +1,9 @@
+:root {
+	--sl-color-accent-low: hsl(0 30% 93%);
+	--sl-color-accent: hsl(0 30% 35%);
+	--sl-color-accent-high: hsl(0 30% 28%);
+}
+
 /*
 	Grider docs — brand accent derived from the project logo.
 
@@ -17,9 +23,9 @@
 
 :root,
 :root[data-theme='dark'] {
-	--sl-color-accent-low: hsl(205, 35%, 16%);
-	--sl-color-accent: hsl(204, 45%, 58%);
-	--sl-color-accent-high: hsl(204, 55%, 82%);
+	--sl-color-accent-low: hsl(0 30% 16%);
+	--sl-color-accent: hsl(0 30% 60%);
+	--sl-color-accent-high: hsl(0 30% 75%);
 }
 
 :root[data-theme='light'] {

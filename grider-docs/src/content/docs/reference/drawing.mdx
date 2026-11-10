@@ -4,7 +4,7 @@ description: GridDrawingConfig with defaults, the builder, color providers, the 
 type: reference
 ---
 
-import { Aside, LinkCard } from '@astrojs/starlight/components';
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
 
 The `drawing` module (gated by the default `drawing` feature) renders grids, cells, and grid lines on images. `GridDrawingConfig` controls the appearance; the `Drawable` trait draws on an `RgbaImage`.
 
@@ -34,8 +34,7 @@ The `drawing` module (gated by the default `drawing` feature) renders grids, cel
 | `column_color_provider(v: Box<dyn Fn(usize) -> Rgba<u8>>)` | Per-column color provider |
 | `line_thickness(v: u32)` | Band thickness, minimum `1` |
 
-```rust
-use grider::drawing::GridDrawingConfig;
+<Code lang="rust" code={`use grider::drawing::GridDrawingConfig;
 use image::Rgba;
 
 let config = GridDrawingConfig::builder()
@@ -43,8 +42,7 @@ let config = GridDrawingConfig::builder()
     .cell_background_color(Rgba([0, 0, 0, 255]))
     .row_color_provider(Box::new(|index| Rgba([index as u8, 0, 0, 255])))
     .build();
-assert_eq!(config.padding, 1);
-```
+assert_eq!(config.padding, 1);`} />
 
 ## Color resolution
 
@@ -55,11 +53,9 @@ assert_eq!(config.padding, 1);
 
 ## Drawable
 
-```rust
-pub trait Drawable {
+<Code lang="rust" code={`pub trait Drawable {
     fn draw(&self, image: &mut RgbaImage, config: &GridDrawingConfig);
-}
-```
+}`} />
 
 Implemented by `Cell`, `Row`, `Column` and [`Grid`](/reference/grid/). Drawing is infallible by construction: every band and rectangle is clipped to the image bounds.
 
@@ -72,19 +68,16 @@ Drawing semantics:
 
 ## debug module
 
-```rust
-pub fn save_image_with_grid(
+<Code lang="rust" code={`pub fn save_image_with_grid(
     image: &DynamicImage,
     grid: &Grid,
     output_path: &str,
     config: &GridDrawingConfig,
-) -> Result<(), GridError>
-```
+) -> Result<(), GridError>`} />
 
 Converts the image to `RgbaImage`, draws the grid with `config`, and writes the file. Returns [`GridError::ImageConversionError`](/reference/errors/) when saving fails.
 
-```rust
-use grider::drawing::GridDrawingConfig;
+<Code lang="rust" code={`use grider::drawing::GridDrawingConfig;
 use grider::{Grid, GridConfig};
 use image::open;
 
@@ -92,8 +85,7 @@ let img = open("tests/large.png").unwrap();
 let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();
 
 grider::debug::save_image_with_grid(&img, &grid, "output_with_grid.png", &GridDrawingConfig::default())
-    .unwrap();
-```
+    .unwrap();`} />
 
 <Aside kind="note">
     The command-line binary calls this function with the default config on every run unless you pass

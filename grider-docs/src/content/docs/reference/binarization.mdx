@@ -4,18 +4,16 @@ description: The Binarization enum, both threshold algorithms, and the public fu
 type: reference
 ---
 
-import { LinkCard } from '@astrojs/starlight/components';
+import { Code, LinkCard } from '@astrojs/starlight/components';
 
 Binarization turns the grayscale image into a black-and-white picture where background is white (`255`) and content is black (`0`); the extraction pipeline then looks for scan lines made purely of background pixels. Both algorithms run in `O(width × height)` regardless of the window radius, with `O(width × radius)` extra memory.
 
 ## The enum
 
-```rust
-pub enum Binarization {
+<Code lang="rust" code={`pub enum Binarization {
     AdaptiveMean,
     Sauvola { k: f32 },
-}
-```
+}`} />
 
 Derives `Debug`, `Clone`, `Copy`, `Default`, `PartialEq` (and `Serialize`/`Deserialize` with the `serde` feature). The default variant is `AdaptiveMean`.
 

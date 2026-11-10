@@ -20,26 +20,22 @@ hero:
       icon: document
 ---
 
-import { Card, CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
+import { Aside, Card, CardGrid, Code, LinkButton, LinkCard } from '@astrojs/starlight/components';
 
 Grider reads an image, binarizes it with an adaptive threshold, detects the runs of background and content scan lines on both axes, and returns them as a [`Grid`](/reference/grid/) of [`Row`](/reference/lines-and-cells/)s and `Column`s — every band tagged `Empty` (background) or `Full` (content).
 
-```toml
-[dependencies]
-grider = "0.3"
-```
+<Code lang="toml" code={`[dependencies]
+grider = "0.3"`} />
 
-```rust
-use grider::{Grid, GridConfig};
+<Code lang="rust" code={`use grider::{Grid, GridConfig};
 use image::open;
 
 let img = open("path/to/image.png").expect("Failed to open image");
 let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).expect("Failed to create grid");
 
 for row in grid.rows() {
-        println!("Row at y: {} ({:?})", row.y, row.kind);
-}
-```
+    println!("Row at y: {} ({:?})", row.y, row.kind);
+}`} />
 
 <Aside kind="tip">
         The `drawing` feature renders this visualization of the detected grid with one call to
@@ -81,6 +77,8 @@ for row in grid.rows() {
                 the performance comes from.
         </Card>
 </CardGrid>
+
+<LinkButton href="/tutorials/extract-your-first-grid/" icon="right-arrow">Start the tutorial</LinkButton>
 
 ## Where to next
 

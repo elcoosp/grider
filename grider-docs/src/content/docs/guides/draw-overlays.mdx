@@ -4,7 +4,7 @@ description: Render the extracted grid with GridDrawingConfig — colors, per-in
 type: how-to
 ---
 
-import { Aside, LinkCard } from '@astrojs/starlight/components';
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
 
 This guide shows you how to visualize a [`Grid`](/reference/grid/) on an image, how to restyle every part of the drawing, and what exactly the renderer paints.
 
@@ -17,8 +17,7 @@ This guide shows you how to visualize a [`Grid`](/reference/grid/) on an image, 
 
 One call renders the grid and writes the file:
 
-```rust
-use grider::debug::save_image_with_grid;
+<Code lang="rust" code={`use grider::debug::save_image_with_grid;
 use grider::drawing::GridDrawingConfig;
 use grider::{Grid, GridConfig};
 use image::open;
@@ -32,8 +31,7 @@ grider::debug::save_image_with_grid(
     "output_with_grid.png",
     &GridDrawingConfig::default(),
 )
-.unwrap();
-```
+.unwrap();`} />
 
 The command-line binary runs the same path by default: `grider tests/large.png` writes `tests/large_with_grid.png` next to the input.
 
@@ -53,8 +51,7 @@ The result visualizes the grid geometry; the original image content stays hidden
 
 `GridDrawingConfig::builder()` overrides one setting at a time:
 
-```rust
-use grider::drawing::GridDrawingConfig;
+<Code lang="rust" code={`use grider::drawing::GridDrawingConfig;
 use image::Rgba;
 
 let config = GridDrawingConfig::builder()
@@ -63,8 +60,7 @@ let config = GridDrawingConfig::builder()
     .column_color(Rgba([0, 0, 255, 255]))
     .cell_background_color(Rgba([200, 200, 200, 255]))
     .line_thickness(3)
-    .build();
-```
+    .build();`} />
 
 | Field | Default | Meaning |
 | :--- | :--- | :--- |
@@ -78,20 +74,18 @@ let config = GridDrawingConfig::builder()
 
 Color providers replace the uniform colors and receive the line index. Numbering rows or highlighting alternates takes one closure:
 
-```rust
-use grider::drawing::GridDrawingConfig;
+<Code lang="rust" code={`use grider::drawing::GridDrawingConfig;
 use image::Rgba;
 
 let config = GridDrawingConfig::builder()
     .row_color_provider(Box::new(|index| {
-        if index % 2 == 0 {
-            Rgba([220, 20, 20, 255])
-        } else {
-            Rgba([255, 140, 0, 255])
-        }
+                    if index % 2 == 0 {
+                                    Rgba([220, 20, 20, 255])
+                    } else {
+                                    Rgba([255, 140, 0, 255])
+                    }
     }))
-    .build();
-```
+    .build();`} />
 
 When a provider is set, `row_color_at(index)` and `column_color_at(index)` return its result for that index; otherwise they fall back to `row_color` / `column_color`.
 
@@ -99,16 +93,14 @@ When a provider is set, `row_color_at(index)` and `column_color_at(index)` retur
 
 `Cell`, `Row`, `Column` and `Grid` implement the `Drawable` trait. Drawing is infallible by construction — every band and rectangle is clipped to the image bounds:
 
-```rust
-use grider::drawing::{Drawable, GridDrawingConfig};
+<Code lang="rust" code={`use grider::drawing::{Drawable, GridDrawingConfig};
 use grider::{LineInfo, LineKind, Row};
 use image::RgbaImage;
 
 let mut image = RgbaImage::new(100, 100);
 let config = GridDrawingConfig::default();
 let row = Row::new(LineInfo::new(0, 10, LineKind::Full));
-row.draw(&mut image, &config);
-```
+row.draw(&mut image, &config);`} />
 
 ## Next steps
 

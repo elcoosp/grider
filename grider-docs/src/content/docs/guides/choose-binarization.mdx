@@ -4,7 +4,7 @@ description: Decide between the adaptive mean threshold for clean input and Sauv
 type: how-to
 ---
 
-import { Aside, LinkCard } from '@astrojs/starlight/components';
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
 
 This guide helps you pick the binarization that Grider applies before line detection, and shows how to switch between the two methods in code and on the command line.
 
@@ -26,20 +26,16 @@ Both methods run in `O(width × height)` regardless of the window radius, with `
 
 The default stays the adaptive mean:
 
-```rust
-use grider::{Binarization, GridConfig};
+<Code lang="rust" code={`use grider::{Binarization, GridConfig};
 
 let mean = GridConfig::default();
-assert_eq!(mean.binarization, Binarization::AdaptiveMean);
-```
+assert_eq!(mean.binarization, Binarization::AdaptiveMean);`} />
 
 Select Sauvola with a sensitivity `k`:
 
-```rust
-use grider::GridConfig;
+<Code lang="rust" code={`use grider::GridConfig;
 
-let config = GridConfig::builder().sauvola(0.34).build();
-```
+let config = GridConfig::builder().sauvola(0.34).build();`} />
 
 ## Choose k
 
@@ -58,30 +54,24 @@ let config = GridConfig::builder().sauvola(0.34).build();
 
 ## Switch in the CLI
 
-```bash
-# Sauvola binarization for degraded documents
-grider scan.png --binarization sauvola --sauvola-k 0.34 --json
-```
+<Code lang="bash" code={`# Sauvola binarization for degraded documents
+grider scan.png --binarization sauvola --sauvola-k 0.34 --json`} />
 
 Passing `--sauvola-k` implies `--binarization sauvola`, so this is equivalent:
 
-```bash
-grider scan.png --sauvola-k 0.34 --json
-```
+<Code lang="bash" code={`grider scan.png --sauvola-k 0.34 --json`} />
 
 ## Expect different segmentation
 
 The two methods segment differently on the same input — that is the point. On the repository's `tests/large.png` screenshot fixture, the adaptive mean starts with two short `Empty` rows, while Sauvola with `k = 0.34` groups the top of the page into one large `Empty` band:
 
-```json
-{
-  "rows": [
-    { "y": 0, "height": 243, "kind": "Empty" },
-    { "y": 243, "height": 91, "kind": "Empty" },
-    { "y": 334, "height": 179, "kind": "Full" }
-  ]
-}
-```
+<Code lang="json" code={`{
+    "rows": [
+  { "y": 0, "height": 243, "kind": "Empty" },
+  { "y": 243, "height": 91, "kind": "Empty" },
+  { "y": 334, "height": 179, "kind": "Full" }
+    ]
+}`} />
 
 Use the overlay (`grider scan.png --binarization sauvola`) to compare candidates on your own image, then keep the setting that matches the bands you see.
 

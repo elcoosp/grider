@@ -4,7 +4,7 @@ description: The public detection internals — flags scanning, run-length encod
 type: reference
 ---
 
-import { Aside, LinkCard } from '@astrojs/starlight/components';
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
 
 The internals of the extraction pipeline are public in the `detection` module, and `Grid` re-exposes the most useful ones as [associated functions](/reference/grid/). Compose them when you need a custom pipeline; otherwise call `Grid::try_from_image_with_config` once.
 
@@ -19,20 +19,16 @@ Both treat white (`255`) as background after binarization.
 
 ## LineFlags
 
-```rust
-pub struct LineFlags {
+<Code lang="rust" code={`pub struct LineFlags {
     pub rows: Vec<bool>,
     pub columns: Vec<bool>,
-}
-```
+}`} />
 
 Emptiness of every row (indexed by `y`) and every column (indexed by `x`); `true` means background only.
 
 ## scan_line_flags
 
-```rust
-pub fn scan_line_flags(img: &GrayImage, parallel: bool) -> LineFlags
-```
+<Code lang="rust" code={`pub fn scan_line_flags(img: &GrayImage, parallel: bool) -> LineFlags`} />
 
 Computes row and column flags together in a **single fused, cache-friendly pass** (~0.4 ns/pixel on the benchmark machine). With `parallel: true` the work spreads over row bands; the heuristics fall back to the sequential path when rayon coordination would cost more than it saves.
 
@@ -47,8 +43,7 @@ Computes row and column flags together in a **single fused, cache-friendly pass*
 
 The pipeline derives the merge threshold as `merge_threshold_for(average_size, ratio)` — runs shorter than `ratio × average` merge into their neighbour. The merge keeps the kind of the run being built, and merged runs cover the same total extent as the input:
 
-```rust
-use grider::detection::merge_small_lines;
+<Code lang="rust" code={`use grider::detection::merge_small_lines;
 use grider::{LineInfo, LineKind};
 
 let lines = vec![
@@ -57,8 +52,7 @@ let lines = vec![
     LineInfo::new(8, 10, LineKind::Full),
 ];
 let merged = merge_small_lines(lines, 4);
-assert_eq!(merged.len(), 2);
-```
+assert_eq!(merged.len(), 2);`} />
 
 ## collect_lines and process_dimension
 

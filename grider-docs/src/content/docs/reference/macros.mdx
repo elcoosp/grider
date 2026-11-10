@@ -4,7 +4,7 @@ description: make_line! and make_grid! — concise constructors for rows, column
 type: reference
 ---
 
-import { LinkCard } from '@astrojs/starlight/components';
+import { Code, LinkCard } from '@astrojs/starlight/components';
 
 The two exported macros build line primitives and whole grids from tuples, which keeps test fixtures readable. Both are available through `grider::*`.
 
@@ -19,8 +19,7 @@ Creates a `Row` or `Column` from a tuple. The kind defaults to `LineKind::Empty`
 | `make_line!(Column, ($x, $width, $kind))` | Column at `x` with `width` and the given kind |
 | `make_line!(Column, ($x, $width))` | Column with `LineKind::Empty` |
 
-```rust
-use grider::*;
+<Code lang="rust" code={`use grider::*;
 
 // With LineKind::Full
 let row = make_line!(Row, (0, 10, LineKind::Full));
@@ -32,30 +31,27 @@ assert_eq!(row.kind, LineKind::Full);
 let row = make_line!(Row, (10, 20));
 assert_eq!(row.y, 10);
 assert_eq!(row.height, 20);
-assert_eq!(row.kind, LineKind::Empty);
-```
+assert_eq!(row.kind, LineKind::Empty);`} />
 
 ## make_grid!
 
 Creates a [`Grid`](/reference/grid/) from lists of row and column tuples. A trailing comma after each tuple is optional.
 
-```rust
-use grider::{make_grid, LineKind};
+<Code lang="rust" code={`use grider::{make_grid, LineKind};
 
 let grid = make_grid!(
     rows: [
-        (0, 10),                  // Row at y=0, height=10, LineKind::Empty
-        (10, 20, LineKind::Full), // Row at y=10, height=20, LineKind::Full
+                    (0, 10),                  // Row at y=0, height=10, LineKind::Empty
+                    (10, 20, LineKind::Full), // Row at y=10, height=20, LineKind::Full
     ],
     columns: [
-        (0, 5),                   // Column at x=0, width=5, LineKind::Empty
-        (5, 15, LineKind::Full),  // Column at x=5, width=15, LineKind::Full
+                    (0, 5),                   // Column at x=0, width=5, LineKind::Empty
+                    (5, 15, LineKind::Full),  // Column at x=5, width=15, LineKind::Full
     ]
 );
 
 assert_eq!(grid.rows.len(), 2);
-assert_eq!(grid.columns.len(), 2);
-```
+assert_eq!(grid.columns.len(), 2);`} />
 
 Notes:
 

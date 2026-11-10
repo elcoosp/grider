@@ -1,0 +1,1876 @@
+---
+title: Page not found
+description: The page you are looking for does not exist or has moved.
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+The address you opened does not match any page of this site. The page may have moved, the link may be outdated, or the URL may contain a typo.
+
+Use one of these starting points instead, or the search box in the top right corner:
+
+<LinkCard title="Overview" description="Everything the Grider documentation covers, on one page." href="/" />
+<LinkCard title="Extract your first grid" description="The step-by-step tutorial from an empty project to a drawn grid." href="/tutorials/extract-your-first-grid/" />
+
+
+---
+
+---
+title: The extraction pipeline
+description: How Grider turns pixels into rows and columns — binarization, the fused emptiness scan, run-length encoding and merging.
+type: explanation
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+Grider reads an image and returns a [`Grid`](/reference/grid/) of rows and columns. This page explains what happens between the two — the stages, the data that flows between them, and why each stage is shaped the way it is. All functions mentioned here are public and documented in the [pipeline reference](/reference/pipeline/).
+
+## Overview
+
+<Code lang="text" code={`DynamicImage / GrayImage
+     │
+     ▼
+[1] Binarization        adaptive mean (Bradley & Roth) or Sauvola
+     │  GrayImage, background = white (255), content = black (0)
+     ▼
+[2] scan_line_flags     one fused pass, row + column flags together
+     │  LineFlags { rows: Vec<bool>, columns: Vec<bool> }
+     ▼
+[3] run_length_encode   booleans → LineInfo runs per axis
+     │  Vec<LineInfo> { start, length, kind }
+     ▼
+[4] merge_small_lines   runs shorter than ratio × average merge into their neighbour
+     │  SmallVecLine<LineInfo>
+     ▼
+[5] lines_from_flags    runs → Row / Column via LineTrait
+     │
+     ▼
+    Grid { rows, columns }`} />
+
+## Stage 1 — Binarization
+
+The pipeline first reduces every pixel to background/content. Two algorithms share one property: `O(width × height)` time regardless of the window radius.
+
+- **Adaptive mean** (Bradley & Roth, 2005) — a pixel is background when it is at least as bright as the mean of its window minus `threshold_delta`. Grider's streaming sliding-window integral image produces output bit-for-bit identical to `imageproc::contrast::adaptive_threshold` while using `O(width × radius)` memory instead of `O(width × height)`.
+- **Sauvola** (Sauvola & Pietikäinen, 2000) — the local threshold follows the mean and the standard deviation of the window, which copes with uneven illumination on degraded documents.
+
+Both steps parallelize over row bands, with work-size gating so small images never pay thread-pool overhead.
+
+## Stage 2 — The fused emptiness scan
+
+Older versions scanned rows, then scanned columns strided across memory — the second pass was cache-hostile. Since 0.3, `scan_line_flags` walks the image once and accumulates per-row and per-column content counts in the same pass, then thresholds the counts into `LineFlags`. The scan measures around 0.4 ns per pixel and is bandwidth-bound on typical machines.
+
+## Stage 3 — Run-length encoding
+
+Per axis, the boolean flags compress into runs: `run_length_encode` turns `true`/`false` sequences into `LineInfo { start, length, kind }` records, where `kind` is `Empty` for background runs and `Full` for content runs.
+
+## Stage 4 — Merging
+
+Real grids contain hairline gaps and sub-pixel seams that split one logical band into many runs. `merge_small_lines` glues any run shorter than `merge_threshold_ratio × average_run_size` into the run being built, left to right. The merged output always covers the same total extent as the input — no pixel ever disappears or duplicates. Lower `merge_threshold_ratio` when legitimate thin bands disappear; raise it when one band still splits.
+
+## Stage 5 — Conversion to typed lines
+
+`lines_from_flags` converts each merged run into a `Row` or a `Column` through the `LineTrait` factory trait (`start` → `y`/`x`, `length` → `height`/`width`). The result is a `Grid` backed by `SmallVecLine` collections with an inline capacity of 32, so grids up to 32 lines per axis allocate nothing beyond the struct.
+
+## Why the entry points differ
+
+The three `Grid` constructors skip stages you do not need:
+
+| Entry point | Skips | Measured cost (1000² Dense fixture) |
+| :--- | :--- | ---: |
+| `try_from_image_with_config` on an RGB image | nothing | 4.98 ms (color conversion dominates) |
+| `try_from_image_with_config` on a `Luma8` image | the conversion — zero-copy gray borrow | 1.70 ms |
+| `try_from_gray_with_config` | the dynamic-image wrapper | 1.72 ms |
+| `try_from_binarized` | the whole binarization stage | 386 µs (**4.4× faster**) |
+
+<Aside kind="tip">
+    If your images are already binary, `try_from_binarized` gives you the full grid at a fraction of the
+    cost. If you control the source, keep images `Luma8` until extraction.
+</Aside>
+
+## Next steps
+
+<LinkCard title="Performance" description="The measured end-to-end and per-stage numbers." href="/explanation/performance/" />
+<LinkCard title="Pipeline functions" description="Every public function of the detection module." href="/reference/pipeline/" />
+
+
+---
+
+---
+title: Performance
+description: Where the speed comes from — measured end-to-end and per-stage benchmarks, complexity and memory behavior.
+type: explanation
+---
+
+import { LinkCard, Aside } from '@astrojs/starlight/components';
+
+Grider is built to make grid extraction the cheap part of your pipeline. This page summarizes the measured numbers and the design decisions behind them. All figures below come from the criterion suites in `benches/` of the repository (`cargo bench --features test-utils`), measured on a 2-vCPU x86-64 Linux machine with `sample_size = 20`, comparing the 0.2 pipeline against the 0.3 pipeline with `--save-baseline`. Every change is statistically significant (`p = 0.00 < 0.05`); the median ratio is reported.
+
+## End-to-end extraction by image size
+
+`Grid::try_from_image_with_config`, Checkerboard pattern, default config:
+
+| Size | 0.2 | 0.3 | Speed-up |
+| :--- | ---: | ---: | ---: |
+| 100 × 100 | 84.7 µs | 28.5 µs | **3.09×** |
+| 500 × 500 | 1.052 ms | 594 µs | **1.87×** |
+| 1000 × 1000 | 3.800 ms | 1.744 ms | **2.17×** |
+| 2000 × 2000 | 14.96 ms | 6.855 ms | **2.22×** |
+| 4000 × 4000 | 66.38 ms | 26.10 ms | **2.55×** |
+
+The speed-up holds across patterns: Checkerboard 2.15×, HorizontalStripes 2.24×, VerticalStripes 2.29×, Sparse 2.76×, Dense 2.22× (all at 1000 × 1000).
+
+## Where the time goes
+
+### Binarization
+
+| Image | `imageproc::adaptive_threshold` | `grider` sequential | `grider` parallel | `grider` Sauvola |
+| :--- | ---: | ---: | ---: | ---: |
+| 1000 × 1000 | 3.765 ms | 1.912 ms (**1.97×**) | 1.429 ms (**2.63×**) | 3.777 ms |
+| 4000 × 4000 | 65.36 ms | 30.90 ms (**2.12×**) | 20.81 ms (**3.14×**) | 61.94 ms |
+
+Sauvola costs about the same as the old adaptive mean while providing the state-of-the-art local threshold for degraded documents — the adaptive mean itself became 2–3× faster in the same release.
+
+### Fused emptiness scan
+
+| Image | Sequential | Parallel |
+| :--- | ---: | ---: |
+| 1000 × 1000 | 382 µs (~0.38 ns/px) | 379 µs |
+| 4000 × 4000 | 6.52 ms (~0.41 ns/px) | 5.08 ms |
+
+On a 2-vCPU machine the scan is bandwidth bound, so parallelism pays only at very large sizes; the work-size heuristics fall back to the sequential path when rayon coordination would cost more than it saves.
+
+### Entry points
+
+| Entry point | Time (1000² Dense, default config) | Notes |
+| :--- | ---: | :--- |
+| `try_from_image_with_config` (Luma8) | 1.701 ms | zero-copy gray borrow |
+| `try_from_image_with_config` (RGB) | 4.982 ms | color conversion dominates |
+| `try_from_gray_with_config` | 1.721 ms | no dynamic-image wrapper |
+| `try_from_binarized` | 386 µs | skips binarization — **4.4× vs. the full path** |
+
+## Memory
+
+The adaptive mean binarizer streams two window bands instead of materializing a whole integral image — peak extra memory is `O(width × radius)` instead of `O(width × height)`:
+
+| Image | Whole integral image (`u32`) | Streaming ring (`f64`) |
+| :--- | ---: | ---: |
+| 1000 × 1000, r = 12 | ~4 MB | ~104 KB |
+| 4000 × 4000, r = 12 | ~64 MB | ~1.7 MB |
+| 4000 × 4000, r = 64 | ~64 MB | ~8.3 MB |
+
+## Practical takeaways
+
+- Prefer `Luma8` input — RGB conversion costs more than the whole extraction.
+- Prefer `try_from_binarized` when your images are already binary.
+- Leave parallelism on for images above a few megapixels; disable it (`--no-parallel` / `.parallel(false)`) for small images or reproducible runs.
+
+<Aside kind="note">
+    Reproduce the comparison on your own machine:
+    `cargo bench --features test-utils -- --save-baseline before` on 0.2, `--save-baseline after`
+    on 0.3, then `--baseline before` for the comparison.
+</Aside>
+
+## Next steps
+
+<LinkCard title="The extraction pipeline" description="The design behind these numbers, stage by stage." href="/explanation/extraction-pipeline/" />
+
+
+---
+
+---
+title: Choose a binarization method
+description: Decide between the adaptive mean threshold for clean input and Sauvola for degraded documents, in the library and the CLI.
+type: how-to
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+This guide helps you pick the binarization that Grider applies before line detection, and shows how to switch between the two methods in code and on the command line.
+
+## Prerequisites
+
+- Grider 0.3 or newer (Sauvola shipped in 0.3.0)
+- An image whose extraction quality depends on illumination or contrast
+
+## Decide by input quality
+
+| Input | Method | Why |
+| :--- | :--- | :--- |
+| Screenshots, scans of clean pages, synthetic patterns | `AdaptiveMean` (default) | Fastest path; bit-for-bit identical to `imageproc::contrast::adaptive_threshold` |
+| Degraded documents, uneven illumination, low contrast | `Sauvola { k }` | The local threshold follows the mean **and** the standard deviation of the window, which copes with dark spots and shadows |
+
+Both methods run in `O(width × height)` regardless of the window radius, with `O(width × radius)` extra memory.
+
+## Switch in the library
+
+The default stays the adaptive mean:
+
+<Code lang="rust" code={`use grider::{Binarization, GridConfig};
+
+let mean = GridConfig::default();
+assert_eq!(mean.binarization, Binarization::AdaptiveMean);`} />
+
+Select Sauvola with a sensitivity `k`:
+
+<Code lang="rust" code={`use grider::GridConfig;
+
+let config = GridConfig::builder().sauvola(0.34).build();`} />
+
+## Choose k
+
+`k` tunes how strongly the threshold reacts to local contrast. The literature typically uses values between `0.1` and `0.5`; `0.2` is the default of the reference `scikit-image` implementation and Grider's fallback for non-finite values (`SAUVOLA_DEFAULT_K`).
+
+| k | Behaviour |
+| :--- | :--- |
+| `0.1` | More permissive — keeps faint content, accepts more noise |
+| `0.2` | Balanced default |
+| `0.34` and up | More selective — favors clearly contrasted content on degraded scans |
+
+<Aside kind="note">
+    [`GridConfig::threshold_delta`](/reference/grid-config/) has no effect on Sauvola — it only applies to
+    the adaptive mean method.
+</Aside>
+
+## Switch in the CLI
+
+<Code lang="bash" code={`# Sauvola binarization for degraded documents
+grider scan.png --binarization sauvola --sauvola-k 0.34 --json`} />
+
+Passing `--sauvola-k` implies `--binarization sauvola`, so this is equivalent:
+
+<Code lang="bash" code={`grider scan.png --sauvola-k 0.34 --json`} />
+
+## Expect different segmentation
+
+The two methods segment differently on the same input — that is the point. On the repository's `tests/large.png` screenshot fixture, the adaptive mean starts with two short `Empty` rows, while Sauvola with `k = 0.34` groups the top of the page into one large `Empty` band:
+
+<Code lang="json" code={`{
+    "rows": [
+  { "y": 0, "height": 243, "kind": "Empty" },
+  { "y": 243, "height": 91, "kind": "Empty" },
+  { "y": 334, "height": 179, "kind": "Full" }
+    ]
+}`} />
+
+Use the overlay (`grider scan.png --binarization sauvola`) to compare candidates on your own image, then keep the setting that matches the bands you see.
+
+## Next steps
+
+<LinkCard title="Binarization reference" description="Both algorithms, all constants and the binarize module functions." href="/reference/binarization/" />
+<LinkCard title="Configure extraction" description="The other knobs of GridConfig, with clamping and validation rules." href="/guides/configure-extraction/" />
+
+
+---
+
+---
+title: Configure extraction
+description: Tune the detection pipeline with GridConfig — threshold window, delta, merge ratio, parallelism — and validate custom values.
+type: how-to
+---
+
+import { Aside, Code, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This guide shows you how to steer the extraction pipeline with [`GridConfig`](/reference/grid-config/) — which knobs move detection in which direction, how invalid values are handled, and when to reach for each one.
+
+## Prerequisites
+
+- Grider added to a Rust project ([Installation](/guides/install/))
+- An image whose grid extraction needs adjusting
+
+## Use the builder
+
+`GridConfig::builder()` starts from the defaults and overrides one field at a time:
+
+<Code lang="rust" code={`use grider::GridConfig;
+
+let config = GridConfig::builder()
+    .threshold_block_size(15) // adaptive threshold radius (min 3)
+    .threshold_delta(0) // offset subtracted from the local mean
+    .merge_threshold_ratio(0.9)
+    .parallel(false)
+    .build();
+
+let grid = Grid::try_from_image_with_config(&img, config).expect("Failed to create grid");`} />
+
+## Pick the right knob
+
+Use this table to move from symptom to setting:
+
+| Symptom | Knob | Direction |
+| :--- | :--- | :--- |
+| Content bands merge with their neighbors | `merge_threshold_ratio` | Lower it (for example `0.5`) so fewer small runs merge |
+| Hairline gaps split one logical band into many | `merge_threshold_ratio` | Raise it (for example `0.9`) |
+| The window ignores fine detail | `threshold_block_size` | Lower it (minimum `3`) |
+| Background noise counts as content | `threshold_delta` | Lower it (negative values make the threshold stricter) |
+| Faint content disappears | `threshold_delta` | Raise it (positive values are more permissive) |
+| Reproducible single-threaded runs | `parallel(false)` | Disable parallelism |
+
+The full field list with types, defaults and clamping rules lives in the [`GridConfig` reference](/reference/grid-config/).
+
+## Understand the clamping contract
+
+Constructors and builders sanitize values, so a build never fails:
+
+- `threshold_block_size` clamps up to `3` (the value is a *radius* — the comparison window is `2 × size + 1` pixels wide).
+- `merge_threshold_ratio` clamps into `[0.0, 1.0]`; `NaN` maps onto the default `0.8`.
+- `Binarization::sauvola(k)` replaces non-finite `k` with the default `0.2`.
+
+<Code lang="rust" code={`use grider::GridConfig;
+
+let config = GridConfig::new(1, 2.5, true);
+assert_eq!(config.threshold_block_size, 3); // clamped up
+assert_eq!(config.merge_threshold_ratio, 1.0); // clamped down`} />
+
+## Validate hand-built values
+
+Values that bypass the builder — struct literals or deserialization — can be out of range. Call `validate()` before extraction:
+
+<Code lang="rust" code={`use grider::GridConfig;
+
+assert!(GridConfig::default().validate().is_ok());
+assert!(GridConfig { threshold_block_size: 0, ..GridConfig::default() }.validate().is_err());`} />
+
+`validate()` reports the first problem it finds as a [`GridError::InvalidConfig`](/reference/errors/): a zero block size, a non-finite or out-of-range merge ratio, or a non-finite Sauvola `k`.
+
+## Verify your changes with an overlay
+
+Tune the config by looking at the visualization it produces — one call per candidate configuration:
+
+<Code lang="rust" code={`use grider::debug::save_image_with_grid;
+use grider::drawing::GridDrawingConfig;
+
+save_image_with_grid(&img, &grid, "output_with_grid.png", &GridDrawingConfig::default())
+    .expect("Failed to save overlay");`} />
+
+<Aside kind="tip">
+    Run the same loop from the terminal instead: `grider scan.png --block-size 15 --delta 2 --merge-ratio 0.9`
+    rewrites `scan_with_grid.png` on every run, so you compare candidates without recompiling.
+</Aside>
+
+## Next steps
+
+<LinkCard title="Choose a binarization method" description="Switch to Sauvola for degraded or unevenly lit documents." href="/guides/choose-binarization/" />
+<LinkCard title="GridConfig reference" description="Every field, constant and builder method with defaults." href="/reference/grid-config/" />
+
+
+---
+
+---
+title: Draw grids and cells
+description: Render the extracted grid with GridDrawingConfig — colors, per-index providers, thickness, padding — and save the visualization.
+type: how-to
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+This guide shows you how to visualize a [`Grid`](/reference/grid/) on an image, how to restyle every part of the drawing, and what exactly the renderer paints.
+
+## Prerequisites
+
+- Grider installed with the default features (drawing gates this API)
+- A `Grid` extracted from an image
+
+## Save the standard visualization
+
+One call renders the grid and writes the file:
+
+<Code lang="rust" code={`use grider::debug::save_image_with_grid;
+use grider::drawing::GridDrawingConfig;
+use grider::{Grid, GridConfig};
+use image::open;
+
+let img = open("tests/large.png").unwrap();
+let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();
+
+grider::debug::save_image_with_grid(
+    &img,
+    &grid,
+    "output_with_grid.png",
+    &GridDrawingConfig::default(),
+)
+.unwrap();`} />
+
+The command-line binary runs the same path by default: `grider tests/large.png` writes `tests/large_with_grid.png` next to the input.
+
+## Know what the renderer paints
+
+`Grid::draw` repaints the picture — it does not annotate the original pixels:
+
+1. Every cell rectangle is filled with `cell_background_color` (default light gray, `Rgba([200, 200, 200, 255])`), optionally inset by `padding`.
+2. A horizontal band of `line_thickness` pixels centered on each row's `end()` (its bottom edge) is drawn in `row_color` (default red).
+3. A vertical band of the same thickness centered on each column's `end()` (its right edge) is drawn in `column_color` (default blue).
+
+The result visualizes the grid geometry; the original image content stays hidden underneath. This is the tool for verifying an extraction, and the defaults are what you see in the figure below.
+
+![Grid visualization with gray cells, red rows and blue columns](../../../assets/docs-overlay.png)
+
+## Restyle with the builder
+
+`GridDrawingConfig::builder()` overrides one setting at a time:
+
+<Code lang="rust" code={`use grider::drawing::GridDrawingConfig;
+use image::Rgba;
+
+let config = GridDrawingConfig::builder()
+    .padding(2)
+    .row_color(Rgba([255, 0, 0, 255]))
+    .column_color(Rgba([0, 0, 255, 255]))
+    .cell_background_color(Rgba([200, 200, 200, 255]))
+    .line_thickness(3)
+    .build();`} />
+
+| Field | Default | Meaning |
+| :--- | :--- | :--- |
+| `padding` | `0` | Inset applied to every cell rectangle, in pixels |
+| `row_color` | `Rgba([255, 0, 0, 255])` | Horizontal band color |
+| `column_color` | `Rgba([0, 0, 255, 255])` | Vertical band color |
+| `cell_background_color` | `Rgba([200, 200, 200, 255])` | Cell fill |
+| `line_thickness` | `2` | Band thickness in pixels (minimum `1`) |
+
+## Color lines by index
+
+Color providers replace the uniform colors and receive the line index. Numbering rows or highlighting alternates takes one closure:
+
+<Code lang="rust" code={`use grider::drawing::GridDrawingConfig;
+use image::Rgba;
+
+let config = GridDrawingConfig::builder()
+    .row_color_provider(Box::new(|index| {
+                    if index % 2 == 0 {
+                                    Rgba([220, 20, 20, 255])
+                    } else {
+                                    Rgba([255, 140, 0, 255])
+                    }
+    }))
+    .build();`} />
+
+When a provider is set, `row_color_at(index)` and `column_color_at(index)` return its result for that index; otherwise they fall back to `row_color` / `column_color`.
+
+## Draw individual pieces
+
+`Cell`, `Row`, `Column` and `Grid` implement the `Drawable` trait. Drawing is infallible by construction — every band and rectangle is clipped to the image bounds:
+
+<Code lang="rust" code={`use grider::drawing::{Drawable, GridDrawingConfig};
+use grider::{LineInfo, LineKind, Row};
+use image::RgbaImage;
+
+let mut image = RgbaImage::new(100, 100);
+let config = GridDrawingConfig::default();
+let row = Row::new(LineInfo::new(0, 10, LineKind::Full));
+row.draw(&mut image, &config);`} />
+
+## Next steps
+
+<LinkCard title="Drawing API reference" description="The full GridDrawingConfig, builder and Drawable documentation." href="/reference/drawing/" />
+<LinkCard title="Configure extraction" description="Improve the grid itself before styling it." href="/guides/configure-extraction/" />
+
+
+---
+
+---
+title: Filter grid lines
+description: Remove structural rows and columns by size, keep kinds, retain in place and look lines and cells up by coordinate.
+type: how-to
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+This guide shows you how to turn a raw extraction into the subset of lines you actually care about: dropping header and footer bands, keeping only content, filtering by predicate, and looking rows, columns and cells up by coordinate.
+
+## Prerequisites
+
+- A [`Grid`](/reference/grid/) extracted with `Grid::try_from_image_with_config` or constructed with `make_grid!`
+
+## Remove structural lines by size
+
+Page headers, footers and margins show up as oversized `Full` bands. The `filter_*` family removes the smallest or biggest rows or columns, returning a new `Grid` and leaving the original untouched:
+
+<Code lang="rust" code={`// Filter out structural lines (headers/footers) by size…
+let grid = grid.filter_biggest_rows();
+// …or drop noise-size bands.
+let grid = grid.filter_smallest_rows();`} />
+
+The same methods exist for columns: `filter_smallest_columns()` and `filter_biggest_columns()`.
+
+<Aside kind="note">
+    Without an explicit tolerance the filters compare sizes with a built-in default tolerance of `0.1`
+    (10 %). The `_with_tolerance` variants let you widen or narrow that margin:
+    `filter_biggest_rows_with_tolerance(0.25)` removes every row whose height is within 25 % of the
+    biggest row.
+</Aside>
+
+## Keep only one kind
+
+`keep_kind` copies the grid and drops every line of the other kind — a common step before visiting cells:
+
+<Code lang="rust" code={`use grider::LineKind;
+
+let full = grid.keep_kind(LineKind::Full);
+
+// Visit every intersection of the remaining lines.
+for cell in full.iter_cells() {
+    let rect = cell.rect();
+    println!("cell at {}x{}", rect.left(), rect.top());
+}`} />
+
+For counting or iterating without allocation, use the accessor family: `rows_by_kind`, `columns_by_kind`, `count_rows_by_kind` and `count_columns_by_kind`:
+
+<Code lang="rust" code={`use grider::LineKind;
+
+let content_rows = grid.count_rows_by_kind(LineKind::Full);`} />
+
+## Filter by predicate
+
+`filtered_rows` and `filtered_columns` return iterators over lines that match any predicate you write:
+
+<Code lang="rust" code={`for row in grid.filtered_rows(|row| row.height >= 20) {
+    println!("tall row at y={} ({}px)", row.y, row.height);
+}`} />
+
+To modify the grid in place instead of copying, use `retain_rows` and `retain_columns`:
+
+<Code lang="rust" code={`use grider::{make_grid, LineKind};
+
+let mut grid = make_grid!(rows: [(0, 5), (5, 5, LineKind::Full)], columns: [(0, 2)]);
+grid.retain_rows(|row| row.kind == LineKind::Full);
+assert_eq!(grid.rows.len(), 1);`} />
+
+## Look up lines and cells by coordinate
+
+Coordinates map directly to lines when a band starts exactly there:
+
+| Method | Lookup | Result |
+| :--- | :--- | :--- |
+| `find_row(y)` | Row starting at `y` | `Option<&Row>` |
+| `find_column(x)` | Column starting at `x` | `Option<&Column>` |
+| `cell(row_index, column_index)` | By index | `Option<Cell>` |
+| `find_cells(row_positions, column_positions)` | By `y`/`x` coordinate lists | Iterator of `Result<Cell, GridError>` |
+
+<Code lang="rust" code={`let cells = grid.find_cells(&[1, 2, 3], &[4, 5, 6]);
+for cell in cells {
+    match cell {
+                    Ok(c) => println!("Found cell at row {}, column {}", c.row.y, c.column.x),
+                    Err(e) => eprintln!("Error finding cell: {e}"),
+    }
+}`} />
+
+`find_cells` reports a [`GridError::RowNotFound`](/reference/errors/) or `ColumnNotFound` for coordinates where no band starts.
+
+## Next steps
+
+<LinkCard title="Grid reference" description="Every method of Grid, including the size accessors and compatibility wrappers." href="/reference/grid/" />
+<LinkCard title="Draw grids and cells" description="Visualize the filtered result with custom colors." href="/guides/draw-overlays/" />
+
+
+---
+
+---
+title: Installation
+description: Add Grider to a Rust project or install the command-line binary, with MSRV and feature-flag notes.
+type: how-to
+---
+
+import { Aside, Code, LinkCard, Steps, TabItem, Tabs } from '@astrojs/starlight/components';
+
+This guide gets the Grider library into a Rust project and the `grider` binary onto your `PATH`.
+
+## Prerequisites
+
+- Rust 1.89 or newer — Grider sets `rust-version = "1.89"` in its manifest. Check yours with `rustc --version`.
+- Network access to [crates.io](https://crates.io/crates/grider).
+
+## Install the library
+
+<Tabs>
+    <TabItem label="cargo add">
+<Code lang="bash" code={`     cargo add grider`} />
+    </TabItem>
+    <TabItem label="Cargo.toml">
+<Code lang="toml" code={`[dependencies]
+grider = "0.3"`} />
+    </TabItem>
+</Tabs>
+
+Then import the crate in your code:
+
+<Code lang="rust" code={`use grider::*;`} />
+
+The prelude-style glob import exposes the main types: [`Grid`](/reference/grid/), [`GridConfig`](/reference/grid-config/), [`Row`](/reference/lines-and-cells/), `Column`, [`Cell`](/reference/lines-and-cells/), [`LineKind`](/reference/lines-and-cells/), [`GridError`](/reference/errors/), the `Binarization` enum and the `make_grid!` / `make_line!` macros.
+
+## Install the CLI binary
+
+The same crate builds a command-line binary with the same extraction pipeline:
+
+<Code lang="bash" code={`cargo install grider`} />
+
+Verify the installation:
+
+<Code lang="bash" code={`grider --version`} />
+
+<Aside kind="note">
+    Pass `--locked` to `cargo install` if you want the dependency versions the release was tested
+    with: `cargo install grider --locked`.
+</Aside>
+
+## Choose your feature flags
+
+Two features are on by default; you only touch them when you shrink the build or need test fixtures:
+
+| Feature | Default | Purpose | Reference |
+| :--- | :--- | :--- | :--- |
+| `serde` | enabled | `Serialize`/`Deserialize` for all data types, JSON output in the CLI | [Feature flags](/reference/feature-flags/) |
+| `drawing` | enabled | Grid drawing and the `debug` overlay helpers | [Drawing API](/reference/drawing/) |
+| `test-utils` | disabled | Shared image fixtures for tests and benchmarks | [Feature flags](/reference/feature-flags/) |
+
+<Code lang="bash" code={`# Everything except serde and drawing:
+cargo add grider --no-default-features
+# Test fixtures only, for development:
+cargo add grider --features test-utils`} />
+
+## Next steps
+
+<LinkCard title="Extract your first grid" description="The step-by-step tutorial from an empty project to a drawn grid." href="/tutorials/extract-your-first-grid/" />
+
+
+---
+
+---
+title: Serialize grids to JSON
+description: Round-trip grids and configs through serde, keep legacy configs compatible and print JSON from the CLI.
+type: how-to
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+This guide shows you how to serialize and deserialize every Grider data type with the default `serde` feature — including the JSON path of the command-line binary and the backward-compatibility rules introduced in 0.3.
+
+## Prerequisites
+
+- Grider with the default features (`serde` is enabled by default)
+
+## Serialize a grid
+
+`Grid`, `Row`, `Column`, `LineInfo`, `LineKind`, `GridConfig` and `Binarization` all derive `Serialize` and `Deserialize` when the `serde` feature is on:
+
+<Code lang="rust" code={`use grider::{Grid, GridConfig};
+use image::open;
+
+let img = open("tests/large.png").unwrap();
+let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();
+
+let json = serde_json::to_string_pretty(&grid).unwrap();
+println!("{json}");`} />
+
+A `Grid` serializes to its two public fields, `rows` and `columns`:
+
+<Code lang="json" code={`{
+    "rows": [
+  { "y": 0, "height": 11, "kind": "Empty" },
+  { "y": 11, "height": 18, "kind": "Empty" },
+  { "y": 46, "height": 177, "kind": "Full" }
+    ],
+    "columns": [
+  { "x": 0, "width": 4, "kind": "Empty" }
+    ]
+}`} />
+
+The JSON above is the real beginning of the output that the 0.3.0 CLI prints for the repository's `tests/large.png` fixture.
+
+## Round-trip a configuration
+
+Deserialization restores a `GridConfig` exactly — including a Sauvola binarization:
+
+<Code lang="rust" code={`use grider::GridConfig;
+
+let config = GridConfig::builder().sauvola(0.45).build();
+let json = serde_json::to_string(&config).unwrap();
+let parsed: GridConfig = serde_json::from_str(&json).unwrap();
+assert_eq!(parsed, config);`} />
+
+## Keep legacy configs deserializable
+
+0.3 added the `binarization` field to `GridConfig`. The field carries `#[serde(default)]`, so JSON written by a 0.2 program still deserializes:
+
+<Code lang="rust" code={`use grider::GridConfig;
+
+let legacy = r#"{
+    "threshold_block_size": 12,
+    "threshold_delta": 0,
+    "merge_threshold_ratio": 0.8,
+    "enable_parallel": true
+}"#;
+let parsed: GridConfig = serde_json::from_str(legacy).unwrap();
+assert_eq!(parsed, GridConfig::default());`} />
+
+<Aside kind="caution">
+    The same addition breaks **struct literals**: `GridConfig { threshold_block_size: 12, … }` no longer
+    compiles without the `binarization` field. Add the field or finish the literal with
+    `..GridConfig::default()`.
+</Aside>
+
+## Print JSON from the CLI
+
+<Code lang="bash" code={`grider tests/large.png --json --quiet`} />
+
+`--json` prints the pretty JSON of the whole grid to stdout and skips the overlay file. Pair it with `--quiet` when a machine reads the output, because the human-readable summary goes to stdout too.
+
+<Aside kind="note">
+    Built without the `serde` feature, the binary prints
+    `Skipping JSON output: built without the 'serde' feature` and exits successfully.
+</Aside>
+
+## Next steps
+
+<LinkCard title="Use the CLI" description="Every flag of the grider binary, with real transcripts." href="/guides/use-the-cli/" />
+<LinkCard title="Feature flags" description="What serde, drawing and test-utils gate." href="/reference/feature-flags/" />
+
+
+---
+
+---
+title: Use the CLI
+description: Extract grids from the terminal — outputs, binarization flags, JSON, quiet mode, logging and exit codes.
+type: how-to
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+This guide covers the `grider` binary end to end: default behavior, every flag, the JSON output, logging and exit codes.
+
+## Prerequisites
+
+- The binary installed: `cargo install grider`
+
+## Extract and save the default overlay
+
+Point the binary at an image. It extracts the grid, prints a summary, and saves `<image>_with_grid.png` next to the input file:
+
+<Code lang="bash" code={`grider tests/large.png`} />
+
+<Code lang="ansi" code={`Extracted grid in 7.22ms
+Grid { rows: 16, columns: 19 }
+Full rows: 7, empty rows: 9, full columns: 9, empty columns: 10
+Saving overlay to tests/large_with_grid.png`} />
+
+Rename the output with `-o`/`--output`:
+
+<Code lang="bash" code={`grider tests/large.png --output result/grid.png`} />
+
+## Configure the extraction
+
+The flags map one-to-one onto [`GridConfig`](/reference/grid-config/) fields:
+
+<Code lang="bash" code={`# Custom configuration
+grider tests/large.png --block-size 15 --delta 2 --merge-ratio 0.9 --no-parallel --json
+
+# Sauvola binarization for degraded documents
+grider scan.png --binarization sauvola --sauvola-k 0.34 --json`} />
+
+`--sauvola-k` implies `--binarization sauvola`, so the second command also works without the explicit `--binarization` flag. The complete flag table, including defaults, lives in the [CLI reference](/reference/cli/).
+
+## Get machine-readable output
+
+`--json` prints the whole grid as pretty JSON to stdout and skips the overlay:
+
+<Code lang="bash" code={`grider tests/large.png --json --quiet`} />
+
+<Code lang="json" code={`{
+    "rows": [
+  { "y": 0, "height": 11, "kind": "Empty" },
+  { "y": 11, "height": 18, "kind": "Empty" },
+  { "y": 29, "height": 17, "kind": "Empty" }
+    ]
+}`} />
+
+Add `-q`/`--quiet` to suppress the human-readable summary — without it, the summary shares stdout with the JSON.
+
+## Log diagnostics
+
+The binary initializes a `tracing` subscriber from `RUST_LOG`. Turn on debug logging to see the parsed arguments:
+
+<Code lang="bash" code={`RUST_LOG=debug grider tests/large.png --quiet`} />
+
+## Handle failures
+
+The binary maps errors onto exit code `1` (`ExitCode::FAILURE`) and prints the error chain. Opening a missing file produces:
+
+<Code lang="ansi" code={`error: Failed to open image
+
+Caused by:
+ No such file or directory (os error 2)`} />
+
+Successful runs exit with code `0`.
+
+<Aside kind="note">
+    Features gate two outputs. Built without `serde`, the binary prints
+    `Skipping JSON output: built without the 'serde' feature`. Built without `drawing`, it prints
+    `Skipping overlay '…': built without the 'drawing' feature`. Both still exit `0`.
+</Aside>
+
+## Next steps
+
+<LinkCard title="CLI reference" description="The complete flag and behavior table." href="/reference/cli/" />
+<LinkCard title="Serialize grids to JSON" description="The JSON shape and serde round-trips in the library." href="/guides/serialize-grids/" />
+
+
+---
+
+---
+title: Grider
+description: High-performance row and column grid extraction from images, as a Rust library and a CLI.
+template: splash
+hero:
+  title: Grider
+  tagline: Extract the row and column grid of an image — the skeleton of tables, spreadsheets and document layouts — with one line of Rust or one terminal command.
+  image:
+    file: ../../assets/docs-overlay.png
+    alt: "Schematic grid visualization produced by grider on a document screenshot: light gray cell bands crossed by red row lines and blue column lines."
+  actions:
+    - text: Extract your first grid
+      link: /tutorials/extract-your-first-grid/
+      icon: right-arrow
+    - text: Installation
+      link: /guides/install/
+      icon: download
+    - text: API reference
+      link: /reference/grid/
+      icon: document
+---
+
+import { Aside, Card, CardGrid, Code, LinkButton, LinkCard } from '@astrojs/starlight/components';
+
+Grider reads an image, binarizes it with an adaptive threshold, detects the runs of background and content scan lines on both axes, and returns them as a [`Grid`](/reference/grid/) of [`Row`](/reference/lines-and-cells/)s and `Column`s — every band tagged `Empty` (background) or `Full` (content).
+
+<Code lang="toml" code={`[dependencies]
+grider = "0.3"`} />
+
+<Code lang="rust" code={`use grider::{Grid, GridConfig};
+use image::open;
+
+let img = open("path/to/image.png").expect("Failed to open image");
+let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).expect("Failed to create grid");
+
+for row in grid.rows() {
+    println!("Row at y: {} ({:?})", row.y, row.kind);
+}`} />
+
+<Aside kind="tip">
+        The `drawing` feature renders this visualization of the detected grid with one call to
+        [`debug::save_image_with_grid`](/reference/drawing/) — the figure above shows the real output of the
+        `grider` command-line tool on a screenshot fixture.
+</Aside>
+
+## Why Grider
+
+- **One-line extraction** — [`Grid::try_from_image_with_config`](/reference/grid/) returns every row and
+        column band of the image, tagged `Empty` or `Full`.
+- **Fast by construction** — binarization runs on a streaming sliding-window integral image
+        (1.6–3.1× faster than the previous `imageproc`-based path, bit-for-bit identical output), the
+        emptiness scan is one fused cache-friendly pass, and both steps parallelize over row bands with
+        work-size gating. See [Performance](/explanation/performance/).
+- **Two binarizers** — the adaptive mean threshold (Bradley & Roth) for clean input, or
+        [Sauvola](/guides/choose-binarization/) for degraded documents, both `O(width × height)` regardless
+        of the window radius.
+- **Ergonomic API** — builders for `GridConfig` and `GridDrawingConfig`, iterators over cells,
+        kind-based filters, in-place `retain`, serde support, and visual debug overlays.
+
+## Choose your path
+
+<CardGrid stagger>
+        <Card title="Learn">
+                Follow the [first-grid tutorial](/tutorials/extract-your-first-grid/) to extract, inspect and
+                draw a grid from scratch.
+        </Card>
+        <Card title="Solve a task">
+                The [how-to guides](/guides/install/) cover configuration, binarization choice, filtering,
+                drawing, JSON serialization and the CLI.
+        </Card>
+        <Card title="Look something up">
+                The [reference section](/reference/grid/) documents every public type, function, macro, error
+                variant and CLI flag.
+        </Card>
+        <Card title="Understand the design">
+                The [concept pages](/explanation/extraction-pipeline/) explain the pipeline stages and where
+                the performance comes from.
+        </Card>
+</CardGrid>
+
+<LinkButton href="/tutorials/extract-your-first-grid/" icon="right-arrow">Start the tutorial</LinkButton>
+
+## Where to next
+
+- Run the binary on your own images: [Use the CLI](/guides/use-the-cli/).
+- Fine-tune detection on difficult input: [Configure extraction](/guides/configure-extraction/).
+- Browse the source: [github.com/elcoosp/grider](https://github.com/elcoosp/grider).
+
+
+---
+
+---
+title: Binarization
+description: The Binarization enum, both threshold algorithms, and the public functions of the binarize module.
+type: reference
+---
+
+import { Code, LinkCard } from '@astrojs/starlight/components';
+
+Binarization turns the grayscale image into a black-and-white picture where background is white (`255`) and content is black (`0`); the extraction pipeline then looks for scan lines made purely of background pixels. Both algorithms run in `O(width × height)` regardless of the window radius, with `O(width × radius)` extra memory.
+
+## The enum
+
+<Code lang="rust" code={`pub enum Binarization {
+    AdaptiveMean,
+    Sauvola { k: f32 },
+}`} />
+
+Derives `Debug`, `Clone`, `Copy`, `Default`, `PartialEq` (and `Serialize`/`Deserialize` with the `serde` feature). The default variant is `AdaptiveMean`.
+
+### AdaptiveMean
+
+The adaptive mean threshold (Bradley & Roth, 2005). A pixel is background when it is at least as bright as the mean of its window minus [`threshold_delta`](/reference/grid-config/). The output is **bit-for-bit identical** to `imageproc::contrast::adaptive_threshold`, verified by property tests.
+
+### Sauvola
+
+The Sauvola & Pietikäinen (2000) threshold for degraded documents. The local threshold follows the mean **and** the standard deviation of the window, which copes with uneven illumination and low contrast.
+
+| Field | Meaning |
+| :--- | :--- |
+| `k` | Sensitivity to local contrast, typically in `[0.1, 0.5]`; `0.2` is a good default and the fallback for non-finite values. [`threshold_delta`](/reference/grid-config/) is unused by this method |
+
+The standard deviation uses the dynamic range constant `SAUVOLA_DYNAMIC_RANGE = 128.0` — for 8-bit grayscale images the deviation is bounded by `255 / 2`, and `128` is the conventional rounding of that bound.
+
+## Constants
+
+| Constant | Value | Meaning |
+| :--- | :--- | :--- |
+| `SAUVOLA_DEFAULT_K` | `0.2` | Fallback for non-finite `k` |
+| `SAUVOLA_DYNAMIC_RANGE` | `128.0` | Standard-deviation range `R` in the Sauvola formula |
+| `MIN_BLOCK_RADIUS` (binarize module) | `1` | Lower bound for the window radius |
+
+## Functions
+
+| Function | Signature | Behavior |
+| :--- | :--- | :--- |
+| `binarize` | `(img: &GrayImage, config: &GridConfig) -> GrayImage` | Dispatches on `config.binarization` — the entry the pipeline uses |
+| `adaptive_mean_threshold` | `(img: &GrayImage, block_radius: u32, delta: i32, parallel: bool) -> GrayImage` | Streaming sliding-window integral image (Bradley & Roth); bit-identical to `imageproc`, 1.6–3.1× faster |
+| `sauvola_threshold` | `(img: &GrayImage, block_radius: u32, k: f32, parallel: bool) -> GrayImage` | Integral-image Sauvola (Shafait et al. 2008) for degraded documents |
+
+## Memory model
+
+The adaptive mean binarizer never materializes a whole integral image. Peak extra memory is two streaming bands, `O(width × radius)`:
+
+| Image | Whole integral image (`u32`) | Streaming ring (`f64`) |
+| :--- | ---: | ---: |
+| 1000 × 1000, r = 12 | ~4 MB | ~104 KB |
+| 4000 × 4000, r = 12 | ~64 MB | ~1.7 MB |
+| 4000 × 4000, r = 64 | ~64 MB | ~8.3 MB |
+
+## Next steps
+
+<LinkCard title="Choose a binarization method" description="Decision guide with k values and CLI flags." href="/guides/choose-binarization/" />
+<LinkCard title="The extraction pipeline" description="Where binarization sits in the overall design." href="/explanation/extraction-pipeline/" />
+
+
+---
+
+---
+title: CLI
+description: The grider command — arguments, every option with its default, outputs and exit codes.
+type: reference
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+The `grider` binary (built by the same crate) runs the library pipeline from a terminal. `grider --help` prints the canonical flag list; the table below adds defaults and behavior.
+
+## Arguments
+
+| Argument | Type | Meaning |
+| :--- | :--- | :--- |
+| `<IMAGE_PATH>` (positional) | path | Path to the input image file |
+
+## Options
+
+| Flag | Type | Default | Meaning |
+| :--- | :--- | :--- | :--- |
+| `--block-size` | `u32` | `12` | Adaptive threshold block size (minimum `3`) |
+| `--delta` | `i32` | `0` | Offset subtracted from the local mean during adaptive thresholding |
+| `--merge-ratio` | `f32` | `0.8` | Ratio of the average line size under which lines merge (`[0, 1]`) |
+| `--binarization` | `mean` \| `sauvola` | `mean` | Binarization method applied before detection |
+| `--sauvola-k` | `f32` | `0.2` | Sauvola sensitivity `k`; implies `--binarization sauvola` |
+| `--no-parallel` | flag | off | Disable parallel processing |
+| `-o`, `--output` | path | `<image>_with_grid.png` next to the input | Where to save the overlay image |
+| `--json` | flag | off | Print the grid as JSON instead of saving an overlay |
+| `-q`, `--quiet` | flag | off | Suppress human-readable summaries |
+| `-h`, `--help` | flag | — | Print help (`-h` prints a summary) |
+| `-V`, `--version` | flag | — | Print version |
+
+## Output behavior
+
+- **Default**: a timing summary, the grid summary, kind counts, then the overlay file path.
+- **`--json`**: pretty JSON of the whole grid on stdout; no overlay file is written.
+- **`--quiet`**: no summary lines; pairs with `--json` for machine-only output.
+
+<Code lang="ansi" code={`Extracted grid in 7.22ms
+Grid { rows: 16, columns: 19 }
+Full rows: 7, empty rows: 9, full columns: 9, empty columns: 10
+Saving overlay to tests/large_with_grid.png`} />
+
+## Exit codes and logging
+
+| Case | Exit code | Output |
+| :--- | :--- | :--- |
+| Success | `0` | As above |
+| Failure (unreadable image, failed extraction, unwritable overlay) | `1` | `error: …` with the `Caused by:` chain |
+
+The binary initializes a `tracing` subscriber from `RUST_LOG`; `RUST_LOG=debug grider img.png` logs the parsed arguments.
+
+<Aside kind="note">
+    Two outputs are feature-gated: without `serde`, JSON printing prints
+    `Skipping JSON output: built without the 'serde' feature`; without `drawing`, the overlay step
+    prints `Skipping overlay '…': built without the 'drawing' feature`. Both still exit `0`.
+</Aside>
+
+## Next steps
+
+<LinkCard title="Use the CLI" description="Task recipes — overlays, JSON, logging, failures." href="/guides/use-the-cli/" />
+<LinkCard title="GridConfig" description="The library-side counterpart of the tuning flags." href="/reference/grid-config/" />
+
+
+---
+
+---
+title: Drawing API
+description: GridDrawingConfig with defaults, the builder, color providers, the Drawable trait and the debug overlay helper.
+type: reference
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+The `drawing` module (gated by the default `drawing` feature) renders grids, cells, and grid lines on images. `GridDrawingConfig` controls the appearance; the `Drawable` trait draws on an `RgbaImage`.
+
+## GridDrawingConfig
+
+| Field | Type | Default | Meaning |
+| :--- | :--- | :--- | :--- |
+| `padding` | `u32` | `0` | Inset between cells and grid lines, applied to every cell rectangle |
+| `row_color` | `Rgba<u8>` | `Rgba([255, 0, 0, 255])` | Horizontal band color |
+| `column_color` | `Rgba<u8>` | `Rgba([0, 0, 255, 255])` | Vertical band color |
+| `cell_background_color` | `Rgba<u8>` | `Rgba([200, 200, 200, 255])` | Cell fill |
+| `row_color_provider` | `Option<Box<dyn Fn(usize) -> Rgba<u8>>>` | `None` | Per-row color by index; overrides `row_color` |
+| `column_color_provider` | `Option<Box<dyn Fn(usize) -> Rgba<u8>>>` | `None` | Per-column color by index; overrides `column_color` |
+| `line_thickness` | `u32` | `2` | Band thickness in pixels (clamped to at least `1`) |
+
+`GridDrawingConfig` implements `Debug`; the providers render as `<function>`.
+
+## Builder
+
+| Method | Sets |
+| :--- | :--- |
+| `padding(v: u32)` | Cell inset |
+| `row_color(v: Rgba<u8>)` | Horizontal band color |
+| `column_color(v: Rgba<u8>)` | Vertical band color |
+| `cell_background_color(v: Rgba<u8>)` | Cell fill |
+| `row_color_provider(v: Box<dyn Fn(usize) -> Rgba<u8>>)` | Per-row color provider |
+| `column_color_provider(v: Box<dyn Fn(usize) -> Rgba<u8>>)` | Per-column color provider |
+| `line_thickness(v: u32)` | Band thickness, minimum `1` |
+
+<Code lang="rust" code={`use grider::drawing::GridDrawingConfig;
+use image::Rgba;
+
+let config = GridDrawingConfig::builder()
+    .padding(1)
+    .cell_background_color(Rgba([0, 0, 0, 255]))
+    .row_color_provider(Box::new(|index| Rgba([index as u8, 0, 0, 255])))
+    .build();
+assert_eq!(config.padding, 1);`} />
+
+## Color resolution
+
+| Method | Behavior |
+| :--- | :--- |
+| `row_color_at(index) -> Rgba<u8>` | Returns the provider result when set, otherwise `row_color` |
+| `column_color_at(index) -> Rgba<u8>` | Returns the provider result when set, otherwise `column_color` |
+
+## Drawable
+
+<Code lang="rust" code={`pub trait Drawable {
+    fn draw(&self, image: &mut RgbaImage, config: &GridDrawingConfig);
+}`} />
+
+Implemented by `Cell`, `Row`, `Column` and [`Grid`](/reference/grid/). Drawing is infallible by construction: every band and rectangle is clipped to the image bounds.
+
+Drawing semantics:
+
+- `Row` draws a horizontal band of `line_thickness` pixels centered on its `end()` (bottom edge).
+- `Column` draws a vertical band of the same thickness centered on its `end()` (right edge).
+- `Cell` fills its rectangle, inset by `padding` on each side.
+- `Grid` draws every cell first, then every row band, then every column band — the result covers the original image pixels and visualizes the grid geometry.
+
+## debug module
+
+<Code lang="rust" code={`pub fn save_image_with_grid(
+    image: &DynamicImage,
+    grid: &Grid,
+    output_path: &str,
+    config: &GridDrawingConfig,
+) -> Result<(), GridError>`} />
+
+Converts the image to `RgbaImage`, draws the grid with `config`, and writes the file. Returns [`GridError::ImageConversionError`](/reference/errors/) when saving fails.
+
+<Code lang="rust" code={`use grider::drawing::GridDrawingConfig;
+use grider::{Grid, GridConfig};
+use image::open;
+
+let img = open("tests/large.png").unwrap();
+let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();
+
+grider::debug::save_image_with_grid(&img, &grid, "output_with_grid.png", &GridDrawingConfig::default())
+    .unwrap();`} />
+
+<Aside kind="note">
+    The command-line binary calls this function with the default config on every run unless you pass
+    `--json` or build without the `drawing` feature.
+</Aside>
+
+## Next steps
+
+<LinkCard title="Draw grids and cells" description="Recipes for providers, thickness and padding." href="/guides/draw-overlays/" />
+
+
+---
+
+---
+title: Errors
+description: Every GridError variant, its fields and its Display output, plus wildcard-match guidance.
+type: reference
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+All errors that [`Grid`](/reference/grid/) operations produce. The enum derives `Error`, `Debug`, `PartialEq`, `Eq`, `Clone` (via `thiserror`) and is `#[non_exhaustive]` — new variants may arrive in minor releases, so downstream `match` arms include a wildcard.
+
+## Variants :badge[non_exhaustive]{variant="caution"}
+
+| Variant | Fields | Display output |
+| :--- | :--- | :--- |
+| `InvalidDimensions` | `width: u32`, `height: u32` | `Invalid image dimensions: width={width}, height={height}` |
+| `RowNotFound` | `y: u32` | `Row not found at y={y}` |
+| `ColumnNotFound` | `x: u32` | `Column not found at x={x}` |
+| `InvalidConfig` | `reason: String` | `Invalid configuration: {reason}` |
+| `ImageConversionError` | `String` | `Failed to convert image: {0}` |
+
+## When each variant occurs
+
+| Variant | Raised by |
+| :--- | :--- |
+| `InvalidDimensions` | Extracting from an image with zero width or zero height; `detection::process_dimension` with a zero dimension |
+| `RowNotFound` / `ColumnNotFound` | [`Grid::find_cells`](/reference/grid/) with a `y`/`x` coordinate where no band starts |
+| `InvalidConfig` | [`GridConfig::validate`](/reference/grid-config/) on a zero block size, a non-finite or out-of-range merge ratio, or a non-finite Sauvola `k` |
+| `ImageConversionError` | `debug::save_image_with_grid` when the output file cannot be written |
+
+## Constructor
+
+<Code lang="rust" code={`pub fn invalid_config(reason: impl Into<String>) -> Self`} />
+
+Builds `GridError::InvalidConfig` from any string-ish value:
+
+<Code lang="rust" code={`use grider::GridError;
+
+let error = GridError::invalid_config("block size must be > 0");
+assert_eq!(error.to_string(), "Invalid configuration: block size must be > 0");`} />
+
+## Handling in practice
+
+<Code lang="rust" code={`match result {
+    Ok(grid) => println!("{grid}"),
+    Err(GridError::InvalidDimensions { width, height }) => eprintln!("empty image {width}x{height}"),
+    Err(e) => eprintln!("extraction failed: {e}"),
+}`} />
+
+<Aside kind="caution">
+    Because the enum is `#[non_exhaustive]`, matching every current variant without a wildcard arm does
+    not compile outside the crate — keep a catch-all arm.
+</Aside>
+
+## Next steps
+
+<LinkCard title="Grid" description="The fallible operations that return these errors." href="/reference/grid/" />
+<LinkCard title="GridConfig" description="The validation rules behind InvalidConfig." href="/reference/grid-config/" />
+
+
+---
+
+---
+title: Feature flags
+description: What the serde, drawing and test-utils cargo features gate, and how the CLI behaves without them.
+type: reference
+---
+
+import { Code, LinkCard } from '@astrojs/starlight/components';
+
+Grider compiles three cargo features. Two are on by default; `test-utils` exists for development only.
+
+## The flags
+
+| Feature | Default | Gates |
+| :--- | :--- | :--- |
+| `serde` | enabled | `Serialize`/`Deserialize` for all public data types, and JSON output in the CLI |
+| `drawing` | enabled | The [`drawing`](/reference/drawing/) module, the `Drawable` trait, and the [`debug::save_image_with_grid`](/reference/drawing/) helpers |
+| `test-utils` | disabled | The `grider::testing` module with shared image fixtures (`Pattern`, `test_image`, `gray_test_image`) for tests and benchmarks |
+
+## Customize a build
+
+<Code lang="bash" code={`# Minimal build — no JSON, no drawing:
+cargo add grider --no-default-features
+
+# Add only serde back:
+cargo add grider --no-default-features --features serde`} />
+
+## CLI behavior without features
+
+| Missing feature | CLI behavior |
+| :--- | :--- |
+| `serde` | `--json` prints `Skipping JSON output: built without the 'serde' feature`; the run still exits `0` |
+| `drawing` | The overlay step prints `Skipping overlay '…': built without the 'drawing' feature`; the run still exits `0` |
+
+## Next steps
+
+<LinkCard title="Installation" description="How to select features with cargo." href="/guides/install/" />
+
+
+---
+
+---
+title: GridConfig
+description: Every field, constant and builder method of the extraction configuration, with defaults, clamping and validation rules.
+type: reference
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+`GridConfig` drives the extraction pipeline. It derives `Debug`, `Clone`, `Copy`, `PartialEq` and `Serialize`/`Deserialize` with the `serde` feature. Build it with the constructor, the builder, or a struct literal followed by `validate()`.
+
+## Fields
+
+| Field | Type | Default | Constraints | Effect |
+| :--- | :--- | :--- | :--- | :--- |
+| `threshold_block_size` | `u32` | `12` | Clamped to at least `3` by constructors and builders; must be non-zero for `validate()` | Block *radius* of the adaptive threshold — the comparison window is `2 × size + 1` pixels wide |
+| `threshold_delta` | `i32` | `0` | Any value | Offset subtracted from the local mean. Positive values count more pixels as background (permissive), negative values stricter. Unused by Sauvola |
+| `merge_threshold_ratio` | `f32` | `0.8` | Clamped to `[0.0, 1.0]`; `NaN` maps onto the default; must be finite and in range for `validate()` | Neighbouring runs shorter than `ratio × average run size` merge |
+| `enable_parallel` | `bool` | `true` | Any value | Parallelize binarization and the emptiness scan over row bands, with work-size gating for small images |
+| `binarization` | [`Binarization`](/reference/binarization/) | `AdaptiveMean` | Sauvola `k` must be finite for `validate()` | Binarization method applied before line detection; carries `#[serde(default)]` for legacy JSON |
+
+## Constants
+
+| Constant | Value | Meaning |
+| :--- | :--- | :--- |
+| `DEFAULT_THRESHOLD_BLOCK_SIZE` | `12` | Default block radius |
+| `MIN_THRESHOLD_BLOCK_SIZE` | `3` | Lower clamp for `threshold_block_size` |
+| `DEFAULT_THRESHOLD_DELTA` | `0` | Default delta |
+| `DEFAULT_MERGE_THRESHOLD_RATIO` | `0.8` | Default merge ratio |
+| `SAUVOLA_DEFAULT_K` | `0.2` | Fallback for non-finite Sauvola `k`; the scikit-image default |
+| `SAUVOLA_DYNAMIC_RANGE` | `128.0` | Dynamic range `R` of the standard deviation in the Sauvola formula (`255 / 2` rounded) |
+
+## Constructors
+
+| Constructor | Signature | Notes |
+| :--- | :--- | :--- |
+| `GridConfig::new` | `(threshold_block_size: u32, merge_threshold_ratio: f32, enable_parallel: bool) -> Self` | Clamps block size and ratio, delta stays `0`, binarization stays `AdaptiveMean` |
+| `GridConfig::builder` | `() -> GridConfigBuilder` | Starts from the defaults |
+| `GridConfig::default` | `() -> Self` | All defaults above |
+
+## Builder methods
+
+Every method consumes and returns the builder; the built config always passes `validate()`.
+
+| Method | Sanitization |
+| :--- | :--- |
+| `threshold_block_size(v: u32)` | Clamps up to `3` |
+| `threshold_delta(v: i32)` | None needed |
+| `merge_threshold_ratio(v: f32)` | Clamps to `[0.0, 1.0]`, `NaN` becomes `0.8` |
+| `parallel(v: bool)` | None needed |
+| `binarization(v: Binarization)` | None needed |
+| `sauvola(k: f32)` | Sets `Binarization::Sauvola { k }`, replacing non-finite `k` with `0.2` |
+
+<Code lang="rust" code={`use grider::GridConfig;
+
+let config = GridConfig::builder()
+    .threshold_block_size(7)
+    .threshold_delta(-2)
+    .merge_threshold_ratio(0.5)
+    .parallel(true)
+    .build();
+
+assert!(config.validate().is_ok());`} />
+
+## validate
+
+<Code lang="rust" code={`pub fn validate(&self) -> Result<(), GridError>`} />
+
+Reports the first problem found in hand-constructed values (struct literal or deserialization) as a [`GridError::InvalidConfig`](/reference/errors/):
+
+| Condition | Error message |
+| :--- | :--- |
+| `threshold_block_size == 0` | `threshold_block_size must be greater than 0` |
+| `merge_threshold_ratio` not finite or outside `[0.0, 1.0]` | `merge_threshold_ratio must be a finite value in [0.0, 1.0]` |
+| `Sauvola { k }` with non-finite `k` | `sauvola k must be a finite value` |
+
+## sanitize_ratio and sanitize_k
+
+| Function | Behavior |
+| :--- | :--- |
+| `GridConfig::sanitize_ratio(ratio: f32) -> f32` | `NaN` becomes the default ratio, everything else clamps to `[0.0, 1.0]` |
+| `Binarization::sanitize_k(k: f32) -> f32` | Non-finite `k` becomes `SAUVOLA_DEFAULT_K` |
+
+<Aside kind="caution">
+    0.3 added the `binarization` field. Struct literals must include it or finish with
+    `..GridConfig::default()`; JSON written by 0.2 keeps deserializing thanks to `#[serde(default)]`.
+</Aside>
+
+## Next steps
+
+<LinkCard title="Binarization" description="The two algorithms this config selects." href="/reference/binarization/" />
+<LinkCard title="Configure extraction" description="Task-oriented recipes for each knob." href="/guides/configure-extraction/" />
+
+
+---
+
+---
+title: Grid
+description: The Grid type — construction from images, iterators, kind-based access, filtering, coordinate lookups and compatibility wrappers.
+type: reference
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+`Grid` is the extracted result of the pipeline: every row and column band of an image, tagged [`Empty` or `Full`](/reference/lines-and-cells/). Use this page to find any method of the type.
+
+## Definition
+
+<Code lang="rust" code={`pub struct Grid {
+    pub rows: SmallVecLine<Row>,
+    pub columns: SmallVecLine<Column>,
+}`} />
+
+- The two fields are public and hold the lines in `SmallVecLine` collections (a small-vector type with an inline capacity of `32`, see `detection::DEFAULT_SMALLVEC_SIZE`).
+- Derives: `Debug`, `PartialEq`, `Clone` — plus `Serialize`/`Deserialize` with the `serde` feature.
+- Implements `Display`, printing a compact summary such as `Grid { rows: 16, columns: 19 }`.
+- Lines store their position (`Row::y` / `Column::x`), extent (`height` / `width`) and [`LineKind`](/reference/lines-and-cells/).
+
+## Construction
+
+| Function | Signature | Behavior |
+| :--- | :--- | :--- |
+| `try_from_image_with_config` | `(&DynamicImage, GridConfig) -> Result<Self, GridError>` | Full pipeline from any image; already-gray inputs borrow zero-copy |
+| `try_from_gray_with_config` | `(&GrayImage, GridConfig) -> Result<Self, GridError>` | Same pipeline directly from a `GrayImage` — no conversion, no copy |
+| `try_from_binarized` | `(&GrayImage, GridConfig) -> Result<Self, GridError>` | Skips binarization; on the benchmark fixture this is **4.4× faster** than the full path |
+
+<Code lang="rust" code={`use grider::{Grid, GridConfig};
+use image::open;
+
+let img = open("tests/large.png").expect("Failed to open image");
+let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).expect("Failed to create grid");`} />
+
+All three validate the image (zero width or height fails with [`GridError::InvalidDimensions`](/reference/errors/)) and the configuration.
+
+## Iterate and count
+
+| Method | Returns | Notes |
+| :--- | :--- | :--- |
+| `rows()` | `impl Iterator<Item = &Row>` | Every row, top to bottom |
+| `columns()` | `impl Iterator<Item = &Column>` | Every column, left to right |
+| `rows_slice()` / `columns_slice()` | `&[Row]` / `&[Column]` | Borrow the backing storage |
+| `row_count()` / `column_count()` | `usize` | Number of lines |
+| `is_empty()` | `bool` | No lines on either axis |
+| `iter_cells()` | `impl Iterator<Item = Cell>` | Every intersection, row-major |
+| `cell(row_index, column_index)` | `Option<Cell>` | Index-based cell lookup |
+| `dimensions()` | `(u32, u32)` | Largest `column.end()`, largest `row.end()`; `0` per empty axis |
+
+## Kind-based access
+
+| Method | Returns |
+| :--- | :--- |
+| `rows_by_kind(kind)` | `impl Iterator<Item = &Row>` |
+| `columns_by_kind(kind)` | `impl Iterator<Item = &Column>` |
+| `count_rows_by_kind(kind)` | `usize` |
+| `count_columns_by_kind(kind)` | `usize` |
+| `keep_kind(kind)` | New `Grid` with only that [`LineKind`](/reference/lines-and-cells/) on both axes |
+
+## Predicate and in-place filtering
+
+| Method | Behavior |
+| :--- | :--- |
+| `filtered_rows(predicate)` | Iterator over rows matching a predicate |
+| `filtered_columns(predicate)` | Iterator over columns matching a predicate |
+| `retain_rows(predicate)` | Removes non-matching rows in place — the allocation-free counterpart of the copy filters |
+| `retain_columns(predicate)` | Same for columns |
+
+## Size filters
+
+Every method returns a new `Grid` and leaves the original untouched. The no-tolerance variants compare sizes with a built-in default tolerance of `0.1`.
+
+| Method | Removes |
+| :--- | :--- |
+| `filter_smallest_rows()` / `filter_smallest_rows_with_tolerance(t)` | Rows at the minimum height |
+| `filter_biggest_rows()` / `filter_biggest_rows_with_tolerance(t)` | Rows at the maximum height — headers and footers |
+| `filter_smallest_columns()` / `filter_smallest_columns_with_tolerance(t)` | Columns at the minimum width |
+| `filter_biggest_columns()` / `filter_biggest_columns_with_tolerance(t)` | Columns at the maximum width |
+
+Size accessors: `smallest_row_height()`, `biggest_row_height()`, `smallest_column_width()`, `biggest_column_width()` — each `Option<u32>`, `None` on an empty axis.
+
+## Coordinate lookups
+
+| Method | Lookup | Result |
+| :--- | :--- | :--- |
+| `find_row(y)` | Row starting at `y` | `Option<&Row>` |
+| `find_column(x)` | Column starting at `x` | `Option<&Column>` |
+| `find_cells(row_positions, column_positions)` | `&[u32]` y- and x-coordinates | Iterator of `Result<Cell, GridError>` |
+
+`find_cells` yields [`RowNotFound`](/reference/errors/) / `ColumnNotFound` errors for coordinates where no band starts:
+
+<Code lang="rust" code={`let cells = grid.find_cells(&[1, 2, 3], &[4, 5, 6]);
+for cell in cells {
+    match cell {
+                    Ok(c) => println!("Found cell at row {}, column {}", c.row.y, c.column.x),
+                    Err(e) => eprintln!("Error finding cell: {e}"),
+    }
+}`} />
+
+## Pipeline compatibility wrappers
+
+`Grid` re-exposes the detection internals as associated functions, so one import serves both levels (see the [pipeline reference](/reference/pipeline/) for semantics):
+
+| Associated function | Delegates to |
+| :--- | :--- |
+| `Grid::is_row_empty(img, y, width)` | `detection::is_row_empty` |
+| `Grid::is_column_empty(img, x, height)` | `detection::is_column_empty` |
+| `Grid::collect_lines(img, primary_dim, secondary_dim, is_empty_fn)` | `detection::collect_lines` |
+| `Grid::process_dimension(img, primary_dim, secondary_dim, ratio, is_empty_fn)` | `detection::process_dimension` |
+| `Grid::merge_small_lines(lines, threshold)` | `detection::merge_small_lines` |
+| `Grid::calculate_average_line_size(lines)` | `detection::calculate_average_line_size` |
+
+## Next steps
+
+<LinkCard title="Lines and cells" description="Row, Column, Cell, LineInfo, LineKind and the LineTrait factory trait." href="/reference/lines-and-cells/" />
+<LinkCard title="Filter grid lines" description="Recipes that combine these methods." href="/guides/filter-lines/" />
+
+
+---
+
+---
+title: Lines and cells
+description: The line primitives — LineKind, LineInfo, Row, Column, Cell, the LineTrait factory trait and clamp_to_i32.
+type: reference
+---
+
+import { Code, LinkCard } from '@astrojs/starlight/components';
+
+A grid is composed of horizontal `Row`s and vertical `Column`s. Both are projections of the same run of `LineInfo` produced by the detection pipeline, unified by the `LineTrait` factory trait. All types derive `Debug`, `PartialEq`, `Eq`, `Clone`, `Copy`, `Hash` (except `Cell`, which borrows) and `Serialize`/`Deserialize` with the `serde` feature.
+
+## LineKind
+
+The content density of a line.
+
+| Variant | Meaning | Helper |
+| :--- | :--- | :--- |
+| `Empty` | The line contains only background pixels | `is_empty()` |
+| `Full` | The line contains content | `is_full()` |
+
+## LineInfo
+
+Raw information about a run of consecutive scan lines sharing a kind.
+
+| Field | Type | Meaning |
+| :--- | :--- | :--- |
+| `start` | `u32` | Start position of the run along the scanned axis |
+| `length` | `u32` | Number of consecutive scan lines in the run |
+| `kind` | `LineKind` | Kind of the run |
+
+Constructor: `LineInfo::new(start, length, kind)`.
+
+## Row
+
+A horizontal band of the grid.
+
+| Field | Type | Meaning |
+| :--- | :--- | :--- |
+| `y` | `u32` | `y` coordinate where the row starts |
+| `height` | `u32` | Height of the row in pixels |
+| `kind` | `LineKind` | Kind of the row |
+
+Method: `end() -> u32` — `y + height`, saturating.
+
+## Column
+
+A vertical band of the grid.
+
+| Field | Type | Meaning |
+| :--- | :--- | :--- |
+| `x` | `u32` | `x` coordinate where the column starts |
+| `width` | `u32` | Width of the column in pixels |
+| `kind` | `LineKind` | Kind of the column |
+
+Method: `end() -> u32` — `x + width`, saturating.
+
+## Cell
+
+The intersection of a `Row` and a `Column`.
+
+| Field | Type | Meaning |
+| :--- | :--- | :--- |
+| `row` | `&Row` | The row defining the vertical extent |
+| `column` | `&Column` | The column defining the horizontal extent |
+
+Method: `rect() -> Rect` — the covered rectangle on the image (an `imageproc::rect::Rect`). Cells compare by value, not by identity:
+
+<Code lang="rust" code={`use grider::{make_grid, LineInfo};
+
+let grid = make_grid!(rows: [(0, 10)], columns: [(5, 15)]);
+let cell = grid.cell(0, 0).expect("single cell grid");
+let rect = cell.rect();
+assert_eq!((rect.left(), rect.top()), (5, 0));
+assert_eq!((rect.width(), rect.height()), (15, 10));`} />
+
+## LineTrait
+
+A factory trait implemented by `Row` and `Column`, letting the detection pipeline convert generic `LineInfo` runs into the matching orientation-specific type:
+
+<Code lang="rust" code={`use grider::{Column, LineInfo, LineKind, LineTrait, Row};
+
+let line_info = LineInfo::new(0, 100, LineKind::Full);
+let row = Row::new(line_info);
+let column = Column::new(line_info);
+
+assert_eq!(row.y, 0);
+assert_eq!(column.x, 0);`} />
+
+| Implementor | `new(LineInfo)` produces |
+| :--- | :--- |
+| `Row` | `y = start`, `height = length`, `kind = kind` |
+| `Column` | `x = start`, `width = length`, `kind = kind` |
+
+## clamp_to_i32
+
+<Code lang="rust" code={`pub fn clamp_to_i32(value: u32) -> i32`} />
+
+Clamps a `u32` coordinate into the `i32` range expected by `imageproc`, mapping overflow onto `i32::MAX`. Coordinates beyond `i32::MAX` cannot occur for images that fit in memory, but the clamp keeps the conversion total and panic free.
+
+## Next steps
+
+<LinkCard title="Grid" description="The type that stores these primitives and queries them." href="/reference/grid/" />
+<LinkCard title="Macros" description="make_line! and make_grid! build these types concisely in tests." href="/reference/macros/" />
+
+
+---
+
+---
+title: Macros
+description: make_line! and make_grid! — concise constructors for rows, columns and whole grids.
+type: reference
+---
+
+import { Code, LinkCard } from '@astrojs/starlight/components';
+
+The two exported macros build line primitives and whole grids from tuples, which keeps test fixtures readable. Both are available through `grider::*`.
+
+## make_line!
+
+Creates a `Row` or `Column` from a tuple. The kind defaults to `LineKind::Empty` when omitted.
+
+| Form | Expands to |
+| :--- | :--- |
+| `make_line!(Row, ($y, $height, $kind))` | Row at `y` with `height` and the given kind |
+| `make_line!(Row, ($y, $height))` | Row with `LineKind::Empty` |
+| `make_line!(Column, ($x, $width, $kind))` | Column at `x` with `width` and the given kind |
+| `make_line!(Column, ($x, $width))` | Column with `LineKind::Empty` |
+
+<Code lang="rust" code={`use grider::*;
+
+// With LineKind::Full
+let row = make_line!(Row, (0, 10, LineKind::Full));
+assert_eq!(row.y, 0);
+assert_eq!(row.height, 10);
+assert_eq!(row.kind, LineKind::Full);
+
+// Without LineKind (defaults to LineKind::Empty)
+let row = make_line!(Row, (10, 20));
+assert_eq!(row.y, 10);
+assert_eq!(row.height, 20);
+assert_eq!(row.kind, LineKind::Empty);`} />
+
+## make_grid!
+
+Creates a [`Grid`](/reference/grid/) from lists of row and column tuples. A trailing comma after each tuple is optional.
+
+<Code lang="rust" code={`use grider::{make_grid, LineKind};
+
+let grid = make_grid!(
+    rows: [
+                    (0, 10),                  // Row at y=0, height=10, LineKind::Empty
+                    (10, 20, LineKind::Full), // Row at y=10, height=20, LineKind::Full
+    ],
+    columns: [
+                    (0, 5),                   // Column at x=0, width=5, LineKind::Empty
+                    (5, 15, LineKind::Full),  // Column at x=5, width=15, LineKind::Full
+    ]
+);
+
+assert_eq!(grid.rows.len(), 2);
+assert_eq!(grid.columns.len(), 2);`} />
+
+Notes:
+
+- An omitted `LineKind` defaults to `LineKind::Empty`.
+- The resulting `Grid` stores rows and columns in `SmallVecLine` collections.
+- `make_grid!` composes with every query method — the macros exist so tests can construct exact grids without an image.
+
+## Next steps
+
+<LinkCard title="Lines and cells" description="The types these macros construct." href="/reference/lines-and-cells/" />
+<LinkCard title="Grid" description="Query the constructed grids." href="/reference/grid/" />
+
+
+---
+
+---
+title: Pipeline functions
+description: The public detection internals — flags scanning, run-length encoding, line merging and per-dimension processing.
+type: reference
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+The internals of the extraction pipeline are public in the `detection` module, and `Grid` re-exposes the most useful ones as [associated functions](/reference/grid/). Compose them when you need a custom pipeline; otherwise call `Grid::try_from_image_with_config` once.
+
+## Emptiness predicates
+
+| Function | Signature | Behavior |
+| :--- | :--- | :--- |
+| `is_row_empty` | `(img: &GrayImage, y: u32, width: u32) -> bool` | `true` when scan line `y` contains only background pixels |
+| `is_column_empty` | `(img: &GrayImage, x: u32, height: u32) -> bool` | `true` when scan line `x` contains only background pixels |
+
+Both treat white (`255`) as background after binarization.
+
+## LineFlags
+
+<Code lang="rust" code={`pub struct LineFlags {
+    pub rows: Vec<bool>,
+    pub columns: Vec<bool>,
+}`} />
+
+Emptiness of every row (indexed by `y`) and every column (indexed by `x`); `true` means background only.
+
+## scan_line_flags
+
+<Code lang="rust" code={`pub fn scan_line_flags(img: &GrayImage, parallel: bool) -> LineFlags`} />
+
+Computes row and column flags together in a **single fused, cache-friendly pass** (~0.4 ns/pixel on the benchmark machine). With `parallel: true` the work spreads over row bands; the heuristics fall back to the sequential path when rayon coordination would cost more than it saves.
+
+## Run-length encoding and merging
+
+| Function | Signature | Behavior |
+| :--- | :--- | :--- |
+| `run_length_encode` | `(flags: &[bool]) -> Vec<LineInfo>` | Encodes runs of `true` (`Empty`) and `false` (`Full`) into `LineInfo` runs |
+| `calculate_average_line_size` | `(lines: &[LineInfo]) -> u32` | Average run length; `0` for an empty slice |
+| `merge_small_lines` | `(lines: Vec<LineInfo>, threshold: u32) -> SmallVecLine<LineInfo>` | Glues runs shorter than `threshold` into their neighbour, left to right; the merged runs always cover the same total extent as the input |
+| `lines_from_flags` | `(flags: &[bool], merge_threshold_ratio: f32) -> SmallVecLine<T>` | Encode, average, compute the merge threshold from the ratio, merge, and convert to `T: LineTrait + Send` |
+
+The pipeline derives the merge threshold as `merge_threshold_for(average_size, ratio)` — runs shorter than `ratio × average` merge into their neighbour. The merge keeps the kind of the run being built, and merged runs cover the same total extent as the input:
+
+<Code lang="rust" code={`use grider::detection::merge_small_lines;
+use grider::{LineInfo, LineKind};
+
+let lines = vec![
+    LineInfo::new(0, 5, LineKind::Empty),
+    LineInfo::new(5, 3, LineKind::Empty),
+    LineInfo::new(8, 10, LineKind::Full),
+];
+let merged = merge_small_lines(lines, 4);
+assert_eq!(merged.len(), 2);`} />
+
+## collect_lines and process_dimension
+
+| Function | Signature | Behavior |
+| :--- | :--- | :--- |
+| `collect_lines` | `(img, primary_dim, secondary_dim, is_empty_fn) -> Vec<LineInfo>` | Collects the initial (unmerged) runs of one axis. `is_empty_fn` is called once per scan line with `(image, line_index, secondary_dimension)`, allowing custom definitions of empty |
+| `process_dimension` | `(img, primary_dim, secondary_dim, merge_threshold_ratio, is_empty_fn) -> Result<SmallVecLine<T>, GridError>` | Full per-axis pipeline — flags, encode, merge, convert — for `T: LineTrait + Send`; fails with [`InvalidDimensions`](/reference/errors/) on a zero dimension |
+
+<Aside kind="note">
+    The built-in `is_row_empty` / `is_column_empty` predicates implement the standard behavior. Pass a
+    custom closure to `collect_lines` or `process_dimension` when you need, for example, a grey-level
+    tolerance.
+</Aside>
+
+## Constants
+
+| Constant | Value | Meaning |
+| :--- | :--- | :--- |
+| `DEFAULT_SMALLVEC_SIZE` | `32` | Inline capacity of the `SmallVecLine` collections that back [`Grid`](/reference/grid/) |
+| `MIN_BLOCK_SIZE` | `3` | Alias of `MIN_THRESHOLD_BLOCK_SIZE` |
+
+## Next steps
+
+<LinkCard title="The extraction pipeline" description="How these functions compose end to end." href="/explanation/extraction-pipeline/" />
+<LinkCard title="Binarization" description="The stage that feeds these functions." href="/reference/binarization/" />
+
+
+---
+
+---
+title: Extract your first grid
+description: A step-by-step tutorial that loads an image, extracts its row and column grid, inspects the result and draws a visualization.
+type: tutorial
+---
+
+import { Aside, Code, LinkCard, Steps, TabItem, Tabs } from '@astrojs/starlight/components';
+
+This tutorial walks you through the golden path of Grider: you load an image, extract its grid, inspect every row and column, visit the cells, and save a visualization. You finish with a working Rust project and a rendered `*_with_grid.png` on disk.
+
+## Prerequisites
+
+- Rust 1.89 or newer (`rustc --version` to check). You can install Rust with [rustup](https://rustup.rs).
+- A terminal.
+
+## What you build
+
+You write a small program that turns this table screenshot into a structured grid of 16 rows and 19 columns, where each band is tagged `Empty` (background) or `Full` (content):
+
+| Input image | Real `save_image_with_grid` output |
+| :--- | :--- |
+| ![Screenshot of a document with a table](../../../assets/docs-input.png) | ![Grid visualization: gray cells with red row and blue column lines](../../../assets/docs-overlay.png) |
+
+## 1. Create a project
+
+<Code lang="bash" code={`cargo new hello-grider
+cd hello-grider`} />
+
+## 2. Add the dependency
+
+<Code lang="bash" code={`cargo add grider`} />
+
+This adds the latest published release — `0.3` — to your `Cargo.toml`. Grider supports Rust 1.89 and newer and ships with the `serde` and `drawing` features enabled.
+
+<Aside kind="note">
+    You can also use the command-line binary for quick inspection. Skip to
+    [step 7](#7-run-the-cli-on-the-same-image) after installing it with
+    `cargo install grider`.
+</Aside>
+
+## 3. Load an image
+
+Replace the contents of `src/main.rs` with code that opens an image file with the `image` crate. Grider accepts any `DynamicImage` and converts non-grayscale images for you:
+
+<Code lang="rust" code={`use grider::{Grid, GridConfig};
+use image::open;
+
+fn main() {
+    let img = open("tests/large.png").expect("Failed to open image");
+    let grid = Grid::try_from_image_with_config(&img, GridConfig::default())
+                    .expect("Failed to create grid");
+    println!("{grid}");
+}`} />
+
+## 4. Extract the grid
+
+One call does the whole pipeline — binarization, the fused emptiness scan, run-length encoding, and line merging:
+
+<Code lang="rust" code={`let grid = Grid::try_from_image_with_config(&img, GridConfig::default())
+    .expect("Failed to create grid");`} />
+
+The function returns a `Result`. Extracting from a zero-sized image or with an invalid configuration returns a [`GridError`](/reference/errors/).
+
+## 5. Inspect rows, columns and cells
+
+Extend `main` to walk the result. Every `Row` has `y`, `height` and `kind`; every `Column` has `x`, `width` and `kind`; every `Cell` is the intersection of one row and one column:
+
+<Code lang="rust" code={`for row in grid.rows() {
+    println!("Row at y: {} ({:?})", row.y, row.kind);
+}
+
+for column in grid.columns() {
+    println!("Column at x: {}", column.x);
+}
+
+// Every intersection of the grid:
+for cell in grid.iter_cells() {
+    let rect = cell.rect();
+    println!("cell {}x{} ({}x{})", rect.left(), rect.top(), rect.width(), rect.height());
+}`} />
+
+<Aside kind="tip">
+    `Grid` implements `Display`, so `println!("{grid}")` prints a compact summary such as
+    `Grid { rows: 16, columns: 19 }`.
+</Aside>
+
+## 6. Verify the result on a tiny image
+
+The repository contains a snapshot test you can reproduce without any fixture file. It builds a 3 × 3 white image with a single black pixel in the center and extracts the grid with `threshold_block_size: 3` and `merge_threshold_ratio: 0.5`:
+
+<Code lang="rust" code={`use grider::{Binarization, Grid, GridConfig};
+use image::DynamicImage;
+
+let img = image::GrayImage::from_raw(3, 3, vec![255, 255, 255, 255, 0, 255, 255, 255, 255])
+    .unwrap();
+let dynamic_img = DynamicImage::ImageLuma8(img);
+let config = GridConfig {
+    threshold_block_size: 3,
+    merge_threshold_ratio: 0.5,
+    threshold_delta: 0,
+    enable_parallel: false,
+    binarization: Binarization::AdaptiveMean,
+};
+let grid = Grid::try_from_image_with_config(&dynamic_img, config).unwrap();`} />
+
+The committed test snapshot records exactly what this produces — the center row and center column are `Full`, everything else is `Empty`:
+
+<Code lang="yaml" code={`rows:
+    - y: 0
+  height: 1
+  kind: Empty
+    - y: 1
+  height: 1
+  kind: Full
+    - y: 2
+  height: 1
+  kind: Empty
+columns:
+    - x: 0
+  width: 1
+  kind: Empty
+    - x: 1
+  width: 1
+  kind: Full
+    - x: 2
+  width: 1
+  kind: Empty`} />
+
+## 7. Run the CLI on the same image
+
+The crate ships a binary with the same powers as the library. Install it, then point it at your image:
+
+<Code lang="bash" code={`cargo install grider
+grider tests/large.png`} />
+
+The command prints a summary, then saves the overlay next to the input file as `<image>_with_grid.png`:
+
+<Code lang="ansi" code={`Extracted grid in 7.22ms
+Grid { rows: 16, columns: 19 }
+Full rows: 7, empty rows: 9, full columns: 9, empty columns: 10
+Saving overlay to tests/large_with_grid.png`} />
+
+Add `--json` to print the whole grid as JSON instead of writing an overlay, and `--quiet` to suppress the summary:
+
+<Code lang="bash" code={`grider tests/large.png --json --quiet`} />
+
+## Troubleshooting
+
+- **`Failed to open image`** — the path is wrong or the format is unsupported by the `image` crate. Run the same path through `image::open` to confirm.
+- **Everything is one giant `Full` band** — your background is darker than the content. Lower [`threshold_delta`](/reference/grid-config/) (negative values make the threshold stricter), or switch to [Sauvola binarization](/guides/choose-binarization/) for uneven lighting.
+- **Thin content lines are missing** — small runs merge into their neighbours when they are shorter than `merge_threshold_ratio × average`. Lower the ratio, for example `.merge_threshold_ratio(0.5)`.
+
+## Next steps
+
+<LinkCard title="Configure extraction" description="Tune every knob of the detection pipeline with GridConfig." href="/guides/configure-extraction/" />
+<LinkCard title="Draw grids and cells" description="Change colors, thickness and padding of the visualization." href="/guides/draw-overlays/" />

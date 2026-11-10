@@ -4,7 +4,7 @@ description: Every field, constant and builder method of the extraction configur
 type: reference
 ---
 
-import { Aside, LinkCard } from '@astrojs/starlight/components';
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
 
 `GridConfig` drives the extraction pipeline. It derives `Debug`, `Clone`, `Copy`, `PartialEq` and `Serialize`/`Deserialize` with the `serde` feature. Build it with the constructor, the builder, or a struct literal followed by `validate()`.
 
@@ -50,8 +50,7 @@ Every method consumes and returns the builder; the built config always passes `v
 | `binarization(v: Binarization)` | None needed |
 | `sauvola(k: f32)` | Sets `Binarization::Sauvola { k }`, replacing non-finite `k` with `0.2` |
 
-```rust
-use grider::GridConfig;
+<Code lang="rust" code={`use grider::GridConfig;
 
 let config = GridConfig::builder()
     .threshold_block_size(7)
@@ -60,14 +59,11 @@ let config = GridConfig::builder()
     .parallel(true)
     .build();
 
-assert!(config.validate().is_ok());
-```
+assert!(config.validate().is_ok());`} />
 
 ## validate
 
-```rust
-pub fn validate(&self) -> Result<(), GridError>
-```
+<Code lang="rust" code={`pub fn validate(&self) -> Result<(), GridError>`} />
 
 Reports the first problem found in hand-constructed values (struct literal or deserialization) as a [`GridError::InvalidConfig`](/reference/errors/):
 

@@ -4,7 +4,7 @@ description: The grider command — arguments, every option with its default, ou
 type: reference
 ---
 
-import { LinkCard, Aside } from '@astrojs/starlight/components';
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
 
 The `grider` binary (built by the same crate) runs the library pipeline from a terminal. `grider --help` prints the canonical flag list; the table below adds defaults and behavior.
 
@@ -36,12 +36,10 @@ The `grider` binary (built by the same crate) runs the library pipeline from a t
 - **`--json`**: pretty JSON of the whole grid on stdout; no overlay file is written.
 - **`--quiet`**: no summary lines; pairs with `--json` for machine-only output.
 
-```ansi
-Extracted grid in 7.22ms
+<Code lang="ansi" code={`Extracted grid in 7.22ms
 Grid { rows: 16, columns: 19 }
 Full rows: 7, empty rows: 9, full columns: 9, empty columns: 10
-Saving overlay to tests/large_with_grid.png
-```
+Saving overlay to tests/large_with_grid.png`} />
 
 ## Exit codes and logging
 

@@ -4,7 +4,7 @@ description: Tune the detection pipeline with GridConfig — threshold window, d
 type: how-to
 ---
 
-import { Aside, LinkCard, Steps } from '@astrojs/starlight/components';
+import { Aside, Code, LinkCard, Steps } from '@astrojs/starlight/components';
 
 This guide shows you how to steer the extraction pipeline with [`GridConfig`](/reference/grid-config/) — which knobs move detection in which direction, how invalid values are handled, and when to reach for each one.
 
@@ -17,8 +17,7 @@ This guide shows you how to steer the extraction pipeline with [`GridConfig`](/r
 
 `GridConfig::builder()` starts from the defaults and overrides one field at a time:
 
-```rust
-use grider::GridConfig;
+<Code lang="rust" code={`use grider::GridConfig;
 
 let config = GridConfig::builder()
     .threshold_block_size(15) // adaptive threshold radius (min 3)
@@ -27,8 +26,7 @@ let config = GridConfig::builder()
     .parallel(false)
     .build();
 
-let grid = Grid::try_from_image_with_config(&img, config).expect("Failed to create grid");
-```
+let grid = Grid::try_from_image_with_config(&img, config).expect("Failed to create grid");`} />
 
 ## Pick the right knob
 
@@ -53,24 +51,20 @@ Constructors and builders sanitize values, so a build never fails:
 - `merge_threshold_ratio` clamps into `[0.0, 1.0]`; `NaN` maps onto the default `0.8`.
 - `Binarization::sauvola(k)` replaces non-finite `k` with the default `0.2`.
 
-```rust
-use grider::GridConfig;
+<Code lang="rust" code={`use grider::GridConfig;
 
 let config = GridConfig::new(1, 2.5, true);
 assert_eq!(config.threshold_block_size, 3); // clamped up
-assert_eq!(config.merge_threshold_ratio, 1.0); // clamped down
-```
+assert_eq!(config.merge_threshold_ratio, 1.0); // clamped down`} />
 
 ## Validate hand-built values
 
 Values that bypass the builder — struct literals or deserialization — can be out of range. Call `validate()` before extraction:
 
-```rust
-use grider::GridConfig;
+<Code lang="rust" code={`use grider::GridConfig;
 
 assert!(GridConfig::default().validate().is_ok());
-assert!(GridConfig { threshold_block_size: 0, ..GridConfig::default() }.validate().is_err());
-```
+assert!(GridConfig { threshold_block_size: 0, ..GridConfig::default() }.validate().is_err());`} />
 
 `validate()` reports the first problem it finds as a [`GridError::InvalidConfig`](/reference/errors/): a zero block size, a non-finite or out-of-range merge ratio, or a non-finite Sauvola `k`.
 
@@ -78,13 +72,11 @@ assert!(GridConfig { threshold_block_size: 0, ..GridConfig::default() }.validate
 
 Tune the config by looking at the visualization it produces — one call per candidate configuration:
 
-```rust
-use grider::debug::save_image_with_grid;
+<Code lang="rust" code={`use grider::debug::save_image_with_grid;
 use grider::drawing::GridDrawingConfig;
 
 save_image_with_grid(&img, &grid, "output_with_grid.png", &GridDrawingConfig::default())
-    .expect("Failed to save overlay");
-```
+    .expect("Failed to save overlay");`} />
 
 <Aside kind="tip">
     Run the same loop from the terminal instead: `grider scan.png --block-size 15 --delta 2 --merge-ratio 0.9`

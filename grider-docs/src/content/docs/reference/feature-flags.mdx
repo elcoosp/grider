@@ -4,7 +4,7 @@ description: What the serde, drawing and test-utils cargo features gate, and how
 type: reference
 ---
 
-import { LinkCard } from '@astrojs/starlight/components';
+import { Code, LinkCard } from '@astrojs/starlight/components';
 
 Grider compiles three cargo features. Two are on by default; `test-utils` exists for development only.
 
@@ -18,13 +18,11 @@ Grider compiles three cargo features. Two are on by default; `test-utils` exists
 
 ## Customize a build
 
-```bash
-# Minimal build — no JSON, no drawing:
+<Code lang="bash" code={`# Minimal build — no JSON, no drawing:
 cargo add grider --no-default-features
 
 # Add only serde back:
-cargo add grider --no-default-features --features serde
-```
+cargo add grider --no-default-features --features serde`} />
 
 ## CLI behavior without features
 

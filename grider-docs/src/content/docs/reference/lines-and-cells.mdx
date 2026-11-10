@@ -4,7 +4,7 @@ description: The line primitives — LineKind, LineInfo, Row, Column, Cell, the 
 type: reference
 ---
 
-import { LinkCard } from '@astrojs/starlight/components';
+import { Code, LinkCard } from '@astrojs/starlight/components';
 
 A grid is composed of horizontal `Row`s and vertical `Column`s. Both are projections of the same run of `LineInfo` produced by the detection pipeline, unified by the `LineTrait` factory trait. All types derive `Debug`, `PartialEq`, `Eq`, `Clone`, `Copy`, `Hash` (except `Cell`, which borrows) and `Serialize`/`Deserialize` with the `serde` feature.
 
@@ -64,30 +64,26 @@ The intersection of a `Row` and a `Column`.
 
 Method: `rect() -> Rect` — the covered rectangle on the image (an `imageproc::rect::Rect`). Cells compare by value, not by identity:
 
-```rust
-use grider::{make_grid, LineInfo};
+<Code lang="rust" code={`use grider::{make_grid, LineInfo};
 
 let grid = make_grid!(rows: [(0, 10)], columns: [(5, 15)]);
 let cell = grid.cell(0, 0).expect("single cell grid");
 let rect = cell.rect();
 assert_eq!((rect.left(), rect.top()), (5, 0));
-assert_eq!((rect.width(), rect.height()), (15, 10));
-```
+assert_eq!((rect.width(), rect.height()), (15, 10));`} />
 
 ## LineTrait
 
 A factory trait implemented by `Row` and `Column`, letting the detection pipeline convert generic `LineInfo` runs into the matching orientation-specific type:
 
-```rust
-use grider::{Column, LineInfo, LineKind, LineTrait, Row};
+<Code lang="rust" code={`use grider::{Column, LineInfo, LineKind, LineTrait, Row};
 
 let line_info = LineInfo::new(0, 100, LineKind::Full);
 let row = Row::new(line_info);
 let column = Column::new(line_info);
 
 assert_eq!(row.y, 0);
-assert_eq!(column.x, 0);
-```
+assert_eq!(column.x, 0);`} />
 
 | Implementor | `new(LineInfo)` produces |
 | :--- | :--- |
@@ -96,9 +92,7 @@ assert_eq!(column.x, 0);
 
 ## clamp_to_i32
 
-```rust
-pub fn clamp_to_i32(value: u32) -> i32
-```
+<Code lang="rust" code={`pub fn clamp_to_i32(value: u32) -> i32`} />
 
 Clamps a `u32` coordinate into the `i32` range expected by `imageproc`, mapping overflow onto `i32::MAX`. Coordinates beyond `i32::MAX` cannot occur for images that fit in memory, but the clamp keeps the conversion total and panic free.
 

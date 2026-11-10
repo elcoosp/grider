@@ -4,7 +4,7 @@ description: Round-trip grids and configs through serde, keep legacy configs com
 type: how-to
 ---
 
-import { Aside, LinkCard } from '@astrojs/starlight/components';
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
 
 This guide shows you how to serialize and deserialize every Grider data type with the default `serde` feature — including the JSON path of the command-line binary and the backward-compatibility rules introduced in 0.3.
 
@@ -16,31 +16,27 @@ This guide shows you how to serialize and deserialize every Grider data type wit
 
 `Grid`, `Row`, `Column`, `LineInfo`, `LineKind`, `GridConfig` and `Binarization` all derive `Serialize` and `Deserialize` when the `serde` feature is on:
 
-```rust
-use grider::{Grid, GridConfig};
+<Code lang="rust" code={`use grider::{Grid, GridConfig};
 use image::open;
 
 let img = open("tests/large.png").unwrap();
 let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();
 
 let json = serde_json::to_string_pretty(&grid).unwrap();
-println!("{json}");
-```
+println!("{json}");`} />
 
 A `Grid` serializes to its two public fields, `rows` and `columns`:
 
-```json
-{
-  "rows": [
-    { "y": 0, "height": 11, "kind": "Empty" },
-    { "y": 11, "height": 18, "kind": "Empty" },
-    { "y": 46, "height": 177, "kind": "Full" }
-  ],
-  "columns": [
-    { "x": 0, "width": 4, "kind": "Empty" }
-  ]
-}
-```
+<Code lang="json" code={`{
+    "rows": [
+  { "y": 0, "height": 11, "kind": "Empty" },
+  { "y": 11, "height": 18, "kind": "Empty" },
+  { "y": 46, "height": 177, "kind": "Full" }
+    ],
+    "columns": [
+  { "x": 0, "width": 4, "kind": "Empty" }
+    ]
+}`} />
 
 The JSON above is the real beginning of the output that the 0.3.0 CLI prints for the repository's `tests/large.png` fixture.
 
@@ -48,21 +44,18 @@ The JSON above is the real beginning of the output that the 0.3.0 CLI prints for
 
 Deserialization restores a `GridConfig` exactly — including a Sauvola binarization:
 
-```rust
-use grider::GridConfig;
+<Code lang="rust" code={`use grider::GridConfig;
 
 let config = GridConfig::builder().sauvola(0.45).build();
 let json = serde_json::to_string(&config).unwrap();
 let parsed: GridConfig = serde_json::from_str(&json).unwrap();
-assert_eq!(parsed, config);
-```
+assert_eq!(parsed, config);`} />
 
 ## Keep legacy configs deserializable
 
 0.3 added the `binarization` field to `GridConfig`. The field carries `#[serde(default)]`, so JSON written by a 0.2 program still deserializes:
 
-```rust
-use grider::GridConfig;
+<Code lang="rust" code={`use grider::GridConfig;
 
 let legacy = r#"{
     "threshold_block_size": 12,
@@ -71,8 +64,7 @@ let legacy = r#"{
     "enable_parallel": true
 }"#;
 let parsed: GridConfig = serde_json::from_str(legacy).unwrap();
-assert_eq!(parsed, GridConfig::default());
-```
+assert_eq!(parsed, GridConfig::default());`} />
 
 <Aside kind="caution">
     The same addition breaks **struct literals**: `GridConfig { threshold_block_size: 12, … }` no longer
@@ -82,9 +74,7 @@ assert_eq!(parsed, GridConfig::default());
 
 ## Print JSON from the CLI
 
-```bash
-grider tests/large.png --json --quiet
-```
+<Code lang="bash" code={`grider tests/large.png --json --quiet`} />
 
 `--json` prints the pretty JSON of the whole grid to stdout and skips the overlay file. Pair it with `--quiet` when a machine reads the output, because the human-readable summary goes to stdout too.
 

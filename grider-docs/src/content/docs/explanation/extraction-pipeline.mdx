@@ -4,33 +4,31 @@ description: How Grider turns pixels into rows and columns — binarization, the
 type: explanation
 ---
 
-import { Aside, LinkCard } from '@astrojs/starlight/components';
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
 
 Grider reads an image and returns a [`Grid`](/reference/grid/) of rows and columns. This page explains what happens between the two — the stages, the data that flows between them, and why each stage is shaped the way it is. All functions mentioned here are public and documented in the [pipeline reference](/reference/pipeline/).
 
 ## Overview
 
-```
-DynamicImage / GrayImage
-        │
-        ▼
-   [1] Binarization        adaptive mean (Bradley & Roth) or Sauvola
-        │  GrayImage, background = white (255), content = black (0)
-        ▼
-   [2] scan_line_flags     one fused pass, row + column flags together
-        │  LineFlags { rows: Vec<bool>, columns: Vec<bool> }
-        ▼
-   [3] run_length_encode   booleans → LineInfo runs per axis
-        │  Vec<LineInfo> { start, length, kind }
-        ▼
-   [4] merge_small_lines   runs shorter than ratio × average merge into their neighbour
-        │  SmallVecLine<LineInfo>
-        ▼
-   [5] lines_from_flags    runs → Row / Column via LineTrait
-        │
-        ▼
-       Grid { rows, columns }
-```
+<Code lang="text" code={`DynamicImage / GrayImage
+     │
+     ▼
+[1] Binarization        adaptive mean (Bradley & Roth) or Sauvola
+     │  GrayImage, background = white (255), content = black (0)
+     ▼
+[2] scan_line_flags     one fused pass, row + column flags together
+     │  LineFlags { rows: Vec<bool>, columns: Vec<bool> }
+     ▼
+[3] run_length_encode   booleans → LineInfo runs per axis
+     │  Vec<LineInfo> { start, length, kind }
+     ▼
+[4] merge_small_lines   runs shorter than ratio × average merge into their neighbour
+     │  SmallVecLine<LineInfo>
+     ▼
+[5] lines_from_flags    runs → Row / Column via LineTrait
+     │
+     ▼
+    Grid { rows, columns }`} />
 
 ## Stage 1 — Binarization
 

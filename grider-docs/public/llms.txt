@@ -1,0 +1,26 @@
+# grider
+
+> AI-agent index.
+
+- [Page not found](/404/) — The page you are looking for does not exist or has moved.
+- [The extraction pipeline](/explanation/extraction-pipeline/) — How Grider turns pixels into rows and columns — binarization, the fused emptiness scan, run-length encoding and merging.
+- [Performance](/explanation/performance/) — Where the speed comes from — measured end-to-end and per-stage benchmarks, complexity and memory behavior.
+- [Choose a binarization method](/guides/choose-binarization/) — Decide between the adaptive mean threshold for clean input and Sauvola for degraded documents, in the library and the CLI.
+- [Configure extraction](/guides/configure-extraction/) — Tune the detection pipeline with GridConfig — threshold window, delta, merge ratio, parallelism — and validate custom values.
+- [Draw grids and cells](/guides/draw-overlays/) — Render the extracted grid with GridDrawingConfig — colors, per-index providers, thickness, padding — and save the visualization.
+- [Filter grid lines](/guides/filter-lines/) — Remove structural rows and columns by size, keep kinds, retain in place and look lines and cells up by coordinate.
+- [Installation](/guides/install/) — Add Grider to a Rust project or install the command-line binary, with MSRV and feature-flag notes.
+- [Serialize grids to JSON](/guides/serialize-grids/) — Round-trip grids and configs through serde, keep legacy configs compatible and print JSON from the CLI.
+- [Use the CLI](/guides/use-the-cli/) — Extract grids from the terminal — outputs, binarization flags, JSON, quiet mode, logging and exit codes.
+- [Grider](/) — High-performance row and column grid extraction from images, as a Rust library and a CLI.
+- [Binarization](/reference/binarization/) — The Binarization enum, both threshold algorithms, and the public functions of the binarize module.
+- [CLI](/reference/cli/) — The grider command — arguments, every option with its default, outputs and exit codes.
+- [Drawing API](/reference/drawing/) — GridDrawingConfig with defaults, the builder, color providers, the Drawable trait and the debug overlay helper.
+- [Errors](/reference/errors/) — Every GridError variant, its fields and its Display output, plus wildcard-match guidance.
+- [Feature flags](/reference/feature-flags/) — What the serde, drawing and test-utils cargo features gate, and how the CLI behaves without them.
+- [GridConfig](/reference/grid-config/) — Every field, constant and builder method of the extraction configuration, with defaults, clamping and validation rules.
+- [Grid](/reference/grid/) — The Grid type — construction from images, iterators, kind-based access, filtering, coordinate lookups and compatibility wrappers.
+- [Lines and cells](/reference/lines-and-cells/) — The line primitives — LineKind, LineInfo, Row, Column, Cell, the LineTrait factory trait and clamp_to_i32.
+- [Macros](/reference/macros/) — make_line! and make_grid! — concise constructors for rows, columns and whole grids.
+- [Pipeline functions](/reference/pipeline/) — The public detection internals — flags scanning, run-length encoding, line merging and per-dimension processing.
+- [Extract your first grid](/tutorials/extract-your-first-grid/) — A step-by-step tutorial that loads an image, extracts its row and column grid, inspects the result and draws a visualization.
