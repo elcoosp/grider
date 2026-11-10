@@ -1,28 +1,77 @@
-# Release + changelog — calls the canonical reusable workflow.
-# Copy to .github/workflows/release.yml in every fleet repo.
-#
-# The reusable workflow lives at:
-#   elcoosp/docs-toolkit/.github/workflows/changelog.yml@main
-#
-# It uses the canonical cliff.toml at:
-#   docs-toolkit/git-cliff/cliff.toml
-#
-# No cliff.toml is stored in this repo — config is fetched at runtime.
-
 name: Release
 
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: write
-  pull-requests: write
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  changelog:
-    uses: elcoosp/docs-toolkit/.github/workflows/changelog.yml@main
-    with:
-      mode: release
-    secrets: inherit
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Verify tag matches crate version
+        shell: bash
+        run: |
+          crate_version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "grider") | .version')
+          tag_version="${GITHUB_REF_NAME#v}"
+          if [ "$crate_version" != "$tag_version" ]; then
+            echo "Tag v$tag_version does not match crate version $crate_version"
+            exit 1
+          fi
+          echo "Releasing grider v$crate_version"
+
+      - name: Run tests
+        run: cargo test --features test-utils --all-features
+
+      - name: Generate changelog for this release
+        uses: orhun/git-cliff-action@v4
+        id: git-cliff
+        with:
+          config: cliff.toml
+          args: "--latest --strip all --config-url https://raw.githubusercontent.com/elcoosp/docs-toolkit/main/git-cliff/cliff.toml"
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+
+      - name: Build release binary
+        run: cargo build --release --all-features
+
+      - name: Package release artifacts
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          archive="grider-v${version}-x86_64-unknown-linux-gnu"
+          mkdir -p "dist/${archive}"
+          cp target/release/grider "dist/${archive}/"
+          cp README.md LICENSE CHANGELOG.md "dist/${archive}/"
+          tar -czf "dist/${archive}.tar.gz" -C dist "${archive}"
+          (cd dist && zip -q -r "${archive}.zip" "${archive}")
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          body: ${{ steps.git-cliff.outputs.changelog }}
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+          generate_release_notes: false
+
+      - name: Publish to crates.io
+        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
