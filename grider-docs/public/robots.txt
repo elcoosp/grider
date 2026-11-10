@@ -1,2 +1,4 @@
 User-agent: *
 Allow: /
+
+Sitemap: https://grider-docs.vercel.app/sitemap-index.xml
