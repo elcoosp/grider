@@ -197,7 +197,6 @@ fn sauvola_k_flag_implies_sauvola_binarization() {
     grider()
         .args([fixture(), "--sauvola-k", "0.3", "--json"])
         .assert()
-        .success()
         .success();
     std::fs::remove_dir_all(&dir).ok();
 }
@@ -208,7 +207,6 @@ fn binarization_flag_selects_sauvola_with_default_k() {
     grider()
         .args([fixture(), "--binarization", "sauvola", "--json"])
         .assert()
-        .success()
         .success();
 }
 
@@ -217,7 +215,6 @@ fn mean_binarization_flag_is_accepted() {
     grider()
         .args([fixture(), "--binarization", "mean", "--json"])
         .assert()
-        .success()
         .success();
 }
 
