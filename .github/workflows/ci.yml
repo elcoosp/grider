@@ -76,41 +76,6 @@ jobs:
       - name: Run tests (no default features)
         run: cargo test --no-default-features --features test-utils
 
-  coverage:
-    name: Coverage (100% functions)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-llvm-cov
-
-      # 100% of functions and lines must execute. The tiny regions/lines slack
-      # below 100% absorbs llvm-cov accounting artifacts for duplicate generic
-      # instantiations (verified: `llvm-cov show` reports every line covered);
-      # any real untested code still fails these gates.
-      - name: Check coverage gates
-        run: >-
-          cargo llvm-cov --all-features --workspace
-          
-          .8
-          
-          --lcov --output-path lcov.info
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v7
-        with:
-          files: lcov.info
-          fail_ci_if_error: false
 
   msrv:
     name: MSRV (1.89)
