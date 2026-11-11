@@ -6,6 +6,7 @@ import starlightLlmsTxt from 'starlight-llms-txt';
 
 
 export default await defineDocsConfig({
+  llmsTxt: {},
   changelog: { repo: 'elcoosp/grider' },
   site: 'https://grider-docs.vercel.app',
   domain: 'grider-docs.vercel.app',
