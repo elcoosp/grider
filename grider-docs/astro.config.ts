@@ -37,7 +37,7 @@ export default await defineDocsConfig({
                         social: [
                                 {
                                         icon: 'github',
-                                        label: 'GitHub',
+                                        label: 'GitHub', translations: { fr: "GitHub" },
                                         href: 'https://github.com/elcoosp/grider'
                                 },
                         ],
@@ -60,12 +60,12 @@ export default await defineDocsConfig({
                         ],
                         sidebar: [
                                 {
-                                        label: 'Start here',
+                                        label: 'Start here', translations: { fr: "Commencer ici" },
                                         items: [
                                                 { label: 'Overview', translations: { fr: 'Aperçu' }, link: '/' },
                                                 { label: 'Installation', translations: { fr: "Installation" }, link: '/guides/install/' },
                                                 {
-                                                        label: 'Extract your first grid',
+                                                        label: 'Extract your first grid', translations: { fr: "Extraire votre première grille" },
                                                         link: '/tutorials/extract-your-first-grid/'
                                                 },
                                         ]
@@ -73,37 +73,37 @@ export default await defineDocsConfig({
                                 {
                                         label: 'How-to guides', translations: { fr: 'Guides pratiques' },
                                         items: [
-                                                { label: 'Configure extraction', link: '/guides/configure-extraction/' },
+                                                { label: 'Configure extraction', translations: { fr: "Configurer l'extraction" }, link: '/guides/configure-extraction/' },
                                                 {
-                                                        label: 'Choose a binarization method',
+                                                        label: 'Choose a binarization method', translations: { fr: "Choisir une méthode de binarisation" },
                                                         link: '/guides/choose-binarization/'
                                                 },
-                                                { label: 'Filter grid lines', link: '/guides/filter-lines/' },
-                                                { label: 'Draw grids and cells', link: '/guides/draw-overlays/' },
-                                                { label: 'Serialize grids to JSON', link: '/guides/serialize-grids/' },
-                                                { label: 'Use the CLI', link: '/guides/use-the-cli/' },
+                                                { label: 'Filter grid lines', translations: { fr: "Filtrer les lignes de la grille" }, link: '/guides/filter-lines/' },
+                                                { label: 'Draw grids and cells', translations: { fr: "Dessiner des grilles et des cellules" }, link: '/guides/draw-overlays/' },
+                                                { label: 'Serialize grids to JSON', translations: { fr: "Sérialiser les grilles en JSON" }, link: '/guides/serialize-grids/' },
+                                                { label: 'Use the CLI', translations: { fr: "Utiliser la CLI" }, link: '/guides/use-the-cli/' },
                                         ]
                                 },
                                 {
                                         label: 'Reference', translations: { fr: 'Référence' },
                                         items: [
-                                                { label: 'Grid', link: '/reference/grid/' },
-                                                { label: 'Lines and cells', link: '/reference/lines-and-cells/' },
-                                                { label: 'GridConfig', link: '/reference/grid-config/' },
-                                                { label: 'Binarization', link: '/reference/binarization/' },
-                                                { label: 'Drawing API', link: '/reference/drawing/' },
-                                                { label: 'Pipeline functions', link: '/reference/pipeline/' },
+                                                { label: 'Grid', translations: { fr: "Grille" }, link: '/reference/grid/' },
+                                                { label: 'Lines and cells', translations: { fr: "Lignes et cellules" }, link: '/reference/lines-and-cells/' },
+                                                { label: 'GridConfig', translations: { fr: "GridConfig" }, link: '/reference/grid-config/' },
+                                                { label: 'Binarization', translations: { fr: "Binarisation" }, link: '/reference/binarization/' },
+                                                { label: 'Drawing API', translations: { fr: "API de dessin" }, link: '/reference/drawing/' },
+                                                { label: 'Pipeline functions', translations: { fr: "Fonctions du pipeline" }, link: '/reference/pipeline/' },
                                                 { label: 'Macros', translations: { fr: "Macros" }, link: '/reference/macros/' },
-                                                { label: 'Errors', link: '/reference/errors/' },
+                                                { label: 'Errors', translations: { fr: "Erreurs" }, link: '/reference/errors/' },
                                                 { label: 'CLI', translations: { fr: "CLI" }, link: '/reference/cli/' },
-                                                { label: 'Feature flags', link: '/reference/feature-flags/' },
+                                                { label: 'Feature flags', translations: { fr: "Drapeaux de fonctionnalités" }, link: '/reference/feature-flags/' },
                                         ]
                                 },
                                 {
                                         label: 'Concepts', translations: { fr: "Concepts" },
                                         items: [
-                                                { label: 'The extraction pipeline', link: '/explanation/extraction-pipeline/' },
-                                                { label: 'Performance', link: '/explanation/performance/' },
+                                                { label: 'The extraction pipeline', translations: { fr: "Le pipeline d'extraction" }, link: '/explanation/extraction-pipeline/' },
+                                                { label: 'Performance', translations: { fr: "Performances" }, link: '/explanation/performance/' },
                                         ]
                                 },
                         ]
