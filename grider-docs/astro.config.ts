@@ -63,7 +63,7 @@ export default await defineDocsConfig({
                                         label: 'Start here',
                                         items: [
                                                 { label: 'Overview', translations: { fr: 'Aperçu' }, link: '/' },
-                                                { label: 'Installation', link: '/guides/install/' },
+                                                { label: 'Installation', translations: { fr: "Installation" }, link: '/guides/install/' },
                                                 {
                                                         label: 'Extract your first grid',
                                                         link: '/tutorials/extract-your-first-grid/'
@@ -93,14 +93,14 @@ export default await defineDocsConfig({
                                                 { label: 'Binarization', link: '/reference/binarization/' },
                                                 { label: 'Drawing API', link: '/reference/drawing/' },
                                                 { label: 'Pipeline functions', link: '/reference/pipeline/' },
-                                                { label: 'Macros', link: '/reference/macros/' },
+                                                { label: 'Macros', translations: { fr: "Macros" }, link: '/reference/macros/' },
                                                 { label: 'Errors', link: '/reference/errors/' },
-                                                { label: 'CLI', link: '/reference/cli/' },
+                                                { label: 'CLI', translations: { fr: "CLI" }, link: '/reference/cli/' },
                                                 { label: 'Feature flags', link: '/reference/feature-flags/' },
                                         ]
                                 },
                                 {
-                                        label: 'Concepts',
+                                        label: 'Concepts', translations: { fr: "Concepts" },
                                         items: [
                                                 { label: 'The extraction pipeline', link: '/explanation/extraction-pipeline/' },
                                                 { label: 'Performance', link: '/explanation/performance/' },
