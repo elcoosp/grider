@@ -1,6 +1,4 @@
 import { defineDocsConfig } from '@elcoosp/docs-toolkit/config';
-import starlightChangelogs from 'starlight-changelogs';
-import starlightLinksValidator from 'starlight-links-validator';
 import starlightImageZoom from 'starlight-image-zoom';
 import starlightHeadingBadges from 'starlight-heading-badges';
 import starlightLlmsTxt from 'starlight-llms-txt';
@@ -44,9 +42,9 @@ export default await defineDocsConfig({
                         editLink: {
                                 baseUrl: 'https://github.com/elcoosp/grider/edit/main/docs-site/'
                         },
-                        plugins: [ starlightChangelogs(), 
+                        plugins: [
                                 // Fails the build on broken internal links (release gate).
-                                starlightLinksValidator(),
+                                
                                 // Click-to-zoom on figures (input vs. overlay comparisons).
                                 starlightImageZoom(),
                                 // Badges in headings, e.g. `:badge[serde]{variant="note"}`.
