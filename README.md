@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/logo.png" alt="Grider Logo" width="300"/>
+  <img src="https://cdn.jsdelivr.net/gh/elcoosp/grider@main/docs/logo.png" alt="Grider Logo" width="300"/>
   <p>
     <strong>Image Grid Processing for Rust</strong><br/>
     A high-performance library for extracting, analyzing, and manipulating row and column grids from images.
@@ -22,7 +22,7 @@
   (1.6–3.1× faster than the previous `imageproc`-based path, bit-for-bit identical output), the
   emptiness scan is a single fused cache-friendly pass, and both steps parallelize over row bands
   with work-size gating so small images never pay thread-pool overhead. See
-  [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+  [docs/BENCHMARKS.md](https://github.com/elcoosp/grider/blob/main/docs/BENCHMARKS.md).
 - **SOTA binarization options**: the adaptive mean threshold (Bradley & Roth) or
   [`Binarization::Sauvola`](https://doi.org/10.1016/S0031-3203(99)00055-2) for degraded documents —
   both `O(width × height)` regardless of the window radius, with `O(width × radius)` extra memory.
@@ -203,8 +203,8 @@ cargo llvm-cov --all-features --workspace \
 cargo bench --features test-utils           # criterion benchmarks (see docs/BENCHMARKS.md)
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines and
-[docs/BRAINSTORM.md](docs/BRAINSTORM.md) for the design notes behind the 0.2 release.
+See CONTRIBUTING.md for guidelines and
+[docs/BRAINSTORM.md](https://github.com/elcoosp/grider/blob/main/docs/BRAINSTORM.md) for the design notes behind the 0.2 release.
 
 > [!NOTE]
-> This project is distributed under the terms of the MIT License. See [LICENSE](LICENSE) for details.
+> This project is distributed under the terms of the MIT License. See LICENSE for details.
