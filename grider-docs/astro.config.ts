@@ -62,7 +62,7 @@ export default await defineDocsConfig({
                                 {
                                         label: 'Start here',
                                         items: [
-                                                { label: 'Overview', link: '/' },
+                                                { label: 'Overview', translations: { fr: 'Aperçu' }, link: '/' },
                                                 { label: 'Installation', link: '/guides/install/' },
                                                 {
                                                         label: 'Extract your first grid',
@@ -71,7 +71,7 @@ export default await defineDocsConfig({
                                         ]
                                 },
                                 {
-                                        label: 'How-to guides',
+                                        label: 'How-to guides', translations: { fr: 'Guides pratiques' },
                                         items: [
                                                 { label: 'Configure extraction', link: '/guides/configure-extraction/' },
                                                 {
@@ -85,7 +85,7 @@ export default await defineDocsConfig({
                                         ]
                                 },
                                 {
-                                        label: 'Reference',
+                                        label: 'Reference', translations: { fr: 'Référence' },
                                         items: [
                                                 { label: 'Grid', link: '/reference/grid/' },
                                                 { label: 'Lines and cells', link: '/reference/lines-and-cells/' },
