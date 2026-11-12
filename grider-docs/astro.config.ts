@@ -21,7 +21,7 @@ export default await defineDocsConfig({
                         description:
                                 'High-performance row and column grid extraction from images, as a Rust library and a CLI.',
                         favicon: '/favicon.png',
-                        defaultLocale: 'en',
+                        defaultLocale: 'root',
                         // The docs collection provides src/content/docs/404.md; the built-in
                         // dedicated /404 route is disabled so the two do not conflict.
                         disable404Route: true,
