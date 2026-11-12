@@ -3,8 +3,6 @@ import starlightLinksValidator from 'starlight-links-validator';
 import starlightImageZoom from 'starlight-image-zoom';
 import starlightHeadingBadges from 'starlight-heading-badges';
 import starlightLlmsTxt from 'starlight-llms-txt';
-
-
 export default await defineDocsConfig({
   llmsTxt: {},
   changelog: { repo: 'elcoosp/grider' },
@@ -21,15 +19,11 @@ export default await defineDocsConfig({
                         description:
                                 'High-performance row and column grid extraction from images, as a Rust library and a CLI.',
                         favicon: '/favicon.png',
-                        defaultLocale: 'root',
                         // The docs collection provides src/content/docs/404.md; the built-in
                         // dedicated /404 route is disabled so the two do not conflict.
                         disable404Route: true,
-                        locales: {
 				// `root` marks the unprefixed default locale in current Starlight;
 				// a key named after the language would create a /en/ prefixed locale.
-				root: { label: 'English', lang: 'en' }
-			},
                         head: [
                                 {
                                         tag: 'link',
