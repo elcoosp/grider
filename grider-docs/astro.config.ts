@@ -1,11 +1,11 @@
 import { defineDocsConfig } from '@elcoosp/docs-toolkit/config';
+import starlightChangelogs from 'starlight-changelogs';
 import starlightLinksValidator from 'starlight-links-validator';
 import starlightImageZoom from 'starlight-image-zoom';
 import starlightHeadingBadges from 'starlight-heading-badges';
 import starlightLlmsTxt from 'starlight-llms-txt';
 export default await defineDocsConfig({
   llmsTxt: {},
-  changelog: { repo: 'elcoosp/grider' },
   site: 'https://grider-docs.vercel.app',
   domain: 'grider-docs.vercel.app',
   title: "Grider",
@@ -44,7 +44,7 @@ export default await defineDocsConfig({
                         editLink: {
                                 baseUrl: 'https://github.com/elcoosp/grider/edit/main/docs-site/'
                         },
-                        plugins: [
+                        plugins: [ starlightChangelogs(), 
                                 // Fails the build on broken internal links (release gate).
                                 starlightLinksValidator(),
                                 // Click-to-zoom on figures (input vs. overlay comparisons).
