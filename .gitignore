@@ -8,3 +8,5 @@ output.png
 *_with_grid.png
 /tests/snapshots/*.snap.new
 Cargo.lock.bak
+.vercel
+.env*
