@@ -9,7 +9,7 @@ repository = "https://github.com/elcoosp/grider"
 homepage = "https://github.com/elcoosp/grider"
 documentation = "https://docs.rs/grider"
 readme = "README.md"
-keywords = ["image", "grid", "table", "detection", "rows"]
+keywords = ["grid", "layout", "ui", "gui", "tui"]
 categories = ["multimedia::images", "computer-vision"]
 exclude = [".github", "benches", "docs", "renovate.json"]
 
