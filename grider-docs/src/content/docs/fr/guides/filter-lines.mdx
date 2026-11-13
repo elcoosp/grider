@@ -1,0 +1,93 @@
+---
+title: Filtrer les lignes de la grille
+description: Supprimez les lignes et colonnes structurelles par taille, conservez les types, retenez en place et recherchez les lignes et cellules par coordonnée.
+type: how-to
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+Ce guide montre comment transformer une extraction brute en sous-ensemble de lignes qui vous intéresse réellement : supprimer les bandes d'en-tête et de pied de page, conserver uniquement le contenu, filtrer par prédicat, et rechercher les lignes, colonnes et cellules par coordonnée.
+
+## Prérequis
+
+- Une [`Grid`](/reference/grid/) extraite avec `Grid::try_from_image_with_config` ou construite avec `make_grid!`
+
+## Supprimer les lignes structurelles par taille
+
+Les en-têtes, pieds de page et marges apparaissent comme des bandes `Full` surdimensionnées. La famille `filter_*` supprime les lignes ou colonnes les plus petites ou les plus grandes, retournant une nouvelle `Grid` et laissant l'originale intacte :
+
+<Code lang="rust" code={`// Filter out structural lines (headers/footers) by size…
+let grid = grid.filter_biggest_rows();
+// …or drop noise-size bands.
+let grid = grid.filter_smallest_rows();`} />
+
+Les mêmes méthodes existent pour les colonnes : `filter_smallest_columns()` et `filter_biggest_columns()`.
+
+<Aside kind="note">
+    Sans tolérance explicite, les filtres comparent les tailles avec une tolérance par défaut intégrée de `0.1`
+    (10 %). Les variantes `_with_tolerance` vous permettent d'élargir ou de réduire cette marge :
+    `filter_biggest_rows_with_tolerance(0.25)` supprime chaque ligne dont la hauteur est à moins de 25 % de la
+    plus grande ligne.
+</Aside>
+
+## Conserver un seul type
+
+`keep_kind` copie la grille et supprime chaque ligne de l'autre type — une étape courante avant de visiter les cellules :
+
+<Code lang="rust" code={`use grider::LineKind;
+
+let full = grid.keep_kind(LineKind::Full);
+
+// Visit every intersection of the remaining lines.
+for cell in full.iter_cells() {
+    let rect = cell.rect();
+    println!("cell at {}x{}", rect.left(), rect.top());
+}`} />
+
+Pour compter ou itérer sans allocation, utilisez la famille d'accesseurs : `rows_by_kind`, `columns_by_kind`, `count_rows_by_kind` et `count_columns_by_kind` :
+
+<Code lang="rust" code={`use grider::LineKind;
+
+let content_rows = grid.count_rows_by_kind(LineKind::Full);`} />
+
+## Filtrer par prédicat
+
+`filtered_rows` et `filtered_columns` retournent des itérateurs sur les lignes qui correspondent à n'importe quel prédicat que vous écrivez :
+
+<Code lang="rust" code={`for row in grid.filtered_rows(|row| row.height >= 20) {
+    println!("tall row at y={} ({}px)", row.y, row.height);
+}`} />
+
+Pour modifier la grille en place au lieu de la copier, utilisez `retain_rows` et `retain_columns` :
+
+<Code lang="rust" code={`use grider::{make_grid, LineKind};
+
+let mut grid = make_grid!(rows: [(0, 5), (5, 5, LineKind::Full)], columns: [(0, 2)]);
+grid.retain_rows(|row| row.kind == LineKind::Full);
+assert_eq!(grid.rows.len(), 1);`} />
+
+## Rechercher des lignes et des cellules par coordonnée
+
+Les coordonnées correspondent directement aux lignes lorsqu'une bande commence exactement à cet endroit :
+
+| Méthode | Recherche | Résultat |
+| :--- | :--- | :--- |
+| `find_row(y)` | Ligne commençant à `y` | `Option<&Row>` |
+| `find_column(x)` | Colonne commençant à `x` | `Option<&Column>` |
+| `cell(row_index, column_index)` | Par index | `Option<Cell>` |
+| `find_cells(row_positions, column_positions)` | Par listes de coordonnées `y`/`x` | Itérateur de `Result<Cell, GridError>` |
+
+<Code lang="rust" code={`let cells = grid.find_cells(&[1, 2, 3], &[4, 5, 6]);
+for cell in cells {
+    match cell {
+                    Ok(c) => println!("Found cell at row {}, column {}", c.row.y, c.column.x),
+                    Err(e) => eprintln!("Error finding cell: {e}"),
+    }
+}`} />
+
+`find_cells` signale une [`GridError::RowNotFound`](/reference/errors/) ou `ColumnNotFound` pour les coordonnées où aucune bande ne commence.
+
+## Étapes suivantes
+
+<LinkCard title="Référence Grid" description="Chaque méthode de Grid, y compris les accesseurs de taille et les wrappers de compatibilité." href="/reference/grid/" />
+<LinkCard title="Dessiner des grilles et des cellules" description="Visualisez le résultat filtré avec des couleurs personnalisées." href="/guides/draw-overlays/" />

@@ -1,0 +1,97 @@
+---
+title: API de dessin
+description: GridDrawingConfig avec les valeurs par défaut, le builder, les fournisseurs de couleurs, le trait Drawable et le helper de superposition debug.
+type: reference
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+Le module `drawing` (conditionné par la fonctionnalité `drawing` par défaut) rend des grilles, des cellules et des lignes de grille sur des images. `GridDrawingConfig` contrôle l'apparence ; le trait `Drawable` dessine sur une `RgbaImage`.
+
+## GridDrawingConfig
+
+| Champ | Type | Défaut | Signification |
+| :--- | :--- | :--- | :--- |
+| `padding` | `u32` | `0` | Retrait entre les cellules et les lignes de grille, appliqué à chaque rectangle de cellule |
+| `row_color` | `Rgba<u8>` | `Rgba([255, 0, 0, 255])` | Couleur de la bande horizontale |
+| `column_color` | `Rgba<u8>` | `Rgba([0, 0, 255, 255])` | Couleur de la bande verticale |
+| `cell_background_color` | `Rgba<u8>` | `Rgba([200, 200, 200, 255])` | Remplissage de la cellule |
+| `row_color_provider` | `Option<Box<dyn Fn(usize) -> Rgba<u8>>>` | `None` | Couleur par ligne selon l'index ; remplace `row_color` |
+| `column_color_provider` | `Option<Box<dyn Fn(usize) -> Rgba<u8>>>` | `None` | Couleur par colonne selon l'index ; remplace `column_color` |
+| `line_thickness` | `u32` | `2` | Épaisseur de la bande en pixels (contrainte à au moins `1`) |
+
+`GridDrawingConfig` implémente `Debug` ; les fournisseurs s'affichent comme `<function>`.
+
+## Builder
+
+| Méthode | Définit |
+| :--- | :--- |
+| `padding(v: u32)` | Retrait de cellule |
+| `row_color(v: Rgba<u8>)` | Couleur de la bande horizontale |
+| `column_color(v: Rgba<u8>)` | Couleur de la bande verticale |
+| `cell_background_color(v: Rgba<u8>)` | Remplissage de la cellule |
+| `row_color_provider(v: Box<dyn Fn(usize) -> Rgba<u8>>)` | Fournisseur de couleur par ligne |
+| `column_color_provider(v: Box<dyn Fn(usize) -> Rgba<u8>>)` | Fournisseur de couleur par colonne |
+| `line_thickness(v: u32)` | Épaisseur de bande, minimum `1` |
+
+<Code lang="rust" code={`use grider::drawing::GridDrawingConfig;
+use image::Rgba;
+
+let config = GridDrawingConfig::builder()
+    .padding(1)
+    .cell_background_color(Rgba([0, 0, 0, 255]))
+    .row_color_provider(Box::new(|index| Rgba([index as u8, 0, 0, 255])))
+    .build();
+assert_eq!(config.padding, 1);`} />
+
+## Résolution des couleurs
+
+| Méthode | Comportement |
+| :--- | :--- |
+| `row_color_at(index) -> Rgba<u8>` | Retourne le résultat du fournisseur lorsqu'il est défini, sinon `row_color` |
+| `column_color_at(index) -> Rgba<u8>` | Retourne le résultat du fournisseur lorsqu'il est défini, sinon `column_color` |
+
+## Drawable
+
+<Code lang="rust" code={`pub trait Drawable {
+    fn draw(&self, image: &mut RgbaImage, config: &GridDrawingConfig);
+}`} />
+
+Implémenté par `Cell`, `Row`, `Column` et [`Grid`](/reference/grid/). Le dessin est infaillible par construction : chaque bande et rectangle est découpé aux limites de l'image.
+
+Sémantique du dessin :
+
+- `Row` dessine une bande horizontale de `line_thickness` pixels centrée sur son `end()` (bord inférieur).
+- `Column` dessine une bande verticale de la même épaisseur centrée sur son `end()` (bord droit).
+- `Cell` remplit son rectangle, en retrait par `padding` de chaque côté.
+- `Grid` dessine chaque cellule d'abord, puis chaque bande de ligne, puis chaque bande de colonne — le résultat couvre les pixels de l'image originale et visualise la géométrie de la grille.
+
+## Module debug
+
+<Code lang="rust" code={`pub fn save_image_with_grid(
+    image: &DynamicImage,
+    grid: &Grid,
+    output_path: &str,
+    config: &GridDrawingConfig,
+) -> Result<(), GridError>`} />
+
+Convertit l'image en `RgbaImage`, dessine la grille avec `config` et écrit le fichier. Retourne [`GridError::ImageConversionError`](/reference/errors/) lorsque la sauvegarde échoue.
+
+<Code lang="rust" code={`use grider::drawing::GridDrawingConfig;
+use grider::{Grid, GridConfig};
+use image::open;
+
+let img = open("tests/large.png").unwrap();
+let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();
+
+grider::debug::save_image_with_grid(&img, &grid, "output_with_grid.png", &GridDrawingConfig::default())
+    .unwrap();`} />
+
+<Aside kind="note">
+    Le binaire en ligne de commande appelle cette fonction avec la configuration par défaut à chaque exécution, sauf si vous passez
+    `--json` ou compilez sans la fonctionnalité `drawing`.
+</Aside>
+
+## Étapes suivantes
+
+<LinkCard title="Dessiner des grilles et des cellules" description="Recettes pour les fournisseurs, l'épaisseur et le remplissage." href="/guides/draw-overlays/" />

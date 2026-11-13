@@ -1,0 +1,62 @@
+---
+title: CLI
+description: La commande grider — arguments, chaque option avec sa valeur par défaut, sorties et codes de sortie.
+type: reference
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+Le binaire `grider` (construit par le même crate) exécute le pipeline de la bibliothèque depuis un terminal. `grider --help` imprime la liste canonique des drapeaux ; le tableau ci-dessous ajoute les valeurs par défaut et le comportement.
+
+## Arguments
+
+| Argument | Type | Signification |
+| :--- | :--- | :--- |
+| `<IMAGE_PATH>` (positionnel) | chemin | Chemin vers le fichier image d'entrée |
+
+## Options
+
+| Drapeau | Type | Défaut | Signification |
+| :--- | :--- | :--- | :--- |
+| `--block-size` | `u32` | `12` | Taille de bloc du seuil adaptatif (minimum `3`) |
+| `--delta` | `i32` | `0` | Décalage soustrait de la moyenne locale pendant le seuillage adaptatif |
+| `--merge-ratio` | `f32` | `0.8` | Ratio de la taille moyenne de ligne en dessous duquel les lignes fusionnent (`[0, 1]`) |
+| `--binarization` | `mean` \| `sauvola` | `mean` | Méthode de binarisation appliquée avant la détection |
+| `--sauvola-k` | `f32` | `0.2` | Sensibilité `k` de Sauvola ; implique `--binarization sauvola` |
+| `--no-parallel` | drapeau | off | Désactiver le traitement parallèle |
+| `-o`, `--output` | chemin | `<image>_with_grid.png` à côté de l'entrée | Où sauvegarder l'image de superposition |
+| `--json` | drapeau | off | Imprimer la grille en JSON au lieu de sauvegarder une superposition |
+| `-q`, `--quiet` | drapeau | off | Supprimer les résumés lisibles par l'homme |
+| `-h`, `--help` | drapeau | — | Imprimer l'aide (`-h` imprime un résumé) |
+| `-V`, `--version` | drapeau | — | Imprimer la version |
+
+## Comportement de sortie
+
+- **Défaut** : un résumé de minutage, le résumé de la grille, les décomptes par type, puis le chemin du fichier de superposition.
+- **`--json`** : JSON joli de toute la grille sur stdout ; aucun fichier de superposition n'est écrit.
+- **`--quiet`** : aucune ligne de résumé ; s'associe à `--json` pour une sortie machine uniquement.
+
+<Code lang="ansi" code={`Extracted grid in 7.22ms
+Grid { rows: 16, columns: 19 }
+Full rows: 7, empty rows: 9, full columns: 9, empty columns: 10
+Saving overlay to tests/large_with_grid.png`} />
+
+## Codes de sortie et journalisation
+
+| Cas | Code de sortie | Sortie |
+| :--- | :--- | :--- |
+| Succès | `0` | Comme ci-dessus |
+| Échec (image illisible, extraction échouée, superposition non inscriptible) | `1` | `error: …` avec la chaîne `Caused by:` |
+
+Le binaire initialise un abonné `tracing` à partir de `RUST_LOG` ; `RUST_LOG=debug grider img.png` journalise les arguments analysés.
+
+<Aside kind="note">
+    Deux sorties sont conditionnées par des fonctionnalités : sans `serde`, l'impression JSON affiche
+    `Skipping JSON output: built without the 'serde' feature` ; sans `drawing`, l'étape de superposition
+    affiche `Skipping overlay '…': built without the 'drawing' feature`. Les deux sortent quand même avec `0`.
+</Aside>
+
+## Étapes suivantes
+
+<LinkCard title="Utiliser la CLI" description="Recettes de tâches — superpositions, JSON, journalisation, échecs." href="/guides/use-the-cli/" />
+<LinkCard title="GridConfig" description="Le pendant côté bibliothèque des drapeaux de réglage." href="/reference/grid-config/" />

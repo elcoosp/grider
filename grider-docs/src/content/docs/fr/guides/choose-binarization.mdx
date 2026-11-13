@@ -1,0 +1,81 @@
+---
+title: Choisir une méthode de binarisation
+description: Décidez entre le seuil de moyenne adaptative pour une entrée propre et Sauvola pour des documents dégradés, dans la bibliothèque et la CLI.
+type: how-to
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+Ce guide vous aide à choisir la binarisation que Grider applique avant la détection de lignes, et montre comment basculer entre les deux méthodes dans le code et sur la ligne de commande.
+
+## Prérequis
+
+- Grider 0.3 ou plus récent (Sauvola est livré dans la 0.3.0)
+- Une image dont la qualité d'extraction dépend de l'éclairage ou du contraste
+
+## Décider par la qualité de l'entrée
+
+| Entrée | Méthode | Pourquoi |
+| :--- | :--- | :--- |
+| Captures d'écran, scans de pages propres, motifs synthétiques | `AdaptiveMean` (défaut) | Chemin le plus rapide ; identique bit pour bit à `imageproc::contrast::adaptive_threshold` |
+| Documents dégradés, éclairage inégal, faible contraste | `Sauvola { k }` | Le seuil local suit la moyenne **et** l'écart type de la fenêtre, ce qui gère les taches sombres et les ombres |
+
+Les deux méthodes s'exécutent en `O(largeur × hauteur)` quelle que soit la taille du rayon, avec `O(largeur × rayon)` de mémoire supplémentaire.
+
+## Basculer dans la bibliothèque
+
+Le défaut reste la moyenne adaptative :
+
+<Code lang="rust" code={`use grider::{Binarization, GridConfig};
+
+let mean = GridConfig::default();
+assert_eq!(mean.binarization, Binarization::AdaptiveMean);`} />
+
+Sélectionnez Sauvola avec une sensibilité `k` :
+
+<Code lang="rust" code={`use grider::GridConfig;
+
+let config = GridConfig::builder().sauvola(0.34).build();`} />
+
+## Choisir k
+
+`k` règle à quel point le seuil réagit au contraste local. La littérature utilise typiquement des valeurs entre `0.1` et `0.5` ; `0.2` est la valeur par défaut de l'implémentation de référence `scikit-image` et le repli de Grider pour les valeurs non finies (`SAUVOLA_DEFAULT_K`).
+
+| k | Comportement |
+| :--- | :--- |
+| `0.1` | Plus permissif — conserve le contenu pâle, accepte plus de bruit |
+| `0.2` | Défaut équilibré |
+| `0.34` et plus | Plus sélectif — favorise le contenu clairement contrasté sur les scans dégradés |
+
+<Aside kind="note">
+    [`GridConfig::threshold_delta`](/reference/grid-config/) n'a aucun effet sur Sauvola — il ne s'applique qu'à
+    la méthode de moyenne adaptative.
+</Aside>
+
+## Basculer dans la CLI
+
+<Code lang="bash" code={`# Sauvola binarization for degraded documents
+grider scan.png --binarization sauvola --sauvola-k 0.34 --json`} />
+
+Passer `--sauvola-k` implique `--binarization sauvola`, donc ceci est équivalent :
+
+<Code lang="bash" code={`grider scan.png --sauvola-k 0.34 --json`} />
+
+## Attendez-vous à une segmentation différente
+
+Les deux méthodes segmentent différemment sur la même entrée — c'est le but. Sur la fixture de capture d'écran `tests/large.png` du dépôt, la moyenne adaptative commence par deux courtes lignes `Empty`, tandis que Sauvola avec `k = 0.34` regroupe le haut de la page en une grande bande `Empty` :
+
+<Code lang="json" code={`{
+    "rows": [
+  { "y": 0, "height": 243, "kind": "Empty" },
+  { "y": 243, "height": 91, "kind": "Empty" },
+  { "y": 334, "height": 179, "kind": "Full" }
+    ]
+}`} />
+
+Utilisez la superposition (`grider scan.png --binarization sauvola`) pour comparer les candidats sur votre propre image, puis gardez le réglage qui correspond aux bandes que vous voyez.
+
+## Étapes suivantes
+
+<LinkCard title="Référence de binarisation" description="Les deux algorithmes, toutes les constantes et les fonctions du module binarize." href="/reference/binarization/" />
+<LinkCard title="Configurer l'extraction" description="Les autres réglages de GridConfig, avec les règles de contrainte et de validation." href="/guides/configure-extraction/" />

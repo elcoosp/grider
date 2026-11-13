@@ -1,0 +1,102 @@
+---
+title: Lignes et cellules
+description: Les primitives de ligne — LineKind, LineInfo, Row, Column, Cell, le trait de fabrique LineTrait et clamp_to_i32.
+type: reference
+---
+
+import { Code, LinkCard } from '@astrojs/starlight/components';
+
+Une grille est composée de `Row`s horizontales et de `Column`s verticales. Les deux sont des projections de la même plage de `LineInfo` produite par le pipeline de détection, unifiées par le trait de fabrique `LineTrait`. Tous les types dérivent `Debug`, `PartialEq`, `Eq`, `Clone`, `Copy`, `Hash` (sauf `Cell`, qui emprunte) et `Serialize`/`Deserialize` avec la fonctionnalité `serde`.
+
+## LineKind
+
+La densité de contenu d'une ligne.
+
+| Variante | Signification | Helper |
+| :--- | :--- | :--- |
+| `Empty` | La ligne ne contient que des pixels d'arrière-plan | `is_empty()` |
+| `Full` | La ligne contient du contenu | `is_full()` |
+
+## LineInfo
+
+Informations brutes sur une plage de lignes de balayage consécutives partageant un type.
+
+| Champ | Type | Signification |
+| :--- | :--- | :--- |
+| `start` | `u32` | Position de début de la plage le long de l'axe scanné |
+| `length` | `u32` | Nombre de lignes de balayage consécutives dans la plage |
+| `kind` | `LineKind` | Type de la plage |
+
+Constructeur : `LineInfo::new(start, length, kind)`.
+
+## Row
+
+Une bande horizontale de la grille.
+
+| Champ | Type | Signification |
+| :--- | :--- | :--- |
+| `y` | `u32` | Coordonnée `y` où la ligne commence |
+| `height` | `u32` | Hauteur de la ligne en pixels |
+| `kind` | `LineKind` | Type de la ligne |
+
+Méthode : `end() -> u32` — `y + height`, saturante.
+
+## Column
+
+Une bande verticale de la grille.
+
+| Champ | Type | Signification |
+| :--- | :--- | :--- |
+| `x` | `u32` | Coordonnée `x` où la colonne commence |
+| `width` | `u32` | Largeur de la colonne en pixels |
+| `kind` | `LineKind` | Type de la colonne |
+
+Méthode : `end() -> u32` — `x + width`, saturante.
+
+## Cell
+
+L'intersection d'une `Row` et d'une `Column`.
+
+| Champ | Type | Signification |
+| :--- | :--- | :--- |
+| `row` | `&Row` | La ligne définissant l'étendue verticale |
+| `column` | `&Column` | La colonne définissant l'étendue horizontale |
+
+Méthode : `rect() -> Rect` — le rectangle couvert sur l'image (un `imageproc::rect::Rect`). Les cellules se comparent par valeur, pas par identité :
+
+<Code lang="rust" code={`use grider::{make_grid, LineInfo};
+
+let grid = make_grid!(rows: [(0, 10)], columns: [(5, 15)]);
+let cell = grid.cell(0, 0).expect("single cell grid");
+let rect = cell.rect();
+assert_eq!((rect.left(), rect.top()), (5, 0));
+assert_eq!((rect.width(), rect.height()), (15, 10));`} />
+
+## LineTrait
+
+Un trait de fabrique implémenté par `Row` et `Column`, permettant au pipeline de détection de convertir des plages `LineInfo` génériques vers le type spécifique à l'orientation correspondant :
+
+<Code lang="rust" code={`use grider::{Column, LineInfo, LineKind, LineTrait, Row};
+
+let line_info = LineInfo::new(0, 100, LineKind::Full);
+let row = Row::new(line_info);
+let column = Column::new(line_info);
+
+assert_eq!(row.y, 0);
+assert_eq!(column.x, 0);`} />
+
+| Implémenteur | `new(LineInfo)` produit |
+| :--- | :--- |
+| `Row` | `y = start`, `height = length`, `kind = kind` |
+| `Column` | `x = start`, `width = length`, `kind = kind` |
+
+## clamp_to_i32
+
+<Code lang="rust" code={`pub fn clamp_to_i32(value: u32) -> i32`} />
+
+Contraint une coordonnée `u32` dans la plage `i32` attendue par `imageproc`, mappant le dépassement sur `i32::MAX`. Les coordonnées au-delà de `i32::MAX` ne peuvent pas se produire pour des images qui tiennent en mémoire, mais la contrainte garde la conversion totale et sans panique.
+
+## Étapes suivantes
+
+<LinkCard title="Grid" description="Le type qui stocke ces primitives et les interroge." href="/reference/grid/" />
+<LinkCard title="Macros" description="make_line! et make_grid! construisent ces types de manière concise dans les tests." href="/reference/macros/" />

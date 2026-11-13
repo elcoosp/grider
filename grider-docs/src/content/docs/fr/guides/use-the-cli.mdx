@@ -1,0 +1,84 @@
+---
+title: Utiliser la CLI
+description: Extrayez des grilles depuis le terminal — sorties, drapeaux de binarisation, JSON, mode silencieux, journalisation et codes de sortie.
+type: how-to
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+Ce guide couvre le binaire `grider` de bout en bout : comportement par défaut, chaque drapeau, la sortie JSON, la journalisation et les codes de sortie.
+
+## Prérequis
+
+- Le binaire installé : `cargo install grider`
+
+## Extraire et sauvegarder la superposition par défaut
+
+Pointez le binaire vers une image. Il extrait la grille, imprime un résumé et sauvegarde `<image>_with_grid.png` à côté du fichier d'entrée :
+
+<Code lang="bash" code={`grider tests/large.png`} />
+
+<Code lang="ansi" code={`Extracted grid in 7.22ms
+Grid { rows: 16, columns: 19 }
+Full rows: 7, empty rows: 9, full columns: 9, empty columns: 10
+Saving overlay to tests/large_with_grid.png`} />
+
+Renommez la sortie avec `-o`/`--output` :
+
+<Code lang="bash" code={`grider tests/large.png --output result/grid.png`} />
+
+## Configurer l'extraction
+
+Les drapeaux correspondent un à un aux champs de [`GridConfig`](/reference/grid-config/) :
+
+<Code lang="bash" code={`# Custom configuration
+grider tests/large.png --block-size 15 --delta 2 --merge-ratio 0.9 --no-parallel --json
+
+# Sauvola binarization for degraded documents
+grider scan.png --binarization sauvola --sauvola-k 0.34 --json`} />
+
+`--sauvola-k` implique `--binarization sauvola`, donc la seconde commande fonctionne aussi sans le drapeau explicite `--binarization`. Le tableau complet des drapeaux, y compris les valeurs par défaut, se trouve dans la [référence CLI](/reference/cli/).
+
+## Obtenir une sortie lisible par machine
+
+`--json` imprime toute la grille en JSON joli sur stdout et saute la superposition :
+
+<Code lang="bash" code={`grider tests/large.png --json --quiet`} />
+
+<Code lang="json" code={`{
+    "rows": [
+  { "y": 0, "height": 11, "kind": "Empty" },
+  { "y": 11, "height": 18, "kind": "Empty" },
+  { "y": 29, "height": 17, "kind": "Empty" }
+    ]
+}`} />
+
+Ajoutez `-q`/`--quiet` pour supprimer le résumé lisible par l'homme — sans cela, le résumé partage stdout avec le JSON.
+
+## Journaliser les diagnostics
+
+Le binaire initialise un abonné `tracing` à partir de `RUST_LOG`. Activez la journalisation de débogage pour voir les arguments analysés :
+
+<Code lang="bash" code={`RUST_LOG=debug grider tests/large.png --quiet`} />
+
+## Gérer les échecs
+
+Le binaire mappe les erreurs sur le code de sortie `1` (`ExitCode::FAILURE`) et imprime la chaîne d'erreurs. L'ouverture d'un fichier manquant produit :
+
+<Code lang="ansi" code={`error: Failed to open image
+
+Caused by:
+ No such file or directory (os error 2)`} />
+
+Les exécutions réussies sortent avec le code `0`.
+
+<Aside kind="note">
+    Les fonctionnalités conditionnent deux sorties. Compilé sans `serde`, le binaire imprime
+    `Skipping JSON output: built without the 'serde' feature`. Compilé sans `drawing`, il imprime
+    `Skipping overlay '…': built without the 'drawing' feature`. Les deux sortent quand même avec `0`.
+</Aside>
+
+## Étapes suivantes
+
+<LinkCard title="Référence CLI" description="Le tableau complet des drapeaux et des comportements." href="/reference/cli/" />
+<LinkCard title="Sérialiser les grilles en JSON" description="La forme JSON et les allers-retours serde dans la bibliothèque." href="/guides/serialize-grids/" />

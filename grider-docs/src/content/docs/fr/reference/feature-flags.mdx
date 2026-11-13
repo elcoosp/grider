@@ -1,0 +1,36 @@
+---
+title: Drapeaux de fonctionnalité
+description: Ce que les fonctionnalités cargo serde, drawing et test-utils conditionnent, et comment la CLI se comporte sans elles.
+type: reference
+---
+
+import { Code, LinkCard } from '@astrojs/starlight/components';
+
+Grider compile trois fonctionnalités cargo. Deux sont activées par défaut ; `test-utils` existe uniquement pour le développement.
+
+## Les drapeaux
+
+| Fonctionnalité | Défaut | Conditionne |
+| :--- | :--- | :--- |
+| `serde` | activée | `Serialize`/`Deserialize` pour tous les types de données publics, et la sortie JSON dans la CLI |
+| `drawing` | activée | Le module [`drawing`](/reference/drawing/), le trait `Drawable` et les helpers [`debug::save_image_with_grid`](/reference/drawing/) |
+| `test-utils` | désactivée | Le module `grider::testing` avec les fixtures d'images partagées (`Pattern`, `test_image`, `gray_test_image`) pour les tests et benchmarks |
+
+## Personnaliser une compilation
+
+<Code lang="bash" code={`# Minimal build — no JSON, no drawing:
+cargo add grider --no-default-features
+
+# Add only serde back:
+cargo add grider --no-default-features --features serde`} />
+
+## Comportement de la CLI sans fonctionnalités
+
+| Fonctionnalité manquante | Comportement de la CLI |
+| :--- | :--- |
+| `serde` | `--json` imprime `Skipping JSON output: built without the 'serde' feature` ; l'exécution sort quand même avec `0` |
+| `drawing` | L'étape de superposition imprime `Skipping overlay '…': built without the 'drawing' feature` ; l'exécution sort quand même avec `0` |
+
+## Étapes suivantes
+
+<LinkCard title="Installation" description="Comment sélectionner des fonctionnalités avec cargo." href="/guides/install/" />

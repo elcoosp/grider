@@ -1,0 +1,57 @@
+---
+title: Erreurs
+description: Chaque variante de GridError, ses champs et sa sortie Display, plus des conseils sur la correspondance avec wildcard.
+type: reference
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+Toutes les erreurs que produisent les opérations de [`Grid`](/reference/grid/). L'enum dérive `Error`, `Debug`, `PartialEq`, `Eq`, `Clone` (via `thiserror`) et est `#[non_exhaustive]` — de nouvelles variantes peuvent arriver dans les versions mineures, donc les branches `match` en aval incluent un wildcard.
+
+## Variantes :badge[non_exhaustive]{variant="caution"}
+
+| Variante | Champs | Sortie Display |
+| :--- | :--- | :--- |
+| `InvalidDimensions` | `width: u32`, `height: u32` | `Invalid image dimensions: width={width}, height={height}` |
+| `RowNotFound` | `y: u32` | `Row not found at y={y}` |
+| `ColumnNotFound` | `x: u32` | `Column not found at x={x}` |
+| `InvalidConfig` | `reason: String` | `Invalid configuration: {reason}` |
+| `ImageConversionError` | `String` | `Failed to convert image: {0}` |
+
+## Quand chaque variante se produit
+
+| Variante | Levée par |
+| :--- | :--- |
+| `InvalidDimensions` | Extraction depuis une image de largeur ou hauteur nulle ; `detection::process_dimension` avec une dimension nulle |
+| `RowNotFound` / `ColumnNotFound` | [`Grid::find_cells`](/reference/grid/) avec une coordonnée `y`/`x` où aucune bande ne commence |
+| `InvalidConfig` | [`GridConfig::validate`](/reference/grid-config/) sur une taille de bloc nulle, un ratio de fusion non fini ou hors limites, ou un `k` Sauvola non fini |
+| `ImageConversionError` | `debug::save_image_with_grid` lorsque le fichier de sortie ne peut pas être écrit |
+
+## Constructeur
+
+<Code lang="rust" code={`pub fn invalid_config(reason: impl Into<String>) -> Self`} />
+
+Construit `GridError::InvalidConfig` à partir de n'importe quelle valeur de type chaîne :
+
+<Code lang="rust" code={`use grider::GridError;
+
+let error = GridError::invalid_config("block size must be > 0");
+assert_eq!(error.to_string(), "Invalid configuration: block size must be > 0");`} />
+
+## Gestion en pratique
+
+<Code lang="rust" code={`match result {
+    Ok(grid) => println!("{grid}"),
+    Err(GridError::InvalidDimensions { width, height }) => eprintln!("empty image {width}x{height}"),
+    Err(e) => eprintln!("extraction failed: {e}"),
+}`} />
+
+<Aside kind="caution">
+    Parce que l'enum est `#[non_exhaustive]`, correspondre à chaque variante actuelle sans branche wildcard ne
+    compile pas en dehors du crate — gardez une branche attrape-tout.
+</Aside>
+
+## Étapes suivantes
+
+<LinkCard title="Grid" description="Les opérations faillibles qui retournent ces erreurs." href="/reference/grid/" />
+<LinkCard title="GridConfig" description="Les règles de validation derrière InvalidConfig." href="/reference/grid-config/" />

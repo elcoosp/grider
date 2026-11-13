@@ -1,0 +1,91 @@
+---
+title: GridConfig
+description: Chaque champ, constante et méthode de builder de la configuration d'extraction, avec les valeurs par défaut, les règles de contrainte et de validation.
+type: reference
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+`GridConfig` pilote le pipeline d'extraction. Elle dérive `Debug`, `Clone`, `Copy`, `PartialEq` et `Serialize`/`Deserialize` avec la fonctionnalité `serde`. Construisez-la avec le constructeur, le builder, ou un littéral de structure suivi de `validate()`.
+
+## Champs
+
+| Champ | Type | Défaut | Contraintes | Effet |
+| :--- | :--- | :--- | :--- | :--- |
+| `threshold_block_size` | `u32` | `12` | Contraint à au moins `3` par les constructeurs et builders ; doit être non nul pour `validate()` | *Rayon* de bloc du seuil adaptatif — la fenêtre de comparaison fait `2 × taille + 1` pixels de large |
+| `threshold_delta` | `i32` | `0` | Toute valeur | Décalage soustrait de la moyenne locale. Les valeurs positives comptent plus de pixels comme arrière-plan (permissif), les négatives plus strictes. Inutilisé par Sauvola |
+| `merge_threshold_ratio` | `f32` | `0.8` | Contraint dans `[0.0, 1.0]` ; `NaN` correspond au défaut ; doit être fini et dans les limites pour `validate()` | Les plages voisines plus courtes que `ratio × taille moyenne de plage` fusionnent |
+| `enable_parallel` | `bool` | `true` | Toute valeur | Parallélise la binarisation et le scan de vacuité sur des bandes de lignes, avec déclenchement basé sur la taille du travail pour les petites images |
+| `binarization` | [`Binarization`](/reference/binarization/) | `AdaptiveMean` | Le `k` de Sauvola doit être fini pour `validate()` | Méthode de binarisation appliquée avant la détection de lignes ; porte `#[serde(default)]` pour le JSON hérité |
+
+## Constantes
+
+| Constante | Valeur | Signification |
+| :--- | :--- | :--- |
+| `DEFAULT_THRESHOLD_BLOCK_SIZE` | `12` | Rayon de bloc par défaut |
+| `MIN_THRESHOLD_BLOCK_SIZE` | `3` | Contrainte inférieure pour `threshold_block_size` |
+| `DEFAULT_THRESHOLD_DELTA` | `0` | Delta par défaut |
+| `DEFAULT_MERGE_THRESHOLD_RATIO` | `0.8` | Ratio de fusion par défaut |
+| `SAUVOLA_DEFAULT_K` | `0.2` | Repli pour un `k` Sauvola non fini ; le défaut de scikit-image |
+| `SAUVOLA_DYNAMIC_RANGE` | `128.0` | Plage dynamique `R` de l'écart type dans la formule de Sauvola (`255 / 2` arrondi) |
+
+## Constructeurs
+
+| Constructeur | Signature | Notes |
+| :--- | :--- | :--- |
+| `GridConfig::new` | `(threshold_block_size: u32, merge_threshold_ratio: f32, enable_parallel: bool) -> Self` | Contraint la taille de bloc et le ratio, le delta reste `0`, la binarisation reste `AdaptiveMean` |
+| `GridConfig::builder` | `() -> GridConfigBuilder` | Part des valeurs par défaut |
+| `GridConfig::default` | `() -> Self` | Toutes les valeurs par défaut ci-dessus |
+
+## Méthodes du builder
+
+Chaque méthode consomme et retourne le builder ; la configuration construite passe toujours `validate()`.
+
+| Méthode | Assainissement |
+| :--- | :--- |
+| `threshold_block_size(v: u32)` | Contraint à un minimum de `3` |
+| `threshold_delta(v: i32)` | Aucun nécessaire |
+| `merge_threshold_ratio(v: f32)` | Contraint dans `[0.0, 1.0]`, `NaN` devient `0.8` |
+| `parallel(v: bool)` | Aucun nécessaire |
+| `binarization(v: Binarization)` | Aucun nécessaire |
+| `sauvola(k: f32)` | Définit `Binarization::Sauvola { k }`, remplaçant un `k` non fini par `0.2` |
+
+<Code lang="rust" code={`use grider::GridConfig;
+
+let config = GridConfig::builder()
+    .threshold_block_size(7)
+    .threshold_delta(-2)
+    .merge_threshold_ratio(0.5)
+    .parallel(true)
+    .build();
+
+assert!(config.validate().is_ok());`} />
+
+## validate
+
+<Code lang="rust" code={`pub fn validate(&self) -> Result<(), GridError>`} />
+
+Signale le premier problème trouvé dans les valeurs construites à la main (littéral de structure ou désérialisation) sous forme de [`GridError::InvalidConfig`](/reference/errors/) :
+
+| Condition | Message d'erreur |
+| :--- | :--- |
+| `threshold_block_size == 0` | `threshold_block_size must be greater than 0` |
+| `merge_threshold_ratio` non fini ou hors de `[0.0, 1.0]` | `merge_threshold_ratio must be a finite value in [0.0, 1.0]` |
+| `Sauvola { k }` avec `k` non fini | `sauvola k must be a finite value` |
+
+## sanitize_ratio et sanitize_k
+
+| Fonction | Comportement |
+| :--- | :--- |
+| `GridConfig::sanitize_ratio(ratio: f32) -> f32` | `NaN` devient le ratio par défaut, tout le reste est contraint dans `[0.0, 1.0]` |
+| `Binarization::sanitize_k(k: f32) -> f32` | Un `k` non fini devient `SAUVOLA_DEFAULT_K` |
+
+<Aside kind="caution">
+    La 0.3 a ajouté le champ `binarization`. Les littéraux de structure doivent l'inclure ou terminer par
+    `..GridConfig::default()` ; le JSON écrit par 0.2 continue de se désérialiser grâce à `#[serde(default)]`.
+</Aside>
+
+## Étapes suivantes
+
+<LinkCard title="Binarisation" description="Les deux algorithmes que cette configuration sélectionne." href="/reference/binarization/" />
+<LinkCard title="Configurer l'extraction" description="Recettes orientées tâches pour chaque réglage." href="/guides/configure-extraction/" />

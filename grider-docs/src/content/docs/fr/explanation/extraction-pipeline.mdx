@@ -1,0 +1,77 @@
+---
+title: Le pipeline d'extraction
+description: Comment Grider transforme les pixels en lignes et colonnes — binarisation, scan de vacuité fusionné, encodage par plages et fusion.
+type: explanation
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+Grider lit une image et retourne une [`Grid`](/reference/grid/) de lignes et de colonnes. Cette page explique ce qui se passe entre les deux — les étapes, les données qui circulent entre elles, et pourquoi chaque étape est conçue ainsi. Toutes les fonctions mentionnées ici sont publiques et documentées dans la [référence du pipeline](/reference/pipeline/).
+
+## Aperçu
+
+<Code lang="text" code={`DynamicImage / GrayImage
+     │
+     ▼
+[1] Binarization        adaptive mean (Bradley & Roth) or Sauvola
+     │  GrayImage, background = white (255), content = black (0)
+     ▼
+[2] scan_line_flags     one fused pass, row + column flags together
+     │  LineFlags { rows: Vec<bool>, columns: Vec<bool> }
+     ▼
+[3] run_length_encode   booleans → LineInfo runs per axis
+     │  Vec<LineInfo> { start, length, kind }
+     ▼
+[4] merge_small_lines   runs shorter than ratio × average merge into their neighbour
+     │  SmallVecLine<LineInfo>
+     ▼
+[5] lines_from_flags    runs → Row / Column via LineTrait
+     │
+     ▼
+    Grid { rows, columns }`} />
+
+## Étape 1 — Binarisation
+
+Le pipeline réduit d'abord chaque pixel à un arrière-plan/un contenu. Deux algorithmes partagent une propriété : un temps `O(largeur × hauteur)` quelle que soit la taille du rayon de la fenêtre.
+
+- **Moyenne adaptative** (Bradley & Roth, 2005) — un pixel est un arrière-plan lorsqu'il est au moins aussi lumineux que la moyenne de sa fenêtre moins `threshold_delta`. L'image intégrale glissante en streaming de Grider produit une sortie identique bit pour bit à `imageproc::contrast::adaptive_threshold` tout en utilisant `O(largeur × rayon)` de mémoire au lieu de `O(largeur × hauteur)`.
+- **Sauvola** (Sauvola & Pietikäinen, 2000) — le seuil local suit la moyenne et l'écart type de la fenêtre, ce qui gère l'éclairage inégal sur les documents dégradés.
+
+Les deux étapes se parallélisent sur des bandes de lignes, avec un déclenchement basé sur la taille du travail pour que les petites images ne paient jamais le coût du pool de threads.
+
+## Étape 2 — Le scan de vacuité fusionné
+
+Les anciennes versions scannaient les lignes, puis les colonnes de manière stridée à travers la mémoire — la seconde passe était hostile au cache. Depuis la 0.3, `scan_line_flags` parcourt l'image une seule fois et accumule les comptes de contenu par ligne et par colonne dans la même passe, puis seuille les comptes en `LineFlags`. Le scan mesure environ 0,4 ns par pixel et est limité par la bande passante sur les machines typiques.
+
+## Étape 3 — Encodage par plages (Run-length)
+
+Par axe, les drapeaux booléens se compressent en plages : `run_length_encode` transforme les séquences `true`/`false` en enregistrements `LineInfo { start, length, kind }`, où `kind` est `Empty` pour les plages d'arrière-plan et `Full` pour les plages de contenu.
+
+## Étape 4 — Fusion
+
+Les vraies grilles contiennent des espaces filiformes et des coutures sous-pixel qui divisent une bande logique en plusieurs plages. `merge_small_lines` colle toute plage plus courte que `merge_threshold_ratio × average_run_size` dans la plage en cours de construction, de gauche à droite. La sortie fusionnée couvre toujours la même étendue totale que l'entrée — aucun pixel ne disparaît ni ne se duplique. Baissez `merge_threshold_ratio` lorsque des bandes fines légitimes disparaissent ; augmentez-le lorsqu'une bande se divise encore.
+
+## Étape 5 — Conversion en lignes typées
+
+`lines_from_flags` convertit chaque plage fusionnée en une `Row` ou une `Column` via le trait de fabrique `LineTrait` (`start` → `y`/`x`, `length` → `hauteur`/`largeur`). Le résultat est une `Grid` soutenue par des collections `SmallVecLine` avec une capacité en ligne de 32, donc les grilles jusqu'à 32 lignes par axe n'allouent rien au-delà de la structure.
+
+## Pourquoi les points d'entrée diffèrent
+
+Les trois constructeurs de `Grid` sautent les étapes dont vous n'avez pas besoin :
+
+| Point d'entrée | Saute | Coût mesuré (fixture Dense 1000²) |
+| :--- | :--- | ---: |
+| `try_from_image_with_config` sur une image RGB | rien | 4,98 ms (la conversion de couleur domine) |
+| `try_from_image_with_config` sur une image `Luma8` | la conversion — emprunt gris zéro-copie | 1,70 ms |
+| `try_from_gray_with_config` | l'enveloppe d'image dynamique | 1,72 ms |
+| `try_from_binarized` | toute l'étape de binarisation | 386 µs (**4,4× plus rapide**) |
+
+<Aside kind="tip">
+    Si vos images sont déjà binaires, `try_from_binarized` vous donne la grille complète à une fraction du
+    coût. Si vous contrôlez la source, gardez les images en `Luma8` jusqu'à l'extraction.
+</Aside>
+
+## Étapes suivantes
+
+<LinkCard title="Performance" description="Les chiffres mesurés de bout en bout et par étape." href="/explanation/performance/" />
+<LinkCard title="Fonctions du pipeline" description="Chaque fonction publique du module de détection." href="/reference/pipeline/" />

@@ -1,0 +1,76 @@
+---
+title: Grider
+description: Extraction de grilles de lignes et de colonnes à haute performance à partir d'images, en tant que bibliothèque Rust et CLI.
+template: splash
+hero:
+  title: Grider
+  tagline: Extrayez la grille de lignes et de colonnes d'une image — le squelette des tableaux, des feuilles de calcul et des mises en page de documents — avec une ligne de Rust ou une commande de terminal.
+  image:
+    file: ../../../assets/docs-overlay.png
+    alt: "Visualisation schématique de la grille produite par grider sur une capture d'écran de document : bandes de cellules gris clair traversées par des lignes de lignes rouges et des lignes de colonnes bleues."
+  actions:
+    - text: Extraire votre première grille
+      link: /tutorials/extract-your-first-grid/
+      icon: right-arrow
+    - text: Installation
+      link: /guides/install/
+      icon: download
+    - text: Référence de l'API
+      link: /reference/grid/
+      icon: document
+---
+
+import { Aside, Card, CardGrid, Code, LinkButton, LinkCard } from '@astrojs/starlight/components';
+
+Grider lit une image, la binarise avec un seuil adaptatif, détecte les plages de lignes de balayage d'arrière-plan et de contenu sur les deux axes, et les renvoie sous forme de [`Grid`](/reference/grid/) de [`Row`](/reference/lines-and-cells/)s et de `Column`s — chaque bande étant étiquetée `Empty` (arrière-plan) ou `Full` (contenu).
+
+<Code lang="toml" code={`[dependencies]
+grider = "0.3"`} />
+
+<Code lang="rust" code={`use grider::{Grid, GridConfig};
+use image::open;
+
+let img = open("path/to/image.png").expect("Failed to open image");
+let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).expect("Failed to create grid");
+
+for row in grid.rows() {
+    println!("Row at y: {} ({:?})", row.y, row.kind);
+}`} />
+
+<Aside kind="tip">
+        La fonctionnalité `drawing` rend cette visualisation de la grille détectée en un seul appel à
+        [`debug::save_image_with_grid`](/reference/drawing/) — la figure ci-dessus montre la sortie réelle de
+        l'outil en ligne de commande `grider` sur une capture d'écran de test.
+</Aside>
+
+## Pourquoi Grider
+
+- **Extraction en une ligne** — [`Grid::try_from_image_with_config`](/reference/grid/) retourne chaque bande de ligne et de colonne de l'image, étiquetée `Empty` ou `Full`.
+- **Rapide par construction** — la binarisation s'exécute sur une image intégrale à fenêtre glissante en streaming (1,6 à 3,1 fois plus rapide que le chemin précédent basé sur `imageproc`, sortie identique bit pour bit), le scan de vacuité est une seule passe fusionnée adaptée au cache, et les deux étapes se parallélisent sur des bandes de lignes avec un déclenchement basé sur la taille du travail. Voir [Performance](/explanation/performance/).
+- **Deux binariseurs** — le seuil de moyenne adaptative (Bradley & Roth) pour une entrée propre, ou [Sauvola](/guides/choose-binarization/) pour des documents dégradés, les deux en `O(largeur × hauteur)` quelle que soit la taille du rayon.
+- **API ergonomique** — des builders pour `GridConfig` et `GridDrawingConfig`, des itérateurs sur les cellules, des filtres basés sur le type, `retain` en place, le support de serde, et des superpositions de débogage visuelles.
+
+## Choisissez votre parcours
+
+<CardGrid stagger>
+        <Card title="Apprendre">
+                Suivez le [tutoriel de la première grille](/tutorials/extract-your-first-grid/) pour extraire, inspecter et dessiner une grille de zéro.
+        </Card>
+        <Card title="Résoudre une tâche">
+                Les [guides pratiques](/guides/install/) couvrent la configuration, le choix de binarisation, le filtrage, le dessin, la sérialisation JSON et la CLI.
+        </Card>
+        <Card title="Chercher quelque chose">
+                La [section de référence](/reference/grid/) documente chaque type public, fonction, macro, variante d'erreur et drapeau de CLI.
+        </Card>
+        <Card title="Comprendre la conception">
+                Les [pages de concept](/explanation/extraction-pipeline/) expliquent les étapes du pipeline et d'où vient la performance.
+        </Card>
+</CardGrid>
+
+<LinkButton href="/tutorials/extract-your-first-grid/" icon="right-arrow">Commencer le tutoriel</LinkButton>
+
+## Où aller ensuite
+
+- Exécutez le binaire sur vos propres images : [Utiliser la CLI](/guides/use-the-cli/).
+- Affinez la détection sur des entrées difficiles : [Configurer l'extraction](/guides/configure-extraction/).
+- Parcourez le code source : [github.com/elcoosp/grider](https://github.com/elcoosp/grider).

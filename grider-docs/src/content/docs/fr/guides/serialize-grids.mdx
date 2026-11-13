@@ -1,0 +1,89 @@
+---
+title: Sérialiser les grilles en JSON
+description: Faites un aller-retour des grilles et configurations via serde, gardez la compatibilité des configurations héritées et imprimez du JSON depuis la CLI.
+type: how-to
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+Ce guide montre comment sérialiser et désérialiser chaque type de données Grider avec la fonctionnalité `serde` par défaut — y compris le chemin JSON du binaire en ligne de commande et les règles de rétrocompatibilité introduites dans la 0.3.
+
+## Prérequis
+
+- Grider avec les fonctionnalités par défaut (`serde` est activé par défaut)
+
+## Sérialiser une grille
+
+`Grid`, `Row`, `Column`, `LineInfo`, `LineKind`, `GridConfig` et `Binarization` dérivent tous `Serialize` et `Deserialize` lorsque la fonctionnalité `serde` est activée :
+
+<Code lang="rust" code={`use grider::{Grid, GridConfig};
+use image::open;
+
+let img = open("tests/large.png").unwrap();
+let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();
+
+let json = serde_json::to_string_pretty(&grid).unwrap();
+println!("{json}");`} />
+
+Une `Grid` se sérialise en ses deux champs publics, `rows` et `columns` :
+
+<Code lang="json" code={`{
+    "rows": [
+  { "y": 0, "height": 11, "kind": "Empty" },
+  { "y": 11, "height": 18, "kind": "Empty" },
+  { "y": 46, "height": 177, "kind": "Full" }
+    ],
+    "columns": [
+  { "x": 0, "width": 4, "kind": "Empty" }
+    ]
+}`} />
+
+Le JSON ci-dessus est le vrai début de la sortie que la CLI 0.3.0 imprime pour la fixture `tests/large.png` du dépôt.
+
+## Faire un aller-retour d'une configuration
+
+La désérialisation restaure exactement une `GridConfig` — y compris une binarisation Sauvola :
+
+<Code lang="rust" code={`use grider::GridConfig;
+
+let config = GridConfig::builder().sauvola(0.45).build();
+let json = serde_json::to_string(&config).unwrap();
+let parsed: GridConfig = serde_json::from_str(&json).unwrap();
+assert_eq!(parsed, config);`} />
+
+## Garder les configurations héritées désérialisables
+
+La 0.3 a ajouté le champ `binarization` à `GridConfig`. Le champ porte `#[serde(default)]`, donc le JSON écrit par un programme 0.2 se désérialise toujours :
+
+<Code lang="rust" code={`use grider::GridConfig;
+
+let legacy = r#"{
+    "threshold_block_size": 12,
+    "threshold_delta": 0,
+    "merge_threshold_ratio": 0.8,
+    "enable_parallel": true
+}"#;
+let parsed: GridConfig = serde_json::from_str(legacy).unwrap();
+assert_eq!(parsed, GridConfig::default());`} />
+
+<Aside kind="caution">
+    Le même ajout casse les **littéraux de structure** : `GridConfig { threshold_block_size: 12, … }` ne compile plus
+    sans le champ `binarization`. Ajoutez le champ ou terminez le littéral avec
+    `..GridConfig::default()`.
+</Aside>
+
+## Imprimer du JSON depuis la CLI
+
+<Code lang="bash" code={`grider tests/large.png --json --quiet`} />
+
+`--json` imprime le JSON joli de toute la grille sur stdout et saute le fichier de superposition. Associez-le à `--quiet` lorsqu'une machine lit la sortie, car le résumé lisible par l'homme va aussi sur stdout.
+
+<Aside kind="note">
+    Compilé sans la fonctionnalité `serde`, le binaire imprime
+    `Skipping JSON output: built without the 'serde' feature` et sort avec succès.
+</Aside>
+
+## Étapes suivantes
+
+<LinkCard title="Utiliser la CLI" description="Chaque drapeau du binaire grider, avec des transcriptions réelles." href="/guides/use-the-cli/" />
+<LinkCard title="Drapeaux de fonctionnalité" description="Ce que serde, drawing et test-utils conditionnent." href="/reference/feature-flags/" />

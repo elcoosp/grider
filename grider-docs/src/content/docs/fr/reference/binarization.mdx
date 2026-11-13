@@ -1,0 +1,63 @@
+---
+title: Binarisation
+description: L'enum Binarization, les deux algorithmes de seuil et les fonctions publiques du module binarize.
+type: reference
+---
+
+import { Code, LinkCard } from '@astrojs/starlight/components';
+
+La binarisation transforme l'image en niveaux de gris en une image noir et blanc où l'arrière-plan est blanc (`255`) et le contenu est noir (`0`) ; le pipeline d'extraction cherche ensuite les lignes de balayage composées uniquement de pixels d'arrière-plan. Les deux algorithmes s'exécutent en `O(largeur × hauteur)` quelle que soit la taille du rayon, avec `O(largeur × rayon)` de mémoire supplémentaire.
+
+## L'enum
+
+<Code lang="rust" code={`pub enum Binarization {
+    AdaptiveMean,
+    Sauvola { k: f32 },
+}`} />
+
+Dérive `Debug`, `Clone`, `Copy`, `Default`, `PartialEq` (et `Serialize`/`Deserialize` avec la fonctionnalité `serde`). La variante par défaut est `AdaptiveMean`.
+
+### AdaptiveMean
+
+Le seuil de moyenne adaptative (Bradley & Roth, 2005). Un pixel est un arrière-plan lorsqu'il est au moins aussi lumineux que la moyenne de sa fenêtre moins [`threshold_delta`](/reference/grid-config/). La sortie est **identique bit pour bit** à `imageproc::contrast::adaptive_threshold`, vérifiée par des tests de propriétés.
+
+### Sauvola
+
+Le seuil de Sauvola & Pietikäinen (2000) pour les documents dégradés. Le seuil local suit la moyenne **et** l'écart type de la fenêtre, ce qui gère l'éclairage inégal et le faible contraste.
+
+| Champ | Signification |
+| :--- | :--- |
+| `k` | Sensibilité au contraste local, typiquement dans `[0.1, 0.5]` ; `0.2` est un bon défaut et le repli pour les valeurs non finies. [`threshold_delta`](/reference/grid-config/) n'est pas utilisé par cette méthode |
+
+L'écart type utilise la constante de plage dynamique `SAUVOLA_DYNAMIC_RANGE = 128.0` — pour les images en niveaux de gris 8 bits, l'écart est borné par `255 / 2`, et `128` est l'arrondi conventionnel de cette borne.
+
+## Constantes
+
+| Constante | Valeur | Signification |
+| :--- | :--- | :--- |
+| `SAUVOLA_DEFAULT_K` | `0.2` | Repli pour un `k` non fini |
+| `SAUVOLA_DYNAMIC_RANGE` | `128.0` | Plage d'écart type `R` dans la formule de Sauvola |
+| `MIN_BLOCK_RADIUS` (module binarize) | `1` | Borne inférieure du rayon de la fenêtre |
+
+## Fonctions
+
+| Fonction | Signature | Comportement |
+| :--- | :--- | :--- |
+| `binarize` | `(img: &GrayImage, config: &GridConfig) -> GrayImage` | Distribue sur `config.binarization` — l'entrée utilisée par le pipeline |
+| `adaptive_mean_threshold` | `(img: &GrayImage, block_radius: u32, delta: i32, parallel: bool) -> GrayImage` | Image intégrale à fenêtre glissante en streaming (Bradley & Roth) ; identique bit pour bit à `imageproc`, 1,6 à 3,1 fois plus rapide |
+| `sauvola_threshold` | `(img: &GrayImage, block_radius: u32, k: f32, parallel: bool) -> GrayImage` | Sauvola à image intégrale (Shafait et al. 2008) pour les documents dégradés |
+
+## Modèle mémoire
+
+Le binariseur à moyenne adaptative ne matérialise jamais une image intégrale complète. La mémoire supplémentaire de pointe est de deux bandes en streaming, `O(largeur × rayon)` :
+
+| Image | Image intégrale complète (`u32`) | Anneau de streaming (`f64`) |
+| :--- | ---: | ---: |
+| 1000 × 1000, r = 12 | ~4 Mo | ~104 Ko |
+| 4000 × 4000, r = 12 | ~64 Mo | ~1,7 Mo |
+| 4000 × 4000, r = 64 | ~64 Mo | ~8,3 Mo |
+
+## Étapes suivantes
+
+<LinkCard title="Choisir une méthode de binarisation" description="Guide de décision avec les valeurs de k et les drapeaux de CLI." href="/guides/choose-binarization/" />
+<LinkCard title="Le pipeline d'extraction" description="Où se situe la binarisation dans la conception globale." href="/explanation/extraction-pipeline/" />

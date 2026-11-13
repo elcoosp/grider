@@ -1,0 +1,118 @@
+---
+title: Grid
+description: Le type Grid — construction depuis des images, itérateurs, accès basé sur le type, filtrage, recherches de coordonnées et wrappers de compatibilité.
+type: reference
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+`Grid` est le résultat extrait du pipeline : chaque bande de ligne et de colonne d'une image, étiquetée [`Empty` ou `Full`](/reference/lines-and-cells/). Utilisez cette page pour trouver n'importe quelle méthode du type.
+
+## Définition
+
+<Code lang="rust" code={`pub struct Grid {
+    pub rows: SmallVecLine<Row>,
+    pub columns: SmallVecLine<Column>,
+}`} />
+
+- Les deux champs sont publics et contiennent les lignes dans des collections `SmallVecLine` (un type petit-vecteur avec une capacité en ligne de `32`, voir `detection::DEFAULT_SMALLVEC_SIZE`).
+- Dérive : `Debug`, `PartialEq`, `Clone` — plus `Serialize`/`Deserialize` avec la fonctionnalité `serde`.
+- Implémente `Display`, imprimant un résumé compact tel que `Grid { rows: 16, columns: 19 }`.
+- Les lignes stockent leur position (`Row::y` / `Column::x`), leur étendue (`height` / `width`) et leur [`LineKind`](/reference/lines-and-cells/).
+
+## Construction
+
+| Fonction | Signature | Comportement |
+| :--- | :--- | :--- |
+| `try_from_image_with_config` | `(&DynamicImage, GridConfig) -> Result<Self, GridError>` | Pipeline complet depuis n'importe quelle image ; les entrées déjà en gris sont empruntées en zéro-copie |
+| `try_from_gray_with_config` | `(&GrayImage, GridConfig) -> Result<Self, GridError>` | Même pipeline directement depuis une `GrayImage` — pas de conversion, pas de copie |
+| `try_from_binarized` | `(&GrayImage, GridConfig) -> Result<Self, GridError>` | Saute la binarisation ; sur la fixture de benchmark c'est **4,4 fois plus rapide** que le chemin complet |
+
+<Code lang="rust" code={`use grider::{Grid, GridConfig};
+use image::open;
+
+let img = open("tests/large.png").expect("Failed to open image");
+let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).expect("Failed to create grid");`} />
+
+Les trois valident l'image (une largeur ou hauteur nulle échoue avec [`GridError::InvalidDimensions`](/reference/errors/)) et la configuration.
+
+## Itérer et compter
+
+| Méthode | Retourne | Notes |
+| :--- | :--- | :--- |
+| `rows()` | `impl Iterator<Item = &Row>` | Chaque ligne, de haut en bas |
+| `columns()` | `impl Iterator<Item = &Column>` | Chaque colonne, de gauche à droite |
+| `rows_slice()` / `columns_slice()` | `&[Row]` / `&[Column]` | Emprunte le stockage sous-jacent |
+| `row_count()` / `column_count()` | `usize` | Nombre de lignes |
+| `is_empty()` | `bool` | Aucune ligne sur aucun axe |
+| `iter_cells()` | `impl Iterator<Item = Cell>` | Chaque intersection, ligne par ligne |
+| `cell(row_index, column_index)` | `Option<Cell>` | Recherche de cellule par index |
+| `dimensions()` | `(u32, u32)` | Plus grand `column.end()`, plus grand `row.end()` ; `0` par axe vide |
+
+## Accès basé sur le type
+
+| Méthode | Retourne |
+| :--- | :--- |
+| `rows_by_kind(kind)` | `impl Iterator<Item = &Row>` |
+| `columns_by_kind(kind)` | `impl Iterator<Item = &Column>` |
+| `count_rows_by_kind(kind)` | `usize` |
+| `count_columns_by_kind(kind)` | `usize` |
+| `keep_kind(kind)` | Nouvelle `Grid` avec seulement ce [`LineKind`](/reference/lines-and-cells/) sur les deux axes |
+
+## Filtrage par prédicat et en place
+
+| Méthode | Comportement |
+| :--- | :--- |
+| `filtered_rows(predicate)` | Itérateur sur les lignes correspondant à un prédicat |
+| `filtered_columns(predicate)` | Itérateur sur les colonnes correspondant à un prédicat |
+| `retain_rows(predicate)` | Supprime les lignes non correspondantes en place — le pendant sans allocation des filtres de copie |
+| `retain_columns(predicate)` | Idem pour les colonnes |
+
+## Filtres de taille
+
+Chaque méthode retourne une nouvelle `Grid` et laisse l'originale intacte. Les variantes sans tolérance comparent les tailles avec une tolérance par défaut intégrée de `0.1`.
+
+| Méthode | Supprime |
+| :--- | :--- |
+| `filter_smallest_rows()` / `filter_smallest_rows_with_tolerance(t)` | Lignes à la hauteur minimale |
+| `filter_biggest_rows()` / `filter_biggest_rows_with_tolerance(t)` | Lignes à la hauteur maximale — en-têtes et pieds de page |
+| `filter_smallest_columns()` / `filter_smallest_columns_with_tolerance(t)` | Colonnes à la largeur minimale |
+| `filter_biggest_columns()` / `filter_biggest_columns_with_tolerance(t)` | Colonnes à la largeur maximale |
+
+Accesseurs de taille : `smallest_row_height()`, `biggest_row_height()`, `smallest_column_width()`, `biggest_column_width()` — chacun `Option<u32>`, `None` sur un axe vide.
+
+## Recherches de coordonnées
+
+| Méthode | Recherche | Résultat |
+| :--- | :--- | :--- |
+| `find_row(y)` | Ligne commençant à `y` | `Option<&Row>` |
+| `find_column(x)` | Colonne commençant à `x` | `Option<&Column>` |
+| `find_cells(row_positions, column_positions)` | Coordonnées `y` et `x` en `&[u32]` | Itérateur de `Result<Cell, GridError>` |
+
+`find_cells` produit des erreurs [`RowNotFound`](/reference/errors/) / `ColumnNotFound` pour les coordonnées où aucune bande ne commence :
+
+<Code lang="rust" code={`let cells = grid.find_cells(&[1, 2, 3], &[4, 5, 6]);
+for cell in cells {
+    match cell {
+                    Ok(c) => println!("Found cell at row {}, column {}", c.row.y, c.column.x),
+                    Err(e) => eprintln!("Error finding cell: {e}"),
+    }
+}`} />
+
+## Wrappers de compatibilité du pipeline
+
+`Grid` ré-expose les internes de détection comme fonctions associées, donc un seul import sert les deux niveaux (voir la [référence du pipeline](/reference/pipeline/) pour la sémantique) :
+
+| Fonction associée | Délègue à |
+| :--- | :--- |
+| `Grid::is_row_empty(img, y, width)` | `detection::is_row_empty` |
+| `Grid::is_column_empty(img, x, height)` | `detection::is_column_empty` |
+| `Grid::collect_lines(img, primary_dim, secondary_dim, is_empty_fn)` | `detection::collect_lines` |
+| `Grid::process_dimension(img, primary_dim, secondary_dim, ratio, is_empty_fn)` | `detection::process_dimension` |
+| `Grid::merge_small_lines(lines, threshold)` | `detection::merge_small_lines` |
+| `Grid::calculate_average_line_size(lines)` | `detection::calculate_average_line_size` |
+
+## Étapes suivantes
+
+<LinkCard title="Lignes et cellules" description="Row, Column, Cell, LineInfo, LineKind et le trait de fabrique LineTrait." href="/reference/lines-and-cells/" />
+<LinkCard title="Filtrer les lignes de la grille" description="Recettes qui combinent ces méthodes." href="/guides/filter-lines/" />

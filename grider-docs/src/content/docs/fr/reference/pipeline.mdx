@@ -1,0 +1,80 @@
+---
+title: Fonctions du pipeline
+description: Les internes publics de détection — scan des drapeaux, encodage par plages, fusion de lignes et traitement par dimension.
+type: reference
+---
+
+import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
+
+Les internes du pipeline d'extraction sont publics dans le module `detection`, et `Grid` ré-expose les plus utiles comme [fonctions associées](/reference/grid/). Composez-les lorsque vous avez besoin d'un pipeline personnalisé ; sinon, appelez `Grid::try_from_image_with_config` une fois.
+
+## Prédicats de vacuité
+
+| Fonction | Signature | Comportement |
+| :--- | :--- | :--- |
+| `is_row_empty` | `(img: &GrayImage, y: u32, width: u32) -> bool` | `true` lorsque la ligne de balayage `y` ne contient que des pixels d'arrière-plan |
+| `is_column_empty` | `(img: &GrayImage, x: u32, height: u32) -> bool` | `true` lorsque la ligne de balayage `x` ne contient que des pixels d'arrière-plan |
+
+Les deux traitent le blanc (`255`) comme arrière-plan après binarisation.
+
+## LineFlags
+
+<Code lang="rust" code={`pub struct LineFlags {
+    pub rows: Vec<bool>,
+    pub columns: Vec<bool>,
+}`} />
+
+Vacuité de chaque ligne (indexée par `y`) et de chaque colonne (indexée par `x`) ; `true` signifie arrière-plan uniquement.
+
+## scan_line_flags
+
+<Code lang="rust" code={`pub fn scan_line_flags(img: &GrayImage, parallel: bool) -> LineFlags`} />
+
+Calcule les drapeaux de ligne et de colonne ensemble dans une **seule passe fusionnée et adaptée au cache** (~0,4 ns/pixel sur la machine de benchmark). Avec `parallel: true`, le travail se répartit sur des bandes de lignes ; les heuristiques retombent sur le chemin séquentiel lorsque la coordination rayon coûterait plus qu'elle ne rapporte.
+
+## Encodage par plages et fusion
+
+| Fonction | Signature | Comportement |
+| :--- | :--- | :--- |
+| `run_length_encode` | `(flags: &[bool]) -> Vec<LineInfo>` | Encode les plages de `true` (`Empty`) et `false` (`Full`) en plages `LineInfo` |
+| `calculate_average_line_size` | `(lines: &[LineInfo]) -> u32` | Longueur moyenne de plage ; `0` pour une tranche vide |
+| `merge_small_lines` | `(lines: Vec<LineInfo>, threshold: u32) -> SmallVecLine<LineInfo>` | Colle les plages plus courtes que `threshold` dans leur voisine, de gauche à droite ; les plages fusionnées couvrent toujours la même étendue totale que l'entrée |
+| `lines_from_flags` | `(flags: &[bool], merge_threshold_ratio: f32) -> SmallVecLine<T>` | Encode, moyenne, calcule le seuil de fusion à partir du ratio, fusionne et convertit en `T: LineTrait + Send` |
+
+Le pipeline dérive le seuil de fusion comme `merge_threshold_for(average_size, ratio)` — les plages plus courtes que `ratio × moyenne` fusionnent dans leur voisine. La fusion garde le type de la plage en cours de construction, et les plages fusionnées couvrent la même étendue totale que l'entrée :
+
+<Code lang="rust" code={`use grider::detection::merge_small_lines;
+use grider::{LineInfo, LineKind};
+
+let lines = vec![
+    LineInfo::new(0, 5, LineKind::Empty),
+    LineInfo::new(5, 3, LineKind::Empty),
+    LineInfo::new(8, 10, LineKind::Full),
+];
+let merged = merge_small_lines(lines, 4);
+assert_eq!(merged.len(), 2);`} />
+
+## collect_lines et process_dimension
+
+| Fonction | Signature | Comportement |
+| :--- | :--- | :--- |
+| `collect_lines` | `(img, primary_dim, secondary_dim, is_empty_fn) -> Vec<LineInfo>` | Collecte les plages initiales (non fusionnées) d'un axe. `is_empty_fn` est appelée une fois par ligne de balayage avec `(image, line_index, secondary_dimension)`, permettant des définitions personnalisées de vide |
+| `process_dimension` | `(img, primary_dim, secondary_dim, merge_threshold_ratio, is_empty_fn) -> Result<SmallVecLine<T>, GridError>` | Pipeline complet par axe — drapeaux, encodage, fusion, conversion — pour `T: LineTrait + Send` ; échoue avec [`InvalidDimensions`](/reference/errors/) sur une dimension nulle |
+
+<Aside kind="note">
+    Les prédicats intégrés `is_row_empty` / `is_column_empty` implémentent le comportement standard. Passez une
+    fermeture personnalisée à `collect_lines` ou `process_dimension` lorsque vous avez besoin, par exemple, d'une tolérance
+    au niveau de gris.
+</Aside>
+
+## Constantes
+
+| Constante | Valeur | Signification |
+| :--- | :--- | :--- |
+| `DEFAULT_SMALLVEC_SIZE` | `32` | Capacité en ligne des collections `SmallVecLine` qui soutiennent [`Grid`](/reference/grid/) |
+| `MIN_BLOCK_SIZE` | `3` | Alias de `MIN_THRESHOLD_BLOCK_SIZE` |
+
+## Étapes suivantes
+
+<LinkCard title="Le pipeline d'extraction" description="Comment ces fonctions se composent de bout en bout." href="/explanation/extraction-pipeline/" />
+<LinkCard title="Binarisation" description="L'étape qui alimente ces fonctions." href="/reference/binarization/" />

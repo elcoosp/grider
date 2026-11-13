@@ -1,0 +1,78 @@
+---
+title: Performance
+description: D'où vient la vitesse — benchmarks mesurés de bout en bout et par étape, complexité et comportement mémoire.
+type: explanation
+---
+
+import { LinkCard, Aside } from '@astrojs/starlight/components';
+
+Grider est conçu pour faire de l'extraction de grille la partie bon marché de votre pipeline. Cette page résume les chiffres mesurés et les décisions de conception derrière eux. Tous les chiffres ci-dessous proviennent des suites de critères dans `benches/` du dépôt (`cargo bench --features test-utils`), mesurés sur une machine Linux x86-64 à 2 vCPU avec `sample_size = 20`, comparant le pipeline 0.2 au pipeline 0.3 avec `--save-baseline`. Chaque changement est statistiquement significatif (`p = 0,00 < 0,05`) ; le ratio médian est rapporté.
+
+## Extraction de bout en bout par taille d'image
+
+`Grid::try_from_image_with_config`, motif Checkerboard, configuration par défaut :
+
+| Taille | 0.2 | 0.3 | Accélération |
+| :--- | ---: | ---: | ---: |
+| 100 × 100 | 84,7 µs | 28,5 µs | **3,09×** |
+| 500 × 500 | 1,052 ms | 594 µs | **1,87×** |
+| 1000 × 1000 | 3,800 ms | 1,744 ms | **2,17×** |
+| 2000 × 2000 | 14,96 ms | 6,855 ms | **2,22×** |
+| 4000 × 4000 | 66,38 ms | 26,10 ms | **2,55×** |
+
+L'accélération tient à travers les motifs : Checkerboard 2,15×, HorizontalStripes 2,24×, VerticalStripes 2,29×, Sparse 2,76×, Dense 2,22× (tous à 1000 × 1000).
+
+## Où passe le temps
+
+### Binarisation
+
+| Image | `imageproc::adaptive_threshold` | `grider` séquentiel | `grider` parallèle | `grider` Sauvola |
+| :--- | ---: | ---: | ---: | ---: |
+| 1000 × 1000 | 3,765 ms | 1,912 ms (**1,97×**) | 1,429 ms (**2,63×**) | 3,777 ms |
+| 4000 × 4000 | 65,36 ms | 30,90 ms (**2,12×**) | 20,81 ms (**3,14×**) | 61,94 ms |
+
+Sauvola coûte à peu près le même prix que l'ancienne moyenne adaptative tout en fournissant le seuil local de pointe pour les documents dégradés — la moyenne adaptative elle-même est devenue 2 à 3 fois plus rapide dans la même version.
+
+### Scan de vacuité fusionné
+
+| Image | Séquentiel | Parallèle |
+| :--- | ---: | ---: |
+| 1000 × 1000 | 382 µs (~0,38 ns/px) | 379 µs |
+| 4000 × 4000 | 6,52 ms (~0,41 ns/px) | 5,08 ms |
+
+Sur une machine à 2 vCPU, le scan est limité par la bande passante, donc le parallélisme ne paie qu'à de très grandes tailles ; les heuristiques de taille de travail retombent sur le chemin séquentiel lorsque la coordination rayon coûterait plus qu'elle ne rapporte.
+
+### Points d'entrée
+
+| Point d'entrée | Temps (Dense 1000², config par défaut) | Notes |
+| :--- | ---: | :--- |
+| `try_from_image_with_config` (Luma8) | 1,701 ms | emprunt gris zéro-copie |
+| `try_from_image_with_config` (RGB) | 4,982 ms | la conversion de couleur domine |
+| `try_from_gray_with_config` | 1,721 ms | pas d'enveloppe d'image dynamique |
+| `try_from_binarized` | 386 µs | saute la binarisation — **4,4× vs. le chemin complet** |
+
+## Mémoire
+
+Le binariseur à moyenne adaptative diffuse deux bandes de fenêtre au lieu de matérialiser une image intégrale complète — la mémoire supplémentaire de pointe est `O(largeur × rayon)` au lieu de `O(largeur × hauteur)` :
+
+| Image | Image intégrale complète (`u32`) | Anneau de streaming (`f64`) |
+| :--- | ---: | ---: |
+| 1000 × 1000, r = 12 | ~4 Mo | ~104 Ko |
+| 4000 × 4000, r = 12 | ~64 Mo | ~1,7 Mo |
+| 4000 × 4000, r = 64 | ~64 Mo | ~8,3 Mo |
+
+## Points à retenir en pratique
+
+- Préférez l'entrée `Luma8` — la conversion RGB coûte plus cher que toute l'extraction.
+- Préférez `try_from_binarized` lorsque vos images sont déjà binaires.
+- Laissez le parallélisme activé pour les images de plus de quelques mégapixels ; désactivez-le (`--no-parallel` / `.parallel(false)`) pour les petites images ou les exécutions reproductibles.
+
+<Aside kind="note">
+    Reproduisez la comparaison sur votre propre machine :
+    `cargo bench --features test-utils -- --save-baseline before` sur 0.2, `--save-baseline after`
+    sur 0.3, puis `--baseline before` pour la comparaison.
+</Aside>
+
+## Étapes suivantes
+
+<LinkCard title="Le pipeline d'extraction" description="La conception derrière ces chiffres, étape par étape." href="/explanation/extraction-pipeline/" />

@@ -1,0 +1,65 @@
+---
+title: Macros
+description: make_line! et make_grid! — constructeurs concis pour les lignes, les colonnes et les grilles entières.
+type: reference
+---
+
+import { Code, LinkCard } from '@astrojs/starlight/components';
+
+Les deux macros exportées construisent des primitives de ligne et des grilles entières à partir de tuples, ce qui garde les fixtures de test lisibles. Les deux sont disponibles via `grider::*`.
+
+## make_line!
+
+Crée une `Row` ou une `Column` à partir d'un tuple. Le type par défaut est `LineKind::Empty` lorsqu'il est omis.
+
+| Forme | Se développe en |
+| :--- | :--- |
+| `make_line!(Row, ($y, $height, $kind))` | Ligne à `y` avec `height` et le type donné |
+| `make_line!(Row, ($y, $height))` | Ligne avec `LineKind::Empty` |
+| `make_line!(Column, ($x, $width, $kind))` | Colonne à `x` avec `width` et le type donné |
+| `make_line!(Column, ($x, $width))` | Colonne avec `LineKind::Empty` |
+
+<Code lang="rust" code={`use grider::*;
+
+// With LineKind::Full
+let row = make_line!(Row, (0, 10, LineKind::Full));
+assert_eq!(row.y, 0);
+assert_eq!(row.height, 10);
+assert_eq!(row.kind, LineKind::Full);
+
+// Without LineKind (defaults to LineKind::Empty)
+let row = make_line!(Row, (10, 20));
+assert_eq!(row.y, 10);
+assert_eq!(row.height, 20);
+assert_eq!(row.kind, LineKind::Empty);`} />
+
+## make_grid!
+
+Crée une [`Grid`](/reference/grid/) à partir de listes de tuples de lignes et de colonnes. Une virgule finale après chaque tuple est optionnelle.
+
+<Code lang="rust" code={`use grider::{make_grid, LineKind};
+
+let grid = make_grid!(
+    rows: [
+                    (0, 10),                  // Row at y=0, height=10, LineKind::Empty
+                    (10, 20, LineKind::Full), // Row at y=10, height=20, LineKind::Full
+    ],
+    columns: [
+                    (0, 5),                   // Column at x=0, width=5, LineKind::Empty
+                    (5, 15, LineKind::Full),  // Column at x=5, width=15, LineKind::Full
+    ]
+);
+
+assert_eq!(grid.rows.len(), 2);
+assert_eq!(grid.columns.len(), 2);`} />
+
+Notes :
+
+- Un `LineKind` omis par défaut est `LineKind::Empty`.
+- La `Grid` résultante stocke les lignes et colonnes dans des collections `SmallVecLine`.
+- `make_grid!` se compose avec chaque méthode de requête — les macros existent pour que les tests puissent construire des grilles exactes sans image.
+
+## Étapes suivantes
+
+<LinkCard title="Lignes et cellules" description="Les types que ces macros construisent." href="/reference/lines-and-cells/" />
+<LinkCard title="Grid" description="Interrogez les grilles construites." href="/reference/grid/" />

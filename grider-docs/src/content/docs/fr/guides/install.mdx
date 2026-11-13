@@ -1,0 +1,66 @@
+---
+title: Installation
+description: Ajoutez Grider à un projet Rust ou installez le binaire en ligne de commande, avec les notes sur la MSRV et les fonctionnalités.
+type: how-to
+---
+
+import { Aside, Code, LinkCard, Steps, TabItem, Tabs } from '@astrojs/starlight/components';
+
+Ce guide intègre la bibliothèque Grider dans un projet Rust et le binaire `grider` dans votre `PATH`.
+
+## Prérequis
+
+- Rust 1.89 ou plus récent — Grider définit `rust-version = "1.89"` dans son manifeste. Vérifiez le vôtre avec `rustc --version`.
+- Accès réseau à [crates.io](https://crates.io/crates/grider).
+
+## Installer la bibliothèque
+
+<Tabs>
+    <TabItem label="cargo add">
+<Code lang="bash" code={`     cargo add grider`} />
+    </TabItem>
+    <TabItem label="Cargo.toml">
+<Code lang="toml" code={`[dependencies]
+grider = "0.3"`} />
+    </TabItem>
+</Tabs>
+
+Puis importez le crate dans votre code :
+
+<Code lang="rust" code={`use grider::*;`} />
+
+L'import global de style prélude expose les types principaux : [`Grid`](/reference/grid/), [`GridConfig`](/reference/grid-config/), [`Row`](/reference/lines-and-cells/), `Column`, [`Cell`](/reference/lines-and-cells/), [`LineKind`](/reference/lines-and-cells/), [`GridError`](/reference/errors/), l'enum `Binarization` et les macros `make_grid!` / `make_line!`.
+
+## Installer le binaire CLI
+
+Le même crate construit un binaire en ligne de commande avec le même pipeline d'extraction :
+
+<Code lang="bash" code={`cargo install grider`} />
+
+Vérifiez l'installation :
+
+<Code lang="bash" code={`grider --version`} />
+
+<Aside kind="note">
+    Passez `--locked` à `cargo install` si vous voulez les versions de dépendances avec lesquelles la version a été testée :
+    `cargo install grider --locked`.
+</Aside>
+
+## Choisir vos drapeaux de fonctionnalité
+
+Deux fonctionnalités sont activées par défaut ; vous n'y touchez que lorsque vous réduisez la compilation ou avez besoin de fixtures de test :
+
+| Fonctionnalité | Défaut | Objectif | Référence |
+| :--- | :--- | :--- | :--- |
+| `serde` | activée | `Serialize`/`Deserialize` pour tous les types de données, sortie JSON dans la CLI | [Drapeaux de fonctionnalité](/reference/feature-flags/) |
+| `drawing` | activée | Le dessin de grille et les helpers de superposition `debug` | [API de dessin](/reference/drawing/) |
+| `test-utils` | désactivée | Fixtures d'images partagées pour les tests et benchmarks | [Drapeaux de fonctionnalité](/reference/feature-flags/) |
+
+<Code lang="bash" code={`# Everything except serde and drawing:
+cargo add grider --no-default-features
+# Test fixtures only, for development:
+cargo add grider --features test-utils`} />
+
+## Étapes suivantes
+
+<LinkCard title="Extraire votre première grille" description="Le tutoriel étape par étape d'un projet vide à une grille dessinée." href="/tutorials/extract-your-first-grid/" />
