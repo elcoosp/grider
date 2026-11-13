@@ -60,8 +60,8 @@ export default await defineDocsConfig({
                                 {
                                         label: 'Start here', translations: { fr: "Commencer ici" },
                                         items: [
-                                                { label: 'Overview', translations: { fr: 'Aperçu' }, link: '/' },
-                                                { label: 'Installation', translations: { fr: "Installation" }, link: '/guides/install/' },
+                                                { label: 'Overview', link: '/' },
+                                                { label: 'Installation', link: '/guides/install/' },
                                                 {
                                                         label: 'Extract your first grid', translations: { fr: "Extraire votre première grille" },
                                                         link: '/tutorials/extract-your-first-grid/'
@@ -69,7 +69,7 @@ export default await defineDocsConfig({
                                         ]
                                 },
                                 {
-                                        label: 'How-to guides', translations: { fr: 'Guides pratiques' },
+                                        label: 'How-to guides',
                                         items: [
                                                 { label: 'Configure extraction', translations: { fr: "Configurer l'extraction" }, link: '/guides/configure-extraction/' },
                                                 {
@@ -83,7 +83,7 @@ export default await defineDocsConfig({
                                         ]
                                 },
                                 {
-                                        label: 'Reference', translations: { fr: 'Référence' },
+                                        label: 'Reference',
                                         items: [
                                                 { label: 'Grid', translations: { fr: "Grille" }, link: '/reference/grid/' },
                                                 { label: 'Lines and cells', translations: { fr: "Lignes et cellules" }, link: '/reference/lines-and-cells/' },
@@ -91,14 +91,14 @@ export default await defineDocsConfig({
                                                 { label: 'Binarization', translations: { fr: "Binarisation" }, link: '/reference/binarization/' },
                                                 { label: 'Drawing API', translations: { fr: "API de dessin" }, link: '/reference/drawing/' },
                                                 { label: 'Pipeline functions', translations: { fr: "Fonctions du pipeline" }, link: '/reference/pipeline/' },
-                                                { label: 'Macros', translations: { fr: "Macros" }, link: '/reference/macros/' },
-                                                { label: 'Errors', translations: { fr: "Erreurs" }, link: '/reference/errors/' },
-                                                { label: 'CLI', translations: { fr: "CLI" }, link: '/reference/cli/' },
-                                                { label: 'Feature flags', translations: { fr: "Drapeaux de fonctionnalités" }, link: '/reference/feature-flags/' },
+                                                { label: 'Macros', link: '/reference/macros/' },
+                                                { label: 'Errors', link: '/reference/errors/' },
+                                                { label: 'CLI', link: '/reference/cli/' },
+                                                { label: 'Feature flags', link: '/reference/feature-flags/' },
                                         ]
                                 },
                                 {
-                                        label: 'Concepts', translations: { fr: "Concepts" },
+                                        label: 'Concepts',
                                         items: [
                                                 { label: 'The extraction pipeline', translations: { fr: "Le pipeline d'extraction" }, link: '/explanation/extraction-pipeline/' },
                                                 { label: 'Performance', translations: { fr: "Performances" }, link: '/explanation/performance/' },
