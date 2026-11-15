@@ -1,0 +1,66 @@
+---
+title: Extracting table grids from images without OpenCV
+date: 2026-11-15
+cover:
+  alt: Grider Architecture
+  image: ./welcome-cover.jpg
+image: ./welcome-cover.jpg
+---
+
+import { Card, CardGrid, Aside } from '@astrojs/starlight/components';
+
+Before you can parse a spreadsheet screenshot or route cells to OCR, you need to know where the whitespace bands are. Pulling in OpenCV or an object-detection model just to find horizontal and vertical gutters adds gigabytes of dependencies for a problem that is mostly pixel arithmetic.
+
+Grider finds row and column bands in pure Rust using adaptive thresholding and a single pass over pixel runs.
+
+## The Goal
+
+We wanted a Rust library and CLI (`grider` 0.3) that takes a raster image and returns a `Grid` of `Row` and `Column` bands tagged `Empty` or `Full`. It needed to handle both clean digital UI screenshots and unevenly lit scanned documents without manual per-image threshold tuning.
+
+## How it works
+
+Grider converts the image to grayscale, binarizes it into foreground and background pixels, and scans both axes to group contiguous runs.
+
+<CardGrid stagger>
+  <Card title="Sliding-Window Integral Image" icon="rocket">
+    Binarization runs in `O(width × height)` time regardless of window radius using a streaming integral image.
+  </Card>
+  <Card title="Two Binarization Algorithms" icon="setting">
+    Bradley & Roth adaptive mean for crisp digital input, and Sauvola local thresholding for degraded scans.
+  </Card>
+  <Card title="Fused Emptiness Pass" icon="puzzle">
+    Row and column runs are collected in one cache-friendly pass, parallelized across row bands when image size justifies thread dispatch.
+  </Card>
+  <Card title="Debug Overlays" icon="approve-check">
+    Enabling the `drawing` feature renders detected row and column boundaries directly onto the input image for visual inspection.
+  </Card>
+</CardGrid>
+
+## What it cost
+
+Our initial implementation used `imageproc`'s generic adaptive threshold routines. Replacing that path with a custom streaming integral image made binarization 1.6× to 3.1× faster in our benchmarks while keeping bit-for-bit identical output. The trade-off is maintaining our own border-clamping math and work-size-gated band scheduler.
+
+<Aside type="caution" title="Where this does not apply">
+Grider assumes axis-aligned rectangular layouts. If a scanned page is rotated by even a few degrees, horizontal scan lines cross multiple text rows and collapse them into a single `Full` band. Deskewing must happen before passing the image to Grider.
+</Aside>
+
+## Getting started
+
+```toml
+[dependencies]
+grider = "0.3"
+image = "0.25"
+```
+
+```rust
+use grider::{Grid, GridConfig};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let img = image::open("table.png")?;
+    let grid = Grid::try_from_image_with_config(&img, GridConfig::default())?;
+    println!("Detected {} rows and {} columns", grid.rows().len(), grid.columns().len());
+    Ok(())
+}
+```
+
+Follow the [tutorial](/tutorials/extract-your-first-grid/) to run the CLI and inspect a grid overlay.
