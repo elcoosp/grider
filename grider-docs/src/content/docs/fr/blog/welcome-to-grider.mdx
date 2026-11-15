@@ -1,0 +1,66 @@
+---
+title: Extraire des grilles de tableaux depuis des images sans OpenCV
+date: 2026-11-15
+cover:
+  alt: Architecture de Grider
+  image: ../../blog/welcome-cover.jpg
+image: ../../blog/welcome-cover.jpg
+---
+
+import { Card, CardGrid, Aside } from '@astrojs/starlight/components';
+
+Avant de pouvoir analyser une capture d'écran de tableur ou d'envoyer des cellules vers un moteur OCR, il faut savoir où se trouvent les bandes d'espacement. Embarquer OpenCV ou un modèle de détection d'objets uniquement pour repérer des gouttières horizontales et verticales ajoute des gigaoctets de dépendances pour un problème qui relève essentiellement d'arithmétique de pixels.
+
+Grider détecte les bandes de lignes et de colonnes en Rust pur à l'aide d'un seuillage adaptatif et d'un parcours unique sur les séquences de pixels.
+
+## L'objectif
+
+Nous voulions une bibliothèque Rust et une CLI (`grider` 0.3) qui prennent une image matricielle et renvoient une `Grid` de bandes `Row` et `Column` marquées `Empty` ou `Full`. L'outil devait traiter aussi bien des captures d'écran d'interfaces numériques nettes que des documents numérisés à l'éclairage irrégulier, sans réglage manuel de seuil par image.
+
+## Fonctionnement
+
+Grider convertit l'image en niveaux de gris, la binarise en pixels de premier plan et d'arrière-plan, puis balaie les deux axes pour regrouper les séquences contiguës.
+
+<CardGrid stagger>
+  <Card title="Image intégrale à fenêtre glissante" icon="rocket">
+    La binarisation s'exécute en temps `O(largeur × hauteur)` quel que soit le rayon de fenêtre grâce à une image intégrale en flux.
+  </Card>
+  <Card title="Deux algorithmes de binarisation" icon="setting">
+    Moyenne adaptative de Bradley & Roth pour les entrées numériques nettes, et seuillage local de Sauvola pour les numérisations dégradées.
+  </Card>
+  <Card title="Passe de vacuité fusionnée" icon="puzzle">
+    Les séquences de lignes et de colonnes sont collectées en une seule passe favorable au cache, parallélisée par bandes de lignes lorsque la taille de l'image justifie l'envoi sur plusieurs threads.
+  </Card>
+  <Card title="Superpositions de débogage" icon="approve-check">
+    L'activation de la fonctionnalité `drawing` trace directement les frontières de lignes et de colonnes détectées sur l'image d'entrée pour inspection visuelle.
+  </Card>
+</CardGrid>
+
+## Ce que cela a coûté
+
+Notre première implémentation utilisait les routines génériques de seuillage adaptatif d'`imageproc`. Le remplacement de ce chemin par une image intégrale en flux sur mesure a accéléré la binarisation de 1,6× à 3,1× dans nos benchmarks tout en conservant une sortie identique au bit près. Le compromis consiste à maintenir nos propres calculs de bornage aux bords et notre ordonnanceur de bandes conditionné par la charge de travail.
+
+<Aside type="caution" title="Cas où cela ne s'applique pas">
+Grider suppose des mises en page rectangulaires alignées sur les axes. Si une page numérisée est inclinée ne serait-ce que de quelques degrés, les lignes de balayage horizontales traversent plusieurs lignes de texte et les fusionnent en une seule bande `Full`. Le redressement (deskew) doit être effectué avant de transmettre l'image à Grider.
+</Aside>
+
+## Démarrer
+
+```toml
+[dependencies]
+grider = "0.3"
+image = "0.25"
+```
+
+```rust
+use grider::{Grid, GridConfig};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let img = image::open("table.png")?;
+    let grid = Grid::try_from_image_with_config(&img, GridConfig::default())?;
+    println!("Detected {} rows and {} columns", grid.rows().len(), grid.columns().len());
+    Ok(())
+}
+```
+
+Suivez le [tutoriel](/fr/tutorials/extract-your-first-grid/) pour exécuter la CLI et inspecter une superposition de grille.
