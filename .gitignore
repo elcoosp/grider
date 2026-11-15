@@ -10,3 +10,7 @@ output.png
 Cargo.lock.bak
 .vercel
 .env*
+
+# Build-time backups
+*.bak
+*.orig
