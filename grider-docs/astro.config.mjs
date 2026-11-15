@@ -1,5 +1,4 @@
 import { defineDocsConfig } from '@elcoosp/docs-toolkit/config';
-import starlightImageZoom from 'starlight-image-zoom';
 import starlightHeadingBadges from 'starlight-heading-badges';
 import starlightLlmsTxt from 'starlight-llms-txt';
 export default await defineDocsConfig({
@@ -45,9 +44,7 @@ export default await defineDocsConfig({
                         plugins: [
                                 // Fails the build on broken internal links (release gate).
                                 
-                                // Click-to-zoom on figures (input vs. overlay comparisons).
-                                starlightImageZoom(),
-                                // Badges in headings, e.g. `:badge[serde]{variant="note"}`.
+                                // Click-to-zoom on figures (input vs. overlay comparisons). // Badges in headings, e.g. `:badge[serde]{variant="note"}`.
                                 starlightHeadingBadges(),
                                 // Emits llms.txt, llms-full.txt, llms-small.txt and per-page .txt files.
                                 starlightLlmsTxt({
