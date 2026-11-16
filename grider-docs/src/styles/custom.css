@@ -23,9 +23,9 @@
 
 :root,
 :root[data-theme='dark'] {
-	--sl-color-accent-low: hsl(0 30% 16%);
-	--sl-color-accent: hsl(0 30% 60%);
-	--sl-color-accent-high: hsl(0 30% 75%);
+	--sl-color-accent-low: hsl(211 45% 16%);
+	--sl-color-accent: hsl(211 55% 62%);
+	--sl-color-accent-high: hsl(211 65% 78%);
 }
 
 :root[data-theme='light'] {
