@@ -1,23 +1,16 @@
 import { defineDocsConfig } from '@elcoosp/docs-toolkit/config';
-import starlightLlmsTxt from 'starlight-llms-txt';
 export default await defineDocsConfig({
   llmsTxt: {},
   site: 'https://grider-docs.vercel.app',
   domain: 'grider-docs.vercel.app',
   title: "Grider",
   description: "High-performance row and column grid extraction from images, as a Rust library and a CLI.",
-  sidebar: [],
   extraStarlight: {
-                        expressiveCode: {
-                        	themes: ['github-light', 'github-dark']
-                        },
                         title: 'Grider',
                         description:
                                 'High-performance row and column grid extraction from images, as a Rust library and a CLI.',
-                        favicon: '/favicon.png',
                         // The docs collection provides src/content/docs/404.md; the built-in
                         // dedicated /404 route is disabled so the two do not conflict.
-                        disable404Route: true,
 				// `root` marks the unprefixed default locale in current Starlight;
 				// a key named after the language would create a /en/ prefixed locale.
                         head: [
@@ -45,11 +38,6 @@ export default await defineDocsConfig({
                                 
                                 // Click-to-zoom on figures (input vs. overlay comparisons). // Badges in headings, e.g. `:badge[serde]{variant="note"}`.
                                 // Emits llms.txt, llms-full.txt, llms-small.txt and per-page .txt files.
-                                starlightLlmsTxt({
-                                        projectName: 'Grider',
-                                        description:
-                                                'Documentation for Grider, a high-performance Rust library and CLI that extracts the row and column grid of an image.'
-                                }),
                         ],
                         sidebar: [
                                 {
