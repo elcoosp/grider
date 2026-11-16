@@ -23,12 +23,12 @@ Vous écrivez un petit programme qui transforme cette capture d'écran de tablea
 
 ## 1. Créer un projet
 
-<Code lang="bash" code={`cargo new hello-grider
+<Code lang="bash" title="Terminal" code={`cargo new hello-grider
 cd hello-grider`} />
 
 ## 2. Ajouter la dépendance
 
-<Code lang="bash" code={`cargo add grider`} />
+<Code lang="bash" title="Terminal" code={`cargo add grider`} />
 
 Cela ajoute la dernière version publiée — `0.3` — à votre `Cargo.toml`. Grider prend en charge Rust 1.89 et plus récent et est livré avec les fonctionnalités `serde` et `drawing` activées.
 
@@ -42,7 +42,7 @@ Cela ajoute la dernière version publiée — `0.3` — à votre `Cargo.toml`. G
 
 Remplacez le contenu de `src/main.rs` par du code qui ouvre un fichier image avec le crate `image`. Grider accepte n'importe quelle `DynamicImage` et convertit les images non-grises pour vous :
 
-<Code lang="rust" code={`use grider::{Grid, GridConfig};
+<Code lang="rust" title="src/main.rs" code={`use grider::{Grid, GridConfig};
 use image::open;
 
 fn main() {
@@ -130,7 +130,7 @@ columns:
 
 Le crate livre un binaire avec les mêmes pouvoirs que la bibliothèque. Installez-le, puis pointez-le vers votre image :
 
-<Code lang="bash" code={`cargo install grider
+<Code lang="bash" title="Terminal" code={`cargo install grider
 grider tests/large.png`} />
 
 La commande imprime un résumé, puis sauvegarde la superposition à côté du fichier d'entrée sous `<image>_with_grid.png` :
@@ -142,7 +142,7 @@ Saving overlay to tests/large_with_grid.png`} />
 
 Ajoutez `--json` pour imprimer toute la grille en JSON au lieu d'écrire une superposition, et `--quiet` pour supprimer le résumé :
 
-<Code lang="bash" code={`grider tests/large.png --json --quiet`} />
+<Code lang="bash" title="Terminal" code={`grider tests/large.png --json --quiet`} />
 
 ## Dépannage
 

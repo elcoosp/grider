@@ -54,12 +54,12 @@ let config = GridConfig::builder().sauvola(0.34).build();`} />
 
 ## Switch in the CLI
 
-<Code lang="bash" code={`# Sauvola binarization for degraded documents
+<Code lang="bash" title="Terminal" code={`# Sauvola binarization for degraded documents
 grider scan.png --binarization sauvola --sauvola-k 0.34 --json`} />
 
 Passing `--sauvola-k` implies `--binarization sauvola`, so this is equivalent:
 
-<Code lang="bash" code={`grider scan.png --sauvola-k 0.34 --json`} />
+<Code lang="bash" title="Terminal" code={`grider scan.png --sauvola-k 0.34 --json`} />
 
 ## Expect different segmentation
 

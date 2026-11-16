@@ -17,7 +17,7 @@ This guide gets the Grider library into a Rust project and the `grider` binary o
 
 <Tabs>
     <TabItem label="cargo add">
-<Code lang="bash" code={`     cargo add grider`} />
+<Code lang="bash" title="Terminal" code={`     cargo add grider`} />
     </TabItem>
     <TabItem label="Cargo.toml">
 <Code lang="toml" code={`[dependencies]
@@ -35,11 +35,11 @@ The prelude-style glob import exposes the main types: [`Grid`](/reference/grid/)
 
 The same crate builds a command-line binary with the same extraction pipeline:
 
-<Code lang="bash" code={`cargo install grider`} />
+<Code lang="bash" title="Terminal" code={`cargo install grider`} />
 
 Verify the installation:
 
-<Code lang="bash" code={`grider --version`} />
+<Code lang="bash" title="Terminal" code={`grider --version`} />
 
 <Aside kind="note">
     Pass `--locked` to `cargo install` if you want the dependency versions the release was tested
@@ -56,7 +56,7 @@ Two features are on by default; you only touch them when you shrink the build or
 | `drawing` | enabled | Grid drawing and the `debug` overlay helpers | [Drawing API](/reference/drawing/) |
 | `test-utils` | disabled | Shared image fixtures for tests and benchmarks | [Feature flags](/reference/feature-flags/) |
 
-<Code lang="bash" code={`# Everything except serde and drawing:
+<Code lang="bash" title="Terminal" code={`# Everything except serde and drawing:
 cargo add grider --no-default-features
 # Test fixtures only, for development:
 cargo add grider --features test-utils`} />

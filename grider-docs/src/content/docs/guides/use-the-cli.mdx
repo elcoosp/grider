@@ -16,7 +16,7 @@ This guide covers the `grider` binary end to end: default behavior, every flag, 
 
 Point the binary at an image. It extracts the grid, prints a summary, and saves `<image>_with_grid.png` next to the input file:
 
-<Code lang="bash" code={`grider tests/large.png`} />
+<Code lang="bash" title="Terminal" code={`grider tests/large.png`} />
 
 <Code lang="ansi" code={`Extracted grid in 7.22ms
 Grid { rows: 16, columns: 19 }
@@ -25,13 +25,13 @@ Saving overlay to tests/large_with_grid.png`} />
 
 Rename the output with `-o`/`--output`:
 
-<Code lang="bash" code={`grider tests/large.png --output result/grid.png`} />
+<Code lang="bash" title="Terminal" code={`grider tests/large.png --output result/grid.png`} />
 
 ## Configure the extraction
 
 The flags map one-to-one onto [`GridConfig`](/reference/grid-config/) fields:
 
-<Code lang="bash" code={`# Custom configuration
+<Code lang="bash" title="Terminal" code={`# Custom configuration
 grider tests/large.png --block-size 15 --delta 2 --merge-ratio 0.9 --no-parallel --json
 
 # Sauvola binarization for degraded documents
@@ -43,7 +43,7 @@ grider scan.png --binarization sauvola --sauvola-k 0.34 --json`} />
 
 `--json` prints the whole grid as pretty JSON to stdout and skips the overlay:
 
-<Code lang="bash" code={`grider tests/large.png --json --quiet`} />
+<Code lang="bash" title="Terminal" code={`grider tests/large.png --json --quiet`} />
 
 <Code lang="json" code={`{
     "rows": [
@@ -59,7 +59,7 @@ Add `-q`/`--quiet` to suppress the human-readable summary — without it, the su
 
 The binary initializes a `tracing` subscriber from `RUST_LOG`. Turn on debug logging to see the parsed arguments:
 
-<Code lang="bash" code={`RUST_LOG=debug grider tests/large.png --quiet`} />
+<Code lang="bash" title="Terminal" code={`RUST_LOG=debug grider tests/large.png --quiet`} />
 
 ## Handle failures
 

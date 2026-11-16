@@ -23,12 +23,12 @@ You write a small program that turns this table screenshot into a structured gri
 
 ## 1. Create a project
 
-<Code lang="bash" code={`cargo new hello-grider
+<Code lang="bash" title="Terminal" code={`cargo new hello-grider
 cd hello-grider`} />
 
 ## 2. Add the dependency
 
-<Code lang="bash" code={`cargo add grider`} />
+<Code lang="bash" title="Terminal" code={`cargo add grider`} />
 
 This adds the latest published release — `0.3` — to your `Cargo.toml`. Grider supports Rust 1.89 and newer and ships with the `serde` and `drawing` features enabled.
 
@@ -42,7 +42,7 @@ This adds the latest published release — `0.3` — to your `Cargo.toml`. Gride
 
 Replace the contents of `src/main.rs` with code that opens an image file with the `image` crate. Grider accepts any `DynamicImage` and converts non-grayscale images for you:
 
-<Code lang="rust" code={`use grider::{Grid, GridConfig};
+<Code lang="rust" title="src/main.rs" code={`use grider::{Grid, GridConfig};
 use image::open;
 
 fn main() {
@@ -130,7 +130,7 @@ columns:
 
 The crate ships a binary with the same powers as the library. Install it, then point it at your image:
 
-<Code lang="bash" code={`cargo install grider
+<Code lang="bash" title="Terminal" code={`cargo install grider
 grider tests/large.png`} />
 
 The command prints a summary, then saves the overlay next to the input file as `<image>_with_grid.png`:
@@ -142,7 +142,7 @@ Saving overlay to tests/large_with_grid.png`} />
 
 Add `--json` to print the whole grid as JSON instead of writing an overlay, and `--quiet` to suppress the summary:
 
-<Code lang="bash" code={`grider tests/large.png --json --quiet`} />
+<Code lang="bash" title="Terminal" code={`grider tests/large.png --json --quiet`} />
 
 ## Troubleshooting
 
