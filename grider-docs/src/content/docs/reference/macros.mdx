@@ -19,39 +19,13 @@ Creates a `Row` or `Column` from a tuple. The kind defaults to `LineKind::Empty`
 | `make_line!(Column, ($x, $width, $kind))` | Column at `x` with `width` and the given kind |
 | `make_line!(Column, ($x, $width))` | Column with `LineKind::Empty` |
 
-<Code lang="rust" code={`use grider::*;
-
-// With LineKind::Full
-let row = make_line!(Row, (0, 10, LineKind::Full));
-assert_eq!(row.y, 0);
-assert_eq!(row.height, 10);
-assert_eq!(row.kind, LineKind::Full);
-
-// Without LineKind (defaults to LineKind::Empty)
-let row = make_line!(Row, (10, 20));
-assert_eq!(row.y, 10);
-assert_eq!(row.height, 20);
-assert_eq!(row.kind, LineKind::Empty);`} />
+<Code lang="rust" code={"use grider::*;\n\n// With LineKind::Full\nlet row = make_line!(Row, (0, 10, LineKind::Full));\nassert_eq!(row.y, 0);\nassert_eq!(row.height, 10);\nassert_eq!(row.kind, LineKind::Full);\n\n// Without LineKind (defaults to LineKind::Empty)\nlet row = make_line!(Row, (10, 20));\nassert_eq!(row.y, 10);\nassert_eq!(row.height, 20);\nassert_eq!(row.kind, LineKind::Empty);"} />
 
 ## make_grid!
 
 Creates a [`Grid`](/reference/grid/) from lists of row and column tuples. A trailing comma after each tuple is optional.
 
-<Code lang="rust" code={`use grider::{make_grid, LineKind};
-
-let grid = make_grid!(
-    rows: [
-                    (0, 10),                  // Row at y=0, height=10, LineKind::Empty
-                    (10, 20, LineKind::Full), // Row at y=10, height=20, LineKind::Full
-    ],
-    columns: [
-                    (0, 5),                   // Column at x=0, width=5, LineKind::Empty
-                    (5, 15, LineKind::Full),  // Column at x=5, width=15, LineKind::Full
-    ]
-);
-
-assert_eq!(grid.rows.len(), 2);
-assert_eq!(grid.columns.len(), 2);`} />
+<Code lang="rust" code={"use grider::{make_grid, LineKind};\n\nlet grid = make_grid!(\n    rows: [\n                    (0, 10),                  // Row at y=0, height=10, LineKind::Empty\n                    (10, 20, LineKind::Full), // Row at y=10, height=20, LineKind::Full\n    ],\n    columns: [\n                    (0, 5),                   // Column at x=0, width=5, LineKind::Empty\n                    (5, 15, LineKind::Full),  // Column at x=5, width=15, LineKind::Full\n    ]\n);\n\nassert_eq!(grid.rows.len(), 2);\nassert_eq!(grid.columns.len(), 2);"} />
 
 Notes:
 

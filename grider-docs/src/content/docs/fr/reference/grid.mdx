@@ -10,10 +10,7 @@ import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
 
 ## Définition
 
-<Code lang="rust" title="src/lib.rs" code={`pub struct Grid {
-    pub rows: SmallVecLine<Row>,
-    pub columns: SmallVecLine<Column>,
-}`} />
+<Code lang="rust" title="src/lib.rs" code={"pub struct Grid {\n    pub rows: SmallVecLine<Row>,\n    pub columns: SmallVecLine<Column>,\n}"} />
 
 - Les deux champs sont publics et contiennent les lignes dans des collections `SmallVecLine` (un type petit-vecteur avec une capacité en ligne de `32`, voir `detection::DEFAULT_SMALLVEC_SIZE`).
 - Dérive : `Debug`, `PartialEq`, `Clone` — plus `Serialize`/`Deserialize` avec la fonctionnalité `serde`.
@@ -28,11 +25,7 @@ import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
 | `try_from_gray_with_config` | `(&GrayImage, GridConfig) -> Result<Self, GridError>` | Même pipeline directement depuis une `GrayImage` — pas de conversion, pas de copie |
 | `try_from_binarized` | `(&GrayImage, GridConfig) -> Result<Self, GridError>` | Saute la binarisation ; sur la fixture de benchmark c'est **4,4 fois plus rapide** que le chemin complet |
 
-<Code lang="rust" code={`use grider::{Grid, GridConfig};
-use image::open;
-
-let img = open("tests/large.png").expect("Failed to open image");
-let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).expect("Failed to create grid");`} />
+<Code lang="rust" code={"use grider::{Grid, GridConfig};\nuse image::open;\n\nlet img = open(\"tests/large.png\").expect(\"Failed to open image\");\nlet grid = Grid::try_from_image_with_config(&img, GridConfig::default()).expect(\"Failed to create grid\");"} />
 
 Les trois valident l'image (une largeur ou hauteur nulle échoue avec [`GridError::InvalidDimensions`](/reference/errors/)) et la configuration.
 
@@ -91,13 +84,7 @@ Accesseurs de taille : `smallest_row_height()`, `biggest_row_height()`, `smalles
 
 `find_cells` produit des erreurs [`RowNotFound`](/reference/errors/) / `ColumnNotFound` pour les coordonnées où aucune bande ne commence :
 
-<Code lang="rust" code={`let cells = grid.find_cells(&[1, 2, 3], &[4, 5, 6]);
-for cell in cells {
-    match cell {
-                    Ok(c) => println!("Found cell at row {}, column {}", c.row.y, c.column.x),
-                    Err(e) => eprintln!("Error finding cell: {e}"),
-    }
-}`} />
+<Code lang="rust" code={"let cells = grid.find_cells(&[1, 2, 3], &[4, 5, 6]);\nfor cell in cells {\n    match cell {\n                    Ok(c) => println!(\"Found cell at row {}, column {}\", c.row.y, c.column.x),\n                    Err(e) => eprintln!(\"Error finding cell: {e}\"),\n    }\n}"} />
 
 ## Wrappers de compatibilité du pipeline
 

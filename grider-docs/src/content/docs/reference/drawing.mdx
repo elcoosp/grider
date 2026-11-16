@@ -34,15 +34,7 @@ The `drawing` module (gated by the default `drawing` feature) renders grids, cel
 | `column_color_provider(v: Box<dyn Fn(usize) -> Rgba<u8>>)` | Per-column color provider |
 | `line_thickness(v: u32)` | Band thickness, minimum `1` |
 
-<Code lang="rust" code={`use grider::drawing::GridDrawingConfig;
-use image::Rgba;
-
-let config = GridDrawingConfig::builder()
-    .padding(1)
-    .cell_background_color(Rgba([0, 0, 0, 255]))
-    .row_color_provider(Box::new(|index| Rgba([index as u8, 0, 0, 255])))
-    .build();
-assert_eq!(config.padding, 1);`} />
+<Code lang="rust" code={"use grider::drawing::GridDrawingConfig;\nuse image::Rgba;\n\nlet config = GridDrawingConfig::builder()\n    .padding(1)\n    .cell_background_color(Rgba([0, 0, 0, 255]))\n    .row_color_provider(Box::new(|index| Rgba([index as u8, 0, 0, 255])))\n    .build();\nassert_eq!(config.padding, 1);"} />
 
 ## Color resolution
 
@@ -53,9 +45,7 @@ assert_eq!(config.padding, 1);`} />
 
 ## Drawable
 
-<Code lang="rust" code={`pub trait Drawable {
-    fn draw(&self, image: &mut RgbaImage, config: &GridDrawingConfig);
-}`} />
+<Code lang="rust" code={"pub trait Drawable {\n    fn draw(&self, image: &mut RgbaImage, config: &GridDrawingConfig);\n}"} />
 
 Implemented by `Cell`, `Row`, `Column` and [`Grid`](/reference/grid/). Drawing is infallible by construction: every band and rectangle is clipped to the image bounds.
 
@@ -68,24 +58,11 @@ Drawing semantics:
 
 ## debug module
 
-<Code lang="rust" title="src/lib.rs" code={`pub fn save_image_with_grid(
-    image: &DynamicImage,
-    grid: &Grid,
-    output_path: &str,
-    config: &GridDrawingConfig,
-) -> Result<(), GridError>`} />
+<Code lang="rust" title="src/lib.rs" code={"pub fn save_image_with_grid(\n    image: &DynamicImage,\n    grid: &Grid,\n    output_path: &str,\n    config: &GridDrawingConfig,\n) -> Result<(), GridError>"} />
 
 Converts the image to `RgbaImage`, draws the grid with `config`, and writes the file. Returns [`GridError::ImageConversionError`](/reference/errors/) when saving fails.
 
-<Code lang="rust" code={`use grider::drawing::GridDrawingConfig;
-use grider::{Grid, GridConfig};
-use image::open;
-
-let img = open("tests/large.png").unwrap();
-let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();
-
-grider::debug::save_image_with_grid(&img, &grid, "output_with_grid.png", &GridDrawingConfig::default())
-    .unwrap();`} />
+<Code lang="rust" code={"use grider::drawing::GridDrawingConfig;\nuse grider::{Grid, GridConfig};\nuse image::open;\n\nlet img = open(\"tests/large.png\").unwrap();\nlet grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();\n\ngrider::debug::save_image_with_grid(&img, &grid, \"output_with_grid.png\", &GridDrawingConfig::default())\n    .unwrap();"} />
 
 <Aside kind="note">
     The command-line binary calls this function with the default config on every run unless you pass

@@ -50,20 +50,11 @@ Chaque méthode consomme et retourne le builder ; la configuration construite pa
 | `binarization(v: Binarization)` | Aucun nécessaire |
 | `sauvola(k: f32)` | Définit `Binarization::Sauvola { k }`, remplaçant un `k` non fini par `0.2` |
 
-<Code lang="rust" code={`use grider::GridConfig;
-
-let config = GridConfig::builder()
-    .threshold_block_size(7)
-    .threshold_delta(-2)
-    .merge_threshold_ratio(0.5)
-    .parallel(true)
-    .build();
-
-assert!(config.validate().is_ok());`} />
+<Code lang="rust" code={"use grider::GridConfig;\n\nlet config = GridConfig::builder()\n    .threshold_block_size(7)\n    .threshold_delta(-2)\n    .merge_threshold_ratio(0.5)\n    .parallel(true)\n    .build();\n\nassert!(config.validate().is_ok());"} />
 
 ## validate
 
-<Code lang="rust" code={`pub fn validate(&self) -> Result<(), GridError>`} />
+<Code lang="rust" code={"pub fn validate(&self) -> Result<(), GridError>"} />
 
 Signale le premier problème trouvé dans les valeurs construites à la main (littéral de structure ou désérialisation) sous forme de [`GridError::InvalidConfig`](/reference/errors/) :
 

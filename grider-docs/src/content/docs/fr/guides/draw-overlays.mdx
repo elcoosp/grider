@@ -17,21 +17,7 @@ Ce guide montre comment visualiser une [`Grid`](/reference/grid/) sur une image,
 
 Un appel rend la grille et écrit le fichier :
 
-<Code lang="rust" code={`use grider::debug::save_image_with_grid;
-use grider::drawing::GridDrawingConfig;
-use grider::{Grid, GridConfig};
-use image::open;
-
-let img = open("tests/large.png").unwrap();
-let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();
-
-grider::debug::save_image_with_grid(
-    &img,
-    &grid,
-    "output_with_grid.png",
-    &GridDrawingConfig::default(),
-)
-.unwrap();`} />
+<Code lang="rust" code={"use grider::debug::save_image_with_grid;\nuse grider::drawing::GridDrawingConfig;\nuse grider::{Grid, GridConfig};\nuse image::open;\n\nlet img = open(\"tests/large.png\").unwrap();\nlet grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();\n\ngrider::debug::save_image_with_grid(\n    &img,\n    &grid,\n    \"output_with_grid.png\",\n    &GridDrawingConfig::default(),\n)\n.unwrap();"} />
 
 Le binaire en ligne de commande exécute le même chemin par défaut : `grider tests/large.png` écrit `tests/large_with_grid.png` à côté de l'entrée.
 
@@ -51,16 +37,7 @@ Le résultat visualise la géométrie de la grille ; le contenu de l'image origi
 
 `GridDrawingConfig::builder()` remplace un réglage à la fois :
 
-<Code lang="rust" code={`use grider::drawing::GridDrawingConfig;
-use image::Rgba;
-
-let config = GridDrawingConfig::builder()
-    .padding(2)
-    .row_color(Rgba([255, 0, 0, 255]))
-    .column_color(Rgba([0, 0, 255, 255]))
-    .cell_background_color(Rgba([200, 200, 200, 255]))
-    .line_thickness(3)
-    .build();`} />
+<Code lang="rust" code={"use grider::drawing::GridDrawingConfig;\nuse image::Rgba;\n\nlet config = GridDrawingConfig::builder()\n    .padding(2)\n    .row_color(Rgba([255, 0, 0, 255]))\n    .column_color(Rgba([0, 0, 255, 255]))\n    .cell_background_color(Rgba([200, 200, 200, 255]))\n    .line_thickness(3)\n    .build();"} />
 
 | Champ | Défaut | Signification |
 | :--- | :--- | :--- |
@@ -74,18 +51,7 @@ let config = GridDrawingConfig::builder()
 
 Les fournisseurs de couleurs remplacent les couleurs uniformes et reçoivent l'index de la ligne. Numéroter les lignes ou mettre en évidence les alternances prend une seule fermeture :
 
-<Code lang="rust" code={`use grider::drawing::GridDrawingConfig;
-use image::Rgba;
-
-let config = GridDrawingConfig::builder()
-    .row_color_provider(Box::new(|index| {
-                    if index % 2 == 0 {
-                                    Rgba([220, 20, 20, 255])
-                    } else {
-                                    Rgba([255, 140, 0, 255])
-                    }
-    }))
-    .build();`} />
+<Code lang="rust" code={"use grider::drawing::GridDrawingConfig;\nuse image::Rgba;\n\nlet config = GridDrawingConfig::builder()\n    .row_color_provider(Box::new(|index| {\n                    if index % 2 == 0 {\n                                    Rgba([220, 20, 20, 255])\n                    } else {\n                                    Rgba([255, 140, 0, 255])\n                    }\n    }))\n    .build();"} />
 
 Lorsqu'un fournisseur est défini, `row_color_at(index)` et `column_color_at(index)` retournent son résultat pour cet index ; sinon ils retombent sur `row_color` / `column_color`.
 
@@ -93,14 +59,7 @@ Lorsqu'un fournisseur est défini, `row_color_at(index)` et `column_color_at(ind
 
 `Cell`, `Row`, `Column` et `Grid` implémentent le trait `Drawable`. Le dessin est infaillible par construction — chaque bande et rectangle est découpé aux limites de l'image :
 
-<Code lang="rust" code={`use grider::drawing::{Drawable, GridDrawingConfig};
-use grider::{LineInfo, LineKind, Row};
-use image::RgbaImage;
-
-let mut image = RgbaImage::new(100, 100);
-let config = GridDrawingConfig::default();
-let row = Row::new(LineInfo::new(0, 10, LineKind::Full));
-row.draw(&mut image, &config);`} />
+<Code lang="rust" code={"use grider::drawing::{Drawable, GridDrawingConfig};\nuse grider::{LineInfo, LineKind, Row};\nuse image::RgbaImage;\n\nlet mut image = RgbaImage::new(100, 100);\nlet config = GridDrawingConfig::default();\nlet row = Row::new(LineInfo::new(0, 10, LineKind::Full));\nrow.draw(&mut image, &config);"} />
 
 ## Étapes suivantes
 

@@ -10,10 +10,7 @@ import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
 
 ## Definition
 
-<Code lang="rust" title="src/lib.rs" code={`pub struct Grid {
-    pub rows: SmallVecLine<Row>,
-    pub columns: SmallVecLine<Column>,
-}`} />
+<Code lang="rust" title="src/lib.rs" code={"pub struct Grid {\n    pub rows: SmallVecLine<Row>,\n    pub columns: SmallVecLine<Column>,\n}"} />
 
 - The two fields are public and hold the lines in `SmallVecLine` collections (a small-vector type with an inline capacity of `32`, see `detection::DEFAULT_SMALLVEC_SIZE`).
 - Derives: `Debug`, `PartialEq`, `Clone` — plus `Serialize`/`Deserialize` with the `serde` feature.
@@ -28,11 +25,7 @@ import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
 | `try_from_gray_with_config` | `(&GrayImage, GridConfig) -> Result<Self, GridError>` | Same pipeline directly from a `GrayImage` — no conversion, no copy |
 | `try_from_binarized` | `(&GrayImage, GridConfig) -> Result<Self, GridError>` | Skips binarization; on the benchmark fixture this is **4.4× faster** than the full path |
 
-<Code lang="rust" code={`use grider::{Grid, GridConfig};
-use image::open;
-
-let img = open("tests/large.png").expect("Failed to open image");
-let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).expect("Failed to create grid");`} />
+<Code lang="rust" code={"use grider::{Grid, GridConfig};\nuse image::open;\n\nlet img = open(\"tests/large.png\").expect(\"Failed to open image\");\nlet grid = Grid::try_from_image_with_config(&img, GridConfig::default()).expect(\"Failed to create grid\");"} />
 
 All three validate the image (zero width or height fails with [`GridError::InvalidDimensions`](/reference/errors/)) and the configuration.
 
@@ -91,13 +84,7 @@ Size accessors: `smallest_row_height()`, `biggest_row_height()`, `smallest_colum
 
 `find_cells` yields [`RowNotFound`](/reference/errors/) / `ColumnNotFound` errors for coordinates where no band starts:
 
-<Code lang="rust" code={`let cells = grid.find_cells(&[1, 2, 3], &[4, 5, 6]);
-for cell in cells {
-    match cell {
-                    Ok(c) => println!("Found cell at row {}, column {}", c.row.y, c.column.x),
-                    Err(e) => eprintln!("Error finding cell: {e}"),
-    }
-}`} />
+<Code lang="rust" code={"let cells = grid.find_cells(&[1, 2, 3], &[4, 5, 6]);\nfor cell in cells {\n    match cell {\n                    Ok(c) => println!(\"Found cell at row {}, column {}\", c.row.y, c.column.x),\n                    Err(e) => eprintln!(\"Error finding cell: {e}\"),\n    }\n}"} />
 
 ## Pipeline compatibility wrappers
 

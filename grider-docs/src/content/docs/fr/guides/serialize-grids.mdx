@@ -16,27 +16,11 @@ Ce guide montre comment sérialiser et désérialiser chaque type de données Gr
 
 `Grid`, `Row`, `Column`, `LineInfo`, `LineKind`, `GridConfig` et `Binarization` dérivent tous `Serialize` et `Deserialize` lorsque la fonctionnalité `serde` est activée :
 
-<Code lang="rust" code={`use grider::{Grid, GridConfig};
-use image::open;
-
-let img = open("tests/large.png").unwrap();
-let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();
-
-let json = serde_json::to_string_pretty(&grid).unwrap();
-println!("{json}");`} />
+<Code lang="rust" code={"use grider::{Grid, GridConfig};\nuse image::open;\n\nlet img = open(\"tests/large.png\").unwrap();\nlet grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();\n\nlet json = serde_json::to_string_pretty(&grid).unwrap();\nprintln!(\"{json}\");"} />
 
 Une `Grid` se sérialise en ses deux champs publics, `rows` et `columns` :
 
-<Code lang="json" code={`{
-    "rows": [
-  { "y": 0, "height": 11, "kind": "Empty" },
-  { "y": 11, "height": 18, "kind": "Empty" },
-  { "y": 46, "height": 177, "kind": "Full" }
-    ],
-    "columns": [
-  { "x": 0, "width": 4, "kind": "Empty" }
-    ]
-}`} />
+<Code lang="json" code={"{\n    \"rows\": [\n  { \"y\": 0, \"height\": 11, \"kind\": \"Empty\" },\n  { \"y\": 11, \"height\": 18, \"kind\": \"Empty\" },\n  { \"y\": 46, \"height\": 177, \"kind\": \"Full\" }\n    ],\n    \"columns\": [\n  { \"x\": 0, \"width\": 4, \"kind\": \"Empty\" }\n    ]\n}"} />
 
 Le JSON ci-dessus est le vrai début de la sortie que la CLI 0.3.0 imprime pour la fixture `tests/large.png` du dépôt.
 
@@ -44,27 +28,13 @@ Le JSON ci-dessus est le vrai début de la sortie que la CLI 0.3.0 imprime pour 
 
 La désérialisation restaure exactement une `GridConfig` — y compris une binarisation Sauvola :
 
-<Code lang="rust" code={`use grider::GridConfig;
-
-let config = GridConfig::builder().sauvola(0.45).build();
-let json = serde_json::to_string(&config).unwrap();
-let parsed: GridConfig = serde_json::from_str(&json).unwrap();
-assert_eq!(parsed, config);`} />
+<Code lang="rust" code={"use grider::GridConfig;\n\nlet config = GridConfig::builder().sauvola(0.45).build();\nlet json = serde_json::to_string(&config).unwrap();\nlet parsed: GridConfig = serde_json::from_str(&json).unwrap();\nassert_eq!(parsed, config);"} />
 
 ## Garder les configurations héritées désérialisables
 
 La 0.3 a ajouté le champ `binarization` à `GridConfig`. Le champ porte `#[serde(default)]`, donc le JSON écrit par un programme 0.2 se désérialise toujours :
 
-<Code lang="rust" code={`use grider::GridConfig;
-
-let legacy = r#"{
-    "threshold_block_size": 12,
-    "threshold_delta": 0,
-    "merge_threshold_ratio": 0.8,
-    "enable_parallel": true
-}"#;
-let parsed: GridConfig = serde_json::from_str(legacy).unwrap();
-assert_eq!(parsed, GridConfig::default());`} />
+<Code lang="rust" code={"use grider::GridConfig;\n\nlet legacy = r#\"{\n    \"threshold_block_size\": 12,\n    \"threshold_delta\": 0,\n    \"merge_threshold_ratio\": 0.8,\n    \"enable_parallel\": true\n}\"#;\nlet parsed: GridConfig = serde_json::from_str(legacy).unwrap();\nassert_eq!(parsed, GridConfig::default());"} />
 
 <Aside kind="caution">
     Le même ajout casse les **littéraux de structure** : `GridConfig { threshold_block_size: 12, … }` ne compile plus
@@ -74,7 +44,7 @@ assert_eq!(parsed, GridConfig::default());`} />
 
 ## Imprimer du JSON depuis la CLI
 
-<Code lang="bash" title="Terminal" code={`grider tests/large.png --json --quiet`} />
+<Code lang="bash" title="Terminal" code={"grider tests/large.png --json --quiet"} />
 
 `--json` imprime le JSON joli de toute la grille sur stdout et saute le fichier de superposition. Associez-le à `--quiet` lorsqu'une machine lit la sortie, car le résumé lisible par l'homme va aussi sur stdout.
 

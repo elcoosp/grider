@@ -29,22 +29,15 @@ Toutes les erreurs que produisent les opérations de [`Grid`](/reference/grid/).
 
 ## Constructeur
 
-<Code lang="rust" code={`pub fn invalid_config(reason: impl Into<String>) -> Self`} />
+<Code lang="rust" code={"pub fn invalid_config(reason: impl Into<String>) -> Self"} />
 
 Construit `GridError::InvalidConfig` à partir de n'importe quelle valeur de type chaîne :
 
-<Code lang="rust" code={`use grider::GridError;
-
-let error = GridError::invalid_config("block size must be > 0");
-assert_eq!(error.to_string(), "Invalid configuration: block size must be > 0");`} />
+<Code lang="rust" code={"use grider::GridError;\n\nlet error = GridError::invalid_config(\"block size must be > 0\");\nassert_eq!(error.to_string(), \"Invalid configuration: block size must be > 0\");"} />
 
 ## Gestion en pratique
 
-<Code lang="rust" code={`match result {
-    Ok(grid) => println!("{grid}"),
-    Err(GridError::InvalidDimensions { width, height }) => eprintln!("empty image {width}x{height}"),
-    Err(e) => eprintln!("extraction failed: {e}"),
-}`} />
+<Code lang="rust" code={"match result {\n    Ok(grid) => println!(\"{grid}\"),\n    Err(GridError::InvalidDimensions { width, height }) => eprintln!(\"empty image {width}x{height}\"),\n    Err(e) => eprintln!(\"extraction failed: {e}\"),\n}"} />
 
 <Aside kind="caution">
     Parce que l'enum est `#[non_exhaustive]`, correspondre à chaque variante actuelle sans branche wildcard ne

@@ -19,16 +19,13 @@ Les deux traitent le blanc (`255`) comme arrière-plan après binarisation.
 
 ## LineFlags
 
-<Code lang="rust" title="src/lib.rs" code={`pub struct LineFlags {
-    pub rows: Vec<bool>,
-    pub columns: Vec<bool>,
-}`} />
+<Code lang="rust" title="src/lib.rs" code={"pub struct LineFlags {\n    pub rows: Vec<bool>,\n    pub columns: Vec<bool>,\n}"} />
 
 Vacuité de chaque ligne (indexée par `y`) et de chaque colonne (indexée par `x`) ; `true` signifie arrière-plan uniquement.
 
 ## scan_line_flags
 
-<Code lang="rust" code={`pub fn scan_line_flags(img: &GrayImage, parallel: bool) -> LineFlags`} />
+<Code lang="rust" code={"pub fn scan_line_flags(img: &GrayImage, parallel: bool) -> LineFlags"} />
 
 Calcule les drapeaux de ligne et de colonne ensemble dans une **seule passe fusionnée et adaptée au cache** (~0,4 ns/pixel sur la machine de benchmark). Avec `parallel: true`, le travail se répartit sur des bandes de lignes ; les heuristiques retombent sur le chemin séquentiel lorsque la coordination rayon coûterait plus qu'elle ne rapporte.
 
@@ -43,16 +40,7 @@ Calcule les drapeaux de ligne et de colonne ensemble dans une **seule passe fusi
 
 Le pipeline dérive le seuil de fusion comme `merge_threshold_for(average_size, ratio)` — les plages plus courtes que `ratio × moyenne` fusionnent dans leur voisine. La fusion garde le type de la plage en cours de construction, et les plages fusionnées couvrent la même étendue totale que l'entrée :
 
-<Code lang="rust" code={`use grider::detection::merge_small_lines;
-use grider::{LineInfo, LineKind};
-
-let lines = vec![
-    LineInfo::new(0, 5, LineKind::Empty),
-    LineInfo::new(5, 3, LineKind::Empty),
-    LineInfo::new(8, 10, LineKind::Full),
-];
-let merged = merge_small_lines(lines, 4);
-assert_eq!(merged.len(), 2);`} />
+<Code lang="rust" code={"use grider::detection::merge_small_lines;\nuse grider::{LineInfo, LineKind};\n\nlet lines = vec![\n    LineInfo::new(0, 5, LineKind::Empty),\n    LineInfo::new(5, 3, LineKind::Empty),\n    LineInfo::new(8, 10, LineKind::Full),\n];\nlet merged = merge_small_lines(lines, 4);\nassert_eq!(merged.len(), 2);"} />
 
 ## collect_lines et process_dimension
 

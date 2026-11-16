@@ -10,25 +10,7 @@ Grider reads an image and returns a [`Grid`](/reference/grid/) of rows and colum
 
 ## Overview
 
-<Code lang="text" code={`DynamicImage / GrayImage
-     │
-     ▼
-[1] Binarization        adaptive mean (Bradley & Roth) or Sauvola
-     │  GrayImage, background = white (255), content = black (0)
-     ▼
-[2] scan_line_flags     one fused pass, row + column flags together
-     │  LineFlags { rows: Vec<bool>, columns: Vec<bool> }
-     ▼
-[3] run_length_encode   booleans → LineInfo runs per axis
-     │  Vec<LineInfo> { start, length, kind }
-     ▼
-[4] merge_small_lines   runs shorter than ratio × average merge into their neighbour
-     │  SmallVecLine<LineInfo>
-     ▼
-[5] lines_from_flags    runs → Row / Column via LineTrait
-     │
-     ▼
-    Grid { rows, columns }`} />
+<Code lang="text" code={"DynamicImage / GrayImage\n     \u2502\n     \u25bc\n[1] Binarization        adaptive mean (Bradley & Roth) or Sauvola\n     \u2502  GrayImage, background = white (255), content = black (0)\n     \u25bc\n[2] scan_line_flags     one fused pass, row + column flags together\n     \u2502  LineFlags { rows: Vec<bool>, columns: Vec<bool> }\n     \u25bc\n[3] run_length_encode   booleans \u2192 LineInfo runs per axis\n     \u2502  Vec<LineInfo> { start, length, kind }\n     \u25bc\n[4] merge_small_lines   runs shorter than ratio \u00d7 average merge into their neighbour\n     \u2502  SmallVecLine<LineInfo>\n     \u25bc\n[5] lines_from_flags    runs \u2192 Row / Column via LineTrait\n     \u2502\n     \u25bc\n    Grid { rows, columns }"} />
 
 ## Stage 1 — Binarization
 

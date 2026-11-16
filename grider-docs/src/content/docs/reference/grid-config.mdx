@@ -50,20 +50,11 @@ Every method consumes and returns the builder; the built config always passes `v
 | `binarization(v: Binarization)` | None needed |
 | `sauvola(k: f32)` | Sets `Binarization::Sauvola { k }`, replacing non-finite `k` with `0.2` |
 
-<Code lang="rust" code={`use grider::GridConfig;
-
-let config = GridConfig::builder()
-    .threshold_block_size(7)
-    .threshold_delta(-2)
-    .merge_threshold_ratio(0.5)
-    .parallel(true)
-    .build();
-
-assert!(config.validate().is_ok());`} />
+<Code lang="rust" code={"use grider::GridConfig;\n\nlet config = GridConfig::builder()\n    .threshold_block_size(7)\n    .threshold_delta(-2)\n    .merge_threshold_ratio(0.5)\n    .parallel(true)\n    .build();\n\nassert!(config.validate().is_ok());"} />
 
 ## validate
 
-<Code lang="rust" code={`pub fn validate(&self) -> Result<(), GridError>`} />
+<Code lang="rust" code={"pub fn validate(&self) -> Result<(), GridError>"} />
 
 Reports the first problem found in hand-constructed values (struct literal or deserialization) as a [`GridError::InvalidConfig`](/reference/errors/):
 

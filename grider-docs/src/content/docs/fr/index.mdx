@@ -24,18 +24,9 @@ import { Aside, Card, CardGrid, Code, LinkButton, LinkCard } from '@astrojs/star
 
 Grider lit une image, la binarise avec un seuil adaptatif, détecte les plages de lignes de balayage d'arrière-plan et de contenu sur les deux axes, et les renvoie sous forme de [`Grid`](/reference/grid/) de [`Row`](/reference/lines-and-cells/)s et de `Column`s — chaque bande étant étiquetée `Empty` (arrière-plan) ou `Full` (contenu).
 
-<Code lang="toml" title="Cargo.toml" code={`[dependencies]
-grider = "0.3"`} />
+<Code lang="toml" title="Cargo.toml" code={"[dependencies]\ngrider = \"0.3\""} />
 
-<Code lang="rust" code={`use grider::{Grid, GridConfig};
-use image::open;
-
-let img = open("path/to/image.png").expect("Failed to open image");
-let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).expect("Failed to create grid");
-
-for row in grid.rows() {
-    println!("Row at y: {} ({:?})", row.y, row.kind);
-}`} />
+<Code lang="rust" code={"use grider::{Grid, GridConfig};\nuse image::open;\n\nlet img = open(\"path/to/image.png\").expect(\"Failed to open image\");\nlet grid = Grid::try_from_image_with_config(&img, GridConfig::default()).expect(\"Failed to create grid\");\n\nfor row in grid.rows() {\n    println!(\"Row at y: {} ({:?})\", row.y, row.kind);\n}"} />
 
 <Aside kind="tip">
         La fonctionnalité `drawing` rend cette visualisation de la grille détectée en un seul appel à

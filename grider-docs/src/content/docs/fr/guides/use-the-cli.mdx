@@ -16,26 +16,19 @@ Ce guide couvre le binaire `grider` de bout en bout : comportement par défaut, 
 
 Pointez le binaire vers une image. Il extrait la grille, imprime un résumé et sauvegarde `<image>_with_grid.png` à côté du fichier d'entrée :
 
-<Code lang="bash" title="Terminal" code={`grider tests/large.png`} />
+<Code lang="bash" title="Terminal" code={"grider tests/large.png"} />
 
-<Code lang="ansi" code={`Extracted grid in 7.22ms
-Grid { rows: 16, columns: 19 }
-Full rows: 7, empty rows: 9, full columns: 9, empty columns: 10
-Saving overlay to tests/large_with_grid.png`} />
+<Code lang="ansi" code={"Extracted grid in 7.22ms\nGrid { rows: 16, columns: 19 }\nFull rows: 7, empty rows: 9, full columns: 9, empty columns: 10\nSaving overlay to tests/large_with_grid.png"} />
 
 Renommez la sortie avec `-o`/`--output` :
 
-<Code lang="bash" title="Terminal" code={`grider tests/large.png --output result/grid.png`} />
+<Code lang="bash" title="Terminal" code={"grider tests/large.png --output result/grid.png"} />
 
 ## Configurer l'extraction
 
 Les drapeaux correspondent un à un aux champs de [`GridConfig`](/reference/grid-config/) :
 
-<Code lang="bash" title="Terminal" code={`# Custom configuration
-grider tests/large.png --block-size 15 --delta 2 --merge-ratio 0.9 --no-parallel --json
-
-# Sauvola binarization for degraded documents
-grider scan.png --binarization sauvola --sauvola-k 0.34 --json`} />
+<Code lang="bash" title="Terminal" code={"# Custom configuration\ngrider tests/large.png --block-size 15 --delta 2 --merge-ratio 0.9 --no-parallel --json\n\n# Sauvola binarization for degraded documents\ngrider scan.png --binarization sauvola --sauvola-k 0.34 --json"} />
 
 `--sauvola-k` implique `--binarization sauvola`, donc la seconde commande fonctionne aussi sans le drapeau explicite `--binarization`. Le tableau complet des drapeaux, y compris les valeurs par défaut, se trouve dans la [référence CLI](/reference/cli/).
 
@@ -43,15 +36,9 @@ grider scan.png --binarization sauvola --sauvola-k 0.34 --json`} />
 
 `--json` imprime toute la grille en JSON joli sur stdout et saute la superposition :
 
-<Code lang="bash" title="Terminal" code={`grider tests/large.png --json --quiet`} />
+<Code lang="bash" title="Terminal" code={"grider tests/large.png --json --quiet"} />
 
-<Code lang="json" code={`{
-    "rows": [
-  { "y": 0, "height": 11, "kind": "Empty" },
-  { "y": 11, "height": 18, "kind": "Empty" },
-  { "y": 29, "height": 17, "kind": "Empty" }
-    ]
-}`} />
+<Code lang="json" code={"{\n    \"rows\": [\n  { \"y\": 0, \"height\": 11, \"kind\": \"Empty\" },\n  { \"y\": 11, \"height\": 18, \"kind\": \"Empty\" },\n  { \"y\": 29, \"height\": 17, \"kind\": \"Empty\" }\n    ]\n}"} />
 
 Ajoutez `-q`/`--quiet` pour supprimer le résumé lisible par l'homme — sans cela, le résumé partage stdout avec le JSON.
 
@@ -59,16 +46,13 @@ Ajoutez `-q`/`--quiet` pour supprimer le résumé lisible par l'homme — sans c
 
 Le binaire initialise un abonné `tracing` à partir de `RUST_LOG`. Activez la journalisation de débogage pour voir les arguments analysés :
 
-<Code lang="bash" title="Terminal" code={`RUST_LOG=debug grider tests/large.png --quiet`} />
+<Code lang="bash" title="Terminal" code={"RUST_LOG=debug grider tests/large.png --quiet"} />
 
 ## Gérer les échecs
 
 Le binaire mappe les erreurs sur le code de sortie `1` (`ExitCode::FAILURE`) et imprime la chaîne d'erreurs. L'ouverture d'un fichier manquant produit :
 
-<Code lang="ansi" code={`error: Failed to open image
-
-Caused by:
- No such file or directory (os error 2)`} />
+<Code lang="ansi" code={"error: Failed to open image\n\nCaused by:\n No such file or directory (os error 2)"} />
 
 Les exécutions réussies sortent avec le code `0`.
 

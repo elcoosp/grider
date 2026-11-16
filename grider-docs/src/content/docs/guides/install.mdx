@@ -17,17 +17,16 @@ This guide gets the Grider library into a Rust project and the `grider` binary o
 
 <Tabs>
     <TabItem label="cargo add">
-<Code lang="bash" title="Terminal" code={`     cargo add grider`} />
+<Code lang="bash" title="Terminal" code={"     cargo add grider"} />
     </TabItem>
     <TabItem label="Cargo.toml">
-<Code lang="toml" title="Cargo.toml" code={`[dependencies]
-grider = "0.3"`} />
+<Code lang="toml" title="Cargo.toml" code={"[dependencies]\ngrider = \"0.3\""} />
     </TabItem>
 </Tabs>
 
 Then import the crate in your code:
 
-<Code lang="rust" code={`use grider::*;`} />
+<Code lang="rust" code={"use grider::*;"} />
 
 The prelude-style glob import exposes the main types: [`Grid`](/reference/grid/), [`GridConfig`](/reference/grid-config/), [`Row`](/reference/lines-and-cells/), `Column`, [`Cell`](/reference/lines-and-cells/), [`LineKind`](/reference/lines-and-cells/), [`GridError`](/reference/errors/), the `Binarization` enum and the `make_grid!` / `make_line!` macros.
 
@@ -35,11 +34,11 @@ The prelude-style glob import exposes the main types: [`Grid`](/reference/grid/)
 
 The same crate builds a command-line binary with the same extraction pipeline:
 
-<Code lang="bash" title="Terminal" code={`cargo install grider`} />
+<Code lang="bash" title="Terminal" code={"cargo install grider"} />
 
 Verify the installation:
 
-<Code lang="bash" title="Terminal" code={`grider --version`} />
+<Code lang="bash" title="Terminal" code={"grider --version"} />
 
 <Aside kind="note">
     Pass `--locked` to `cargo install` if you want the dependency versions the release was tested
@@ -56,10 +55,7 @@ Two features are on by default; you only touch them when you shrink the build or
 | `drawing` | enabled | Grid drawing and the `debug` overlay helpers | [Drawing API](/reference/drawing/) |
 | `test-utils` | disabled | Shared image fixtures for tests and benchmarks | [Feature flags](/reference/feature-flags/) |
 
-<Code lang="bash" title="Terminal" code={`# Everything except serde and drawing:
-cargo add grider --no-default-features
-# Test fixtures only, for development:
-cargo add grider --features test-utils`} />
+<Code lang="bash" title="Terminal" code={"# Everything except serde and drawing:\ncargo add grider --no-default-features\n# Test fixtures only, for development:\ncargo add grider --features test-utils"} />
 
 ## Next steps
 

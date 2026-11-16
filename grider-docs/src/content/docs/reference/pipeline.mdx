@@ -19,16 +19,13 @@ Both treat white (`255`) as background after binarization.
 
 ## LineFlags
 
-<Code lang="rust" title="src/lib.rs" code={`pub struct LineFlags {
-    pub rows: Vec<bool>,
-    pub columns: Vec<bool>,
-}`} />
+<Code lang="rust" title="src/lib.rs" code={"pub struct LineFlags {\n    pub rows: Vec<bool>,\n    pub columns: Vec<bool>,\n}"} />
 
 Emptiness of every row (indexed by `y`) and every column (indexed by `x`); `true` means background only.
 
 ## scan_line_flags
 
-<Code lang="rust" code={`pub fn scan_line_flags(img: &GrayImage, parallel: bool) -> LineFlags`} />
+<Code lang="rust" code={"pub fn scan_line_flags(img: &GrayImage, parallel: bool) -> LineFlags"} />
 
 Computes row and column flags together in a **single fused, cache-friendly pass** (~0.4 ns/pixel on the benchmark machine). With `parallel: true` the work spreads over row bands; the heuristics fall back to the sequential path when rayon coordination would cost more than it saves.
 
@@ -43,16 +40,7 @@ Computes row and column flags together in a **single fused, cache-friendly pass*
 
 The pipeline derives the merge threshold as `merge_threshold_for(average_size, ratio)` — runs shorter than `ratio × average` merge into their neighbour. The merge keeps the kind of the run being built, and merged runs cover the same total extent as the input:
 
-<Code lang="rust" code={`use grider::detection::merge_small_lines;
-use grider::{LineInfo, LineKind};
-
-let lines = vec![
-    LineInfo::new(0, 5, LineKind::Empty),
-    LineInfo::new(5, 3, LineKind::Empty),
-    LineInfo::new(8, 10, LineKind::Full),
-];
-let merged = merge_small_lines(lines, 4);
-assert_eq!(merged.len(), 2);`} />
+<Code lang="rust" code={"use grider::detection::merge_small_lines;\nuse grider::{LineInfo, LineKind};\n\nlet lines = vec![\n    LineInfo::new(0, 5, LineKind::Empty),\n    LineInfo::new(5, 3, LineKind::Empty),\n    LineInfo::new(8, 10, LineKind::Full),\n];\nlet merged = merge_small_lines(lines, 4);\nassert_eq!(merged.len(), 2);"} />
 
 ## collect_lines and process_dimension
 

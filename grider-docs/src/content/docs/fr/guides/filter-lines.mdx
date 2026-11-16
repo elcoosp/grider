@@ -16,10 +16,7 @@ Ce guide montre comment transformer une extraction brute en sous-ensemble de lig
 
 Les en-têtes, pieds de page et marges apparaissent comme des bandes `Full` surdimensionnées. La famille `filter_*` supprime les lignes ou colonnes les plus petites ou les plus grandes, retournant une nouvelle `Grid` et laissant l'originale intacte :
 
-<Code lang="rust" code={`// Filter out structural lines (headers/footers) by size…
-let grid = grid.filter_biggest_rows();
-// …or drop noise-size bands.
-let grid = grid.filter_smallest_rows();`} />
+<Code lang="rust" code={"// Filter out structural lines (headers/footers) by size\u2026\nlet grid = grid.filter_biggest_rows();\n// \u2026or drop noise-size bands.\nlet grid = grid.filter_smallest_rows();"} />
 
 Les mêmes méthodes existent pour les colonnes : `filter_smallest_columns()` et `filter_biggest_columns()`.
 
@@ -34,37 +31,21 @@ Les mêmes méthodes existent pour les colonnes : `filter_smallest_columns()` et
 
 `keep_kind` copie la grille et supprime chaque ligne de l'autre type — une étape courante avant de visiter les cellules :
 
-<Code lang="rust" code={`use grider::LineKind;
-
-let full = grid.keep_kind(LineKind::Full);
-
-// Visit every intersection of the remaining lines.
-for cell in full.iter_cells() {
-    let rect = cell.rect();
-    println!("cell at {}x{}", rect.left(), rect.top());
-}`} />
+<Code lang="rust" code={"use grider::LineKind;\n\nlet full = grid.keep_kind(LineKind::Full);\n\n// Visit every intersection of the remaining lines.\nfor cell in full.iter_cells() {\n    let rect = cell.rect();\n    println!(\"cell at {}x{}\", rect.left(), rect.top());\n}"} />
 
 Pour compter ou itérer sans allocation, utilisez la famille d'accesseurs : `rows_by_kind`, `columns_by_kind`, `count_rows_by_kind` et `count_columns_by_kind` :
 
-<Code lang="rust" code={`use grider::LineKind;
-
-let content_rows = grid.count_rows_by_kind(LineKind::Full);`} />
+<Code lang="rust" code={"use grider::LineKind;\n\nlet content_rows = grid.count_rows_by_kind(LineKind::Full);"} />
 
 ## Filtrer par prédicat
 
 `filtered_rows` et `filtered_columns` retournent des itérateurs sur les lignes qui correspondent à n'importe quel prédicat que vous écrivez :
 
-<Code lang="rust" code={`for row in grid.filtered_rows(|row| row.height >= 20) {
-    println!("tall row at y={} ({}px)", row.y, row.height);
-}`} />
+<Code lang="rust" code={"for row in grid.filtered_rows(|row| row.height >= 20) {\n    println!(\"tall row at y={} ({}px)\", row.y, row.height);\n}"} />
 
 Pour modifier la grille en place au lieu de la copier, utilisez `retain_rows` et `retain_columns` :
 
-<Code lang="rust" code={`use grider::{make_grid, LineKind};
-
-let mut grid = make_grid!(rows: [(0, 5), (5, 5, LineKind::Full)], columns: [(0, 2)]);
-grid.retain_rows(|row| row.kind == LineKind::Full);
-assert_eq!(grid.rows.len(), 1);`} />
+<Code lang="rust" code={"use grider::{make_grid, LineKind};\n\nlet mut grid = make_grid!(rows: [(0, 5), (5, 5, LineKind::Full)], columns: [(0, 2)]);\ngrid.retain_rows(|row| row.kind == LineKind::Full);\nassert_eq!(grid.rows.len(), 1);"} />
 
 ## Rechercher des lignes et des cellules par coordonnée
 
@@ -77,13 +58,7 @@ Les coordonnées correspondent directement aux lignes lorsqu'une bande commence 
 | `cell(row_index, column_index)` | Par index | `Option<Cell>` |
 | `find_cells(row_positions, column_positions)` | Par listes de coordonnées `y`/`x` | Itérateur de `Result<Cell, GridError>` |
 
-<Code lang="rust" code={`let cells = grid.find_cells(&[1, 2, 3], &[4, 5, 6]);
-for cell in cells {
-    match cell {
-                    Ok(c) => println!("Found cell at row {}, column {}", c.row.y, c.column.x),
-                    Err(e) => eprintln!("Error finding cell: {e}"),
-    }
-}`} />
+<Code lang="rust" code={"let cells = grid.find_cells(&[1, 2, 3], &[4, 5, 6]);\nfor cell in cells {\n    match cell {\n                    Ok(c) => println!(\"Found cell at row {}, column {}\", c.row.y, c.column.x),\n                    Err(e) => eprintln!(\"Error finding cell: {e}\"),\n    }\n}"} />
 
 `find_cells` signale une [`GridError::RowNotFound`](/reference/errors/) ou `ColumnNotFound` pour les coordonnées où aucune bande ne commence.
 

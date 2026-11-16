@@ -26,16 +26,11 @@ Les deux méthodes s'exécutent en `O(largeur × hauteur)` quelle que soit la ta
 
 Le défaut reste la moyenne adaptative :
 
-<Code lang="rust" code={`use grider::{Binarization, GridConfig};
-
-let mean = GridConfig::default();
-assert_eq!(mean.binarization, Binarization::AdaptiveMean);`} />
+<Code lang="rust" code={"use grider::{Binarization, GridConfig};\n\nlet mean = GridConfig::default();\nassert_eq!(mean.binarization, Binarization::AdaptiveMean);"} />
 
 Sélectionnez Sauvola avec une sensibilité `k` :
 
-<Code lang="rust" code={`use grider::GridConfig;
-
-let config = GridConfig::builder().sauvola(0.34).build();`} />
+<Code lang="rust" code={"use grider::GridConfig;\n\nlet config = GridConfig::builder().sauvola(0.34).build();"} />
 
 ## Choisir k
 
@@ -54,24 +49,17 @@ let config = GridConfig::builder().sauvola(0.34).build();`} />
 
 ## Basculer dans la CLI
 
-<Code lang="bash" title="Terminal" code={`# Sauvola binarization for degraded documents
-grider scan.png --binarization sauvola --sauvola-k 0.34 --json`} />
+<Code lang="bash" title="Terminal" code={"# Sauvola binarization for degraded documents\ngrider scan.png --binarization sauvola --sauvola-k 0.34 --json"} />
 
 Passer `--sauvola-k` implique `--binarization sauvola`, donc ceci est équivalent :
 
-<Code lang="bash" title="Terminal" code={`grider scan.png --sauvola-k 0.34 --json`} />
+<Code lang="bash" title="Terminal" code={"grider scan.png --sauvola-k 0.34 --json"} />
 
 ## Attendez-vous à une segmentation différente
 
 Les deux méthodes segmentent différemment sur la même entrée — c'est le but. Sur la fixture de capture d'écran `tests/large.png` du dépôt, la moyenne adaptative commence par deux courtes lignes `Empty`, tandis que Sauvola avec `k = 0.34` regroupe le haut de la page en une grande bande `Empty` :
 
-<Code lang="json" code={`{
-    "rows": [
-  { "y": 0, "height": 243, "kind": "Empty" },
-  { "y": 243, "height": 91, "kind": "Empty" },
-  { "y": 334, "height": 179, "kind": "Full" }
-    ]
-}`} />
+<Code lang="json" code={"{\n    \"rows\": [\n  { \"y\": 0, \"height\": 243, \"kind\": \"Empty\" },\n  { \"y\": 243, \"height\": 91, \"kind\": \"Empty\" },\n  { \"y\": 334, \"height\": 179, \"kind\": \"Full\" }\n    ]\n}"} />
 
 Utilisez la superposition (`grider scan.png --binarization sauvola`) pour comparer les candidats sur votre propre image, puis gardez le réglage qui correspond aux bandes que vous voyez.
 

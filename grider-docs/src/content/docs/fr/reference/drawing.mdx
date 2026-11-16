@@ -34,15 +34,7 @@ Le module `drawing` (conditionné par la fonctionnalité `drawing` par défaut) 
 | `column_color_provider(v: Box<dyn Fn(usize) -> Rgba<u8>>)` | Fournisseur de couleur par colonne |
 | `line_thickness(v: u32)` | Épaisseur de bande, minimum `1` |
 
-<Code lang="rust" code={`use grider::drawing::GridDrawingConfig;
-use image::Rgba;
-
-let config = GridDrawingConfig::builder()
-    .padding(1)
-    .cell_background_color(Rgba([0, 0, 0, 255]))
-    .row_color_provider(Box::new(|index| Rgba([index as u8, 0, 0, 255])))
-    .build();
-assert_eq!(config.padding, 1);`} />
+<Code lang="rust" code={"use grider::drawing::GridDrawingConfig;\nuse image::Rgba;\n\nlet config = GridDrawingConfig::builder()\n    .padding(1)\n    .cell_background_color(Rgba([0, 0, 0, 255]))\n    .row_color_provider(Box::new(|index| Rgba([index as u8, 0, 0, 255])))\n    .build();\nassert_eq!(config.padding, 1);"} />
 
 ## Résolution des couleurs
 
@@ -53,9 +45,7 @@ assert_eq!(config.padding, 1);`} />
 
 ## Drawable
 
-<Code lang="rust" code={`pub trait Drawable {
-    fn draw(&self, image: &mut RgbaImage, config: &GridDrawingConfig);
-}`} />
+<Code lang="rust" code={"pub trait Drawable {\n    fn draw(&self, image: &mut RgbaImage, config: &GridDrawingConfig);\n}"} />
 
 Implémenté par `Cell`, `Row`, `Column` et [`Grid`](/reference/grid/). Le dessin est infaillible par construction : chaque bande et rectangle est découpé aux limites de l'image.
 
@@ -68,24 +58,11 @@ Sémantique du dessin :
 
 ## Module debug
 
-<Code lang="rust" title="src/lib.rs" code={`pub fn save_image_with_grid(
-    image: &DynamicImage,
-    grid: &Grid,
-    output_path: &str,
-    config: &GridDrawingConfig,
-) -> Result<(), GridError>`} />
+<Code lang="rust" title="src/lib.rs" code={"pub fn save_image_with_grid(\n    image: &DynamicImage,\n    grid: &Grid,\n    output_path: &str,\n    config: &GridDrawingConfig,\n) -> Result<(), GridError>"} />
 
 Convertit l'image en `RgbaImage`, dessine la grille avec `config` et écrit le fichier. Retourne [`GridError::ImageConversionError`](/reference/errors/) lorsque la sauvegarde échoue.
 
-<Code lang="rust" code={`use grider::drawing::GridDrawingConfig;
-use grider::{Grid, GridConfig};
-use image::open;
-
-let img = open("tests/large.png").unwrap();
-let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();
-
-grider::debug::save_image_with_grid(&img, &grid, "output_with_grid.png", &GridDrawingConfig::default())
-    .unwrap();`} />
+<Code lang="rust" code={"use grider::drawing::GridDrawingConfig;\nuse grider::{Grid, GridConfig};\nuse image::open;\n\nlet img = open(\"tests/large.png\").unwrap();\nlet grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();\n\ngrider::debug::save_image_with_grid(&img, &grid, \"output_with_grid.png\", &GridDrawingConfig::default())\n    .unwrap();"} />
 
 <Aside kind="note">
     Le binaire en ligne de commande appelle cette fonction avec la configuration par défaut à chaque exécution, sauf si vous passez

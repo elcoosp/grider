@@ -64,26 +64,13 @@ L'intersection d'une `Row` et d'une `Column`.
 
 Méthode : `rect() -> Rect` — le rectangle couvert sur l'image (un `imageproc::rect::Rect`). Les cellules se comparent par valeur, pas par identité :
 
-<Code lang="rust" code={`use grider::{make_grid, LineInfo};
-
-let grid = make_grid!(rows: [(0, 10)], columns: [(5, 15)]);
-let cell = grid.cell(0, 0).expect("single cell grid");
-let rect = cell.rect();
-assert_eq!((rect.left(), rect.top()), (5, 0));
-assert_eq!((rect.width(), rect.height()), (15, 10));`} />
+<Code lang="rust" code={"use grider::{make_grid, LineInfo};\n\nlet grid = make_grid!(rows: [(0, 10)], columns: [(5, 15)]);\nlet cell = grid.cell(0, 0).expect(\"single cell grid\");\nlet rect = cell.rect();\nassert_eq!((rect.left(), rect.top()), (5, 0));\nassert_eq!((rect.width(), rect.height()), (15, 10));"} />
 
 ## LineTrait
 
 Un trait de fabrique implémenté par `Row` et `Column`, permettant au pipeline de détection de convertir des plages `LineInfo` génériques vers le type spécifique à l'orientation correspondant :
 
-<Code lang="rust" code={`use grider::{Column, LineInfo, LineKind, LineTrait, Row};
-
-let line_info = LineInfo::new(0, 100, LineKind::Full);
-let row = Row::new(line_info);
-let column = Column::new(line_info);
-
-assert_eq!(row.y, 0);
-assert_eq!(column.x, 0);`} />
+<Code lang="rust" code={"use grider::{Column, LineInfo, LineKind, LineTrait, Row};\n\nlet line_info = LineInfo::new(0, 100, LineKind::Full);\nlet row = Row::new(line_info);\nlet column = Column::new(line_info);\n\nassert_eq!(row.y, 0);\nassert_eq!(column.x, 0);"} />
 
 | Implémenteur | `new(LineInfo)` produit |
 | :--- | :--- |
@@ -92,7 +79,7 @@ assert_eq!(column.x, 0);`} />
 
 ## clamp_to_i32
 
-<Code lang="rust" code={`pub fn clamp_to_i32(value: u32) -> i32`} />
+<Code lang="rust" code={"pub fn clamp_to_i32(value: u32) -> i32"} />
 
 Contraint une coordonnée `u32` dans la plage `i32` attendue par `imageproc`, mappant le dépassement sur `i32::MAX`. Les coordonnées au-delà de `i32::MAX` ne peuvent pas se produire pour des images qui tiennent en mémoire, mais la contrainte garde la conversion totale et sans panique.
 

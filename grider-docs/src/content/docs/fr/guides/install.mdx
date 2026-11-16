@@ -17,17 +17,16 @@ Ce guide intègre la bibliothèque Grider dans un projet Rust et le binaire `gri
 
 <Tabs>
     <TabItem label="cargo add">
-<Code lang="bash" title="Terminal" code={`     cargo add grider`} />
+<Code lang="bash" title="Terminal" code={"     cargo add grider"} />
     </TabItem>
     <TabItem label="Cargo.toml">
-<Code lang="toml" title="Cargo.toml" code={`[dependencies]
-grider = "0.3"`} />
+<Code lang="toml" title="Cargo.toml" code={"[dependencies]\ngrider = \"0.3\""} />
     </TabItem>
 </Tabs>
 
 Puis importez le crate dans votre code :
 
-<Code lang="rust" code={`use grider::*;`} />
+<Code lang="rust" code={"use grider::*;"} />
 
 L'import global de style prélude expose les types principaux : [`Grid`](/reference/grid/), [`GridConfig`](/reference/grid-config/), [`Row`](/reference/lines-and-cells/), `Column`, [`Cell`](/reference/lines-and-cells/), [`LineKind`](/reference/lines-and-cells/), [`GridError`](/reference/errors/), l'enum `Binarization` et les macros `make_grid!` / `make_line!`.
 
@@ -35,11 +34,11 @@ L'import global de style prélude expose les types principaux : [`Grid`](/refere
 
 Le même crate construit un binaire en ligne de commande avec le même pipeline d'extraction :
 
-<Code lang="bash" title="Terminal" code={`cargo install grider`} />
+<Code lang="bash" title="Terminal" code={"cargo install grider"} />
 
 Vérifiez l'installation :
 
-<Code lang="bash" title="Terminal" code={`grider --version`} />
+<Code lang="bash" title="Terminal" code={"grider --version"} />
 
 <Aside kind="note">
     Passez `--locked` à `cargo install` si vous voulez les versions de dépendances avec lesquelles la version a été testée :
@@ -56,10 +55,7 @@ Deux fonctionnalités sont activées par défaut ; vous n'y touchez que lorsque 
 | `drawing` | activée | Le dessin de grille et les helpers de superposition `debug` | [API de dessin](/reference/drawing/) |
 | `test-utils` | désactivée | Fixtures d'images partagées pour les tests et benchmarks | [Drapeaux de fonctionnalité](/reference/feature-flags/) |
 
-<Code lang="bash" title="Terminal" code={`# Everything except serde and drawing:
-cargo add grider --no-default-features
-# Test fixtures only, for development:
-cargo add grider --features test-utils`} />
+<Code lang="bash" title="Terminal" code={"# Everything except serde and drawing:\ncargo add grider --no-default-features\n# Test fixtures only, for development:\ncargo add grider --features test-utils"} />
 
 ## Étapes suivantes
 

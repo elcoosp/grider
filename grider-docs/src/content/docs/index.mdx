@@ -24,18 +24,9 @@ import { Aside, Card, CardGrid, Code, LinkButton, LinkCard } from '@astrojs/star
 
 Grider reads an image, binarizes it with an adaptive threshold, detects the runs of background and content scan lines on both axes, and returns them as a [`Grid`](/reference/grid/) of [`Row`](/reference/lines-and-cells/)s and `Column`s — every band tagged `Empty` (background) or `Full` (content).
 
-<Code lang="toml" title="Cargo.toml" code={`[dependencies]
-grider = "0.3"`} />
+<Code lang="toml" title="Cargo.toml" code={"[dependencies]\ngrider = \"0.3\""} />
 
-<Code lang="rust" code={`use grider::{Grid, GridConfig};
-use image::open;
-
-let img = open("path/to/image.png").expect("Failed to open image");
-let grid = Grid::try_from_image_with_config(&img, GridConfig::default()).expect("Failed to create grid");
-
-for row in grid.rows() {
-    println!("Row at y: {} ({:?})", row.y, row.kind);
-}`} />
+<Code lang="rust" code={"use grider::{Grid, GridConfig};\nuse image::open;\n\nlet img = open(\"path/to/image.png\").expect(\"Failed to open image\");\nlet grid = Grid::try_from_image_with_config(&img, GridConfig::default()).expect(\"Failed to create grid\");\n\nfor row in grid.rows() {\n    println!(\"Row at y: {} ({:?})\", row.y, row.kind);\n}"} />
 
 <Aside kind="tip">
         The `drawing` feature renders this visualization of the detected grid with one call to

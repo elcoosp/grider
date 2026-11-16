@@ -23,12 +23,11 @@ You write a small program that turns this table screenshot into a structured gri
 
 ## 1. Create a project
 
-<Code lang="bash" title="Terminal" code={`cargo new hello-grider
-cd hello-grider`} />
+<Code lang="bash" title="Terminal" code={"cargo new hello-grider\ncd hello-grider"} />
 
 ## 2. Add the dependency
 
-<Code lang="bash" title="Terminal" code={`cargo add grider`} />
+<Code lang="bash" title="Terminal" code={"cargo add grider"} />
 
 This adds the latest published release — `0.3` — to your `Cargo.toml`. Grider supports Rust 1.89 and newer and ships with the `serde` and `drawing` features enabled.
 
@@ -42,22 +41,13 @@ This adds the latest published release — `0.3` — to your `Cargo.toml`. Gride
 
 Replace the contents of `src/main.rs` with code that opens an image file with the `image` crate. Grider accepts any `DynamicImage` and converts non-grayscale images for you:
 
-<Code lang="rust" title="src/main.rs" code={`use grider::{Grid, GridConfig};
-use image::open;
-
-fn main() {
-    let img = open("tests/large.png").expect("Failed to open image");
-    let grid = Grid::try_from_image_with_config(&img, GridConfig::default())
-                    .expect("Failed to create grid");
-    println!("{grid}");
-}`} />
+<Code lang="rust" title="src/main.rs" code={"use grider::{Grid, GridConfig};\nuse image::open;\n\nfn main() {\n    let img = open(\"tests/large.png\").expect(\"Failed to open image\");\n    let grid = Grid::try_from_image_with_config(&img, GridConfig::default())\n                    .expect(\"Failed to create grid\");\n    println!(\"{grid}\");\n}"} />
 
 ## 4. Extract the grid
 
 One call does the whole pipeline — binarization, the fused emptiness scan, run-length encoding, and line merging:
 
-<Code lang="rust" code={`let grid = Grid::try_from_image_with_config(&img, GridConfig::default())
-    .expect("Failed to create grid");`} />
+<Code lang="rust" code={"let grid = Grid::try_from_image_with_config(&img, GridConfig::default())\n    .expect(\"Failed to create grid\");"} />
 
 The function returns a `Result`. Extracting from a zero-sized image or with an invalid configuration returns a [`GridError`](/reference/errors/).
 
@@ -65,19 +55,7 @@ The function returns a `Result`. Extracting from a zero-sized image or with an i
 
 Extend `main` to walk the result. Every `Row` has `y`, `height` and `kind`; every `Column` has `x`, `width` and `kind`; every `Cell` is the intersection of one row and one column:
 
-<Code lang="rust" code={`for row in grid.rows() {
-    println!("Row at y: {} ({:?})", row.y, row.kind);
-}
-
-for column in grid.columns() {
-    println!("Column at x: {}", column.x);
-}
-
-// Every intersection of the grid:
-for cell in grid.iter_cells() {
-    let rect = cell.rect();
-    println!("cell {}x{} ({}x{})", rect.left(), rect.top(), rect.width(), rect.height());
-}`} />
+<Code lang="rust" code={"for row in grid.rows() {\n    println!(\"Row at y: {} ({:?})\", row.y, row.kind);\n}\n\nfor column in grid.columns() {\n    println!(\"Column at x: {}\", column.x);\n}\n\n// Every intersection of the grid:\nfor cell in grid.iter_cells() {\n    let rect = cell.rect();\n    println!(\"cell {}x{} ({}x{})\", rect.left(), rect.top(), rect.width(), rect.height());\n}"} />
 
 <Aside kind="tip">
     `Grid` implements `Display`, so `println!("{grid}")` prints a compact summary such as
@@ -88,61 +66,25 @@ for cell in grid.iter_cells() {
 
 The repository contains a snapshot test you can reproduce without any fixture file. It builds a 3 × 3 white image with a single black pixel in the center and extracts the grid with `threshold_block_size: 3` and `merge_threshold_ratio: 0.5`:
 
-<Code lang="rust" code={`use grider::{Binarization, Grid, GridConfig};
-use image::DynamicImage;
-
-let img = image::GrayImage::from_raw(3, 3, vec![255, 255, 255, 255, 0, 255, 255, 255, 255])
-    .unwrap();
-let dynamic_img = DynamicImage::ImageLuma8(img);
-let config = GridConfig {
-    threshold_block_size: 3,
-    merge_threshold_ratio: 0.5,
-    threshold_delta: 0,
-    enable_parallel: false,
-    binarization: Binarization::AdaptiveMean,
-};
-let grid = Grid::try_from_image_with_config(&dynamic_img, config).unwrap();`} />
+<Code lang="rust" code={"use grider::{Binarization, Grid, GridConfig};\nuse image::DynamicImage;\n\nlet img = image::GrayImage::from_raw(3, 3, vec![255, 255, 255, 255, 0, 255, 255, 255, 255])\n    .unwrap();\nlet dynamic_img = DynamicImage::ImageLuma8(img);\nlet config = GridConfig {\n    threshold_block_size: 3,\n    merge_threshold_ratio: 0.5,\n    threshold_delta: 0,\n    enable_parallel: false,\n    binarization: Binarization::AdaptiveMean,\n};\nlet grid = Grid::try_from_image_with_config(&dynamic_img, config).unwrap();"} />
 
 The committed test snapshot records exactly what this produces — the center row and center column are `Full`, everything else is `Empty`:
 
-<Code lang="yaml" code={`rows:
-    - y: 0
-  height: 1
-  kind: Empty
-    - y: 1
-  height: 1
-  kind: Full
-    - y: 2
-  height: 1
-  kind: Empty
-columns:
-    - x: 0
-  width: 1
-  kind: Empty
-    - x: 1
-  width: 1
-  kind: Full
-    - x: 2
-  width: 1
-  kind: Empty`} />
+<Code lang="yaml" code={"rows:\n    - y: 0\n  height: 1\n  kind: Empty\n    - y: 1\n  height: 1\n  kind: Full\n    - y: 2\n  height: 1\n  kind: Empty\ncolumns:\n    - x: 0\n  width: 1\n  kind: Empty\n    - x: 1\n  width: 1\n  kind: Full\n    - x: 2\n  width: 1\n  kind: Empty"} />
 
 ## 7. Run the CLI on the same image
 
 The crate ships a binary with the same powers as the library. Install it, then point it at your image:
 
-<Code lang="bash" title="Terminal" code={`cargo install grider
-grider tests/large.png`} />
+<Code lang="bash" title="Terminal" code={"cargo install grider\ngrider tests/large.png"} />
 
 The command prints a summary, then saves the overlay next to the input file as `<image>_with_grid.png`:
 
-<Code lang="ansi" code={`Extracted grid in 7.22ms
-Grid { rows: 16, columns: 19 }
-Full rows: 7, empty rows: 9, full columns: 9, empty columns: 10
-Saving overlay to tests/large_with_grid.png`} />
+<Code lang="ansi" code={"Extracted grid in 7.22ms\nGrid { rows: 16, columns: 19 }\nFull rows: 7, empty rows: 9, full columns: 9, empty columns: 10\nSaving overlay to tests/large_with_grid.png"} />
 
 Add `--json` to print the whole grid as JSON instead of writing an overlay, and `--quiet` to suppress the summary:
 
-<Code lang="bash" title="Terminal" code={`grider tests/large.png --json --quiet`} />
+<Code lang="bash" title="Terminal" code={"grider tests/large.png --json --quiet"} />
 
 ## Troubleshooting
 

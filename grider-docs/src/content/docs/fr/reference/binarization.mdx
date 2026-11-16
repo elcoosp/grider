@@ -10,10 +10,7 @@ La binarisation transforme l'image en niveaux de gris en une image noir et blanc
 
 ## L'enum
 
-<Code lang="rust" title="src/lib.rs" code={`pub enum Binarization {
-    AdaptiveMean,
-    Sauvola { k: f32 },
-}`} />
+<Code lang="rust" title="src/lib.rs" code={"pub enum Binarization {\n    AdaptiveMean,\n    Sauvola { k: f32 },\n}"} />
 
 Dérive `Debug`, `Clone`, `Copy`, `Default`, `PartialEq` (et `Serialize`/`Deserialize` avec la fonctionnalité `serde`). La variante par défaut est `AdaptiveMean`.
 

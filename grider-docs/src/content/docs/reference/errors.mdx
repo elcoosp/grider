@@ -29,22 +29,15 @@ All errors that [`Grid`](/reference/grid/) operations produce. The enum derives 
 
 ## Constructor
 
-<Code lang="rust" code={`pub fn invalid_config(reason: impl Into<String>) -> Self`} />
+<Code lang="rust" code={"pub fn invalid_config(reason: impl Into<String>) -> Self"} />
 
 Builds `GridError::InvalidConfig` from any string-ish value:
 
-<Code lang="rust" code={`use grider::GridError;
-
-let error = GridError::invalid_config("block size must be > 0");
-assert_eq!(error.to_string(), "Invalid configuration: block size must be > 0");`} />
+<Code lang="rust" code={"use grider::GridError;\n\nlet error = GridError::invalid_config(\"block size must be > 0\");\nassert_eq!(error.to_string(), \"Invalid configuration: block size must be > 0\");"} />
 
 ## Handling in practice
 
-<Code lang="rust" code={`match result {
-    Ok(grid) => println!("{grid}"),
-    Err(GridError::InvalidDimensions { width, height }) => eprintln!("empty image {width}x{height}"),
-    Err(e) => eprintln!("extraction failed: {e}"),
-}`} />
+<Code lang="rust" code={"match result {\n    Ok(grid) => println!(\"{grid}\"),\n    Err(GridError::InvalidDimensions { width, height }) => eprintln!(\"empty image {width}x{height}\"),\n    Err(e) => eprintln!(\"extraction failed: {e}\"),\n}"} />
 
 <Aside kind="caution">
     Because the enum is `#[non_exhaustive]`, matching every current variant without a wildcard arm does
