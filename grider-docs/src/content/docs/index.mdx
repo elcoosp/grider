@@ -24,7 +24,7 @@ import { Aside, Card, CardGrid, Code, LinkButton, LinkCard } from '@astrojs/star
 
 Grider reads an image, binarizes it with an adaptive threshold, detects the runs of background and content scan lines on both axes, and returns them as a [`Grid`](/reference/grid/) of [`Row`](/reference/lines-and-cells/)s and `Column`s — every band tagged `Empty` (background) or `Full` (content).
 
-<Code lang="toml" code={`[dependencies]
+<Code lang="toml" title="Cargo.toml" code={`[dependencies]
 grider = "0.3"`} />
 
 <Code lang="rust" code={`use grider::{Grid, GridConfig};

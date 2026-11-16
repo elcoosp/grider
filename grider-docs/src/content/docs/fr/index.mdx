@@ -24,7 +24,7 @@ import { Aside, Card, CardGrid, Code, LinkButton, LinkCard } from '@astrojs/star
 
 Grider lit une image, la binarise avec un seuil adaptatif, détecte les plages de lignes de balayage d'arrière-plan et de contenu sur les deux axes, et les renvoie sous forme de [`Grid`](/reference/grid/) de [`Row`](/reference/lines-and-cells/)s et de `Column`s — chaque bande étant étiquetée `Empty` (arrière-plan) ou `Full` (contenu).
 
-<Code lang="toml" code={`[dependencies]
+<Code lang="toml" title="Cargo.toml" code={`[dependencies]
 grider = "0.3"`} />
 
 <Code lang="rust" code={`use grider::{Grid, GridConfig};
