@@ -1,0 +1,29 @@
+# Curated domain glossary for @elcoosp/docs-toolkit (starlight-term-glossary)
+- term: "binarization"
+  locale: en
+  href: "/explanation/extraction-pipeline/#stage-1--binarization"
+  definition: "First extraction stage converting a grayscale input image into a binary mask using Adaptive Mean or Sauvola thresholding."
+- term: "Sauvola"
+  locale: en
+  href: "/guides/choose-binarization/"
+  definition: "Local adaptive thresholding algorithm using window mean and standard deviation to handle uneven lighting and shadows."
+- term: "emptiness scan"
+  locale: en
+  href: "/explanation/extraction-pipeline/#stage-2--the-fused-emptiness-scan"
+  definition: "Single-pass fused scan classifying rows and columns as empty background or content lines without intermediate allocations."
+- term: "run-length encoding"
+  locale: en
+  href: "/explanation/extraction-pipeline/#stage-3--run-length-encoding"
+  definition: "Compression step grouping contiguous empty or non-empty scan lines into compact runs prior to line merging."
+- term: "binarisation"
+  locale: fr
+  href: "/fr/explanation/extraction-pipeline/"
+  definition: "Première étape convertissant une image en niveaux de gris en masque binaire via seuillage adaptatif ou Sauvola."
+- term: "scan de vacuité"
+  locale: fr
+  href: "/fr/explanation/extraction-pipeline/"
+  definition: "Balayage fusionné en une passe classant chaque ligne et colonne comme vide ou porteuse de contenu sans allocation."
+- term: "Adaptive Mean"
+  locale: en
+  href: "/guides/choose-binarization/"
+  definition: "Fast local thresholding algorithm comparing each pixel against the mean luminance of its surrounding window."
