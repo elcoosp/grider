@@ -1,7 +1,7 @@
 :root {
-	--sl-color-accent-low: hsl(0 30% 93%);
-	--sl-color-accent: hsl(0 30% 35%);
-	--sl-color-accent-high: hsl(0 30% 28%);
+  --sl-color-accent-low: hsl(0 30% 93%);
+  --sl-color-accent: hsl(0 30% 35%);
+  --sl-color-accent-high: hsl(0 30% 28%);
 }
 
 /*
@@ -23,13 +23,13 @@
 
 :root,
 :root[data-theme='dark'] {
-	--sl-color-accent-low: hsl(211 45% 16%);
-	--sl-color-accent: hsl(211 55% 62%);
-	--sl-color-accent-high: hsl(211 65% 78%);
+  --sl-color-accent-low: hsl(211 45% 16%);
+  --sl-color-accent: hsl(211 55% 62%);
+  --sl-color-accent-high: hsl(211 65% 78%);
 }
 
 :root[data-theme='light'] {
-	--sl-color-accent-low: hsl(210, 42%, 93%);
-	--sl-color-accent: hsl(211, 45%, 40%);
-	--sl-color-accent-high: hsl(211, 50%, 32%);
+  --sl-color-accent-low: hsl(210, 42%, 93%);
+  --sl-color-accent: hsl(211, 45%, 40%);
+  --sl-color-accent-high: hsl(211, 50%, 32%);
 }
