@@ -103,5 +103,6 @@
   "diataxis.reference": "Référence",
   "diataxis.referenceDesc": "Consultez les API exactes, les types, les options CLI et la configuration.",
   "diataxis.explanation": "Explications",
-  "diataxis.explanationDesc": "Comprenez l'architecture, les choix de conception et le fonctionnement interne."
+  "diataxis.explanationDesc": "Comprenez l'architecture, les choix de conception et le fonctionnement interne.",
+  "cmdk.graphConnections": "Pages connectées"
 }
