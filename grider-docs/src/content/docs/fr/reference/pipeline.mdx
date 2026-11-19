@@ -6,7 +6,7 @@ type: reference
 
 import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
 
-Les internes du pipeline d'extraction sont publics dans le module `detection`, et `Grid` ré-expose les plus utiles comme [fonctions associées](/reference/grid/). Composez-les lorsque vous avez besoin d'un pipeline personnalisé ; sinon, appelez `Grid::try_from_image_with_config` une fois.
+Les internes du pipeline d'extraction sont publics dans le module `detection`, et `Grid` ré-expose les plus utiles comme [fonctions associées](/fr/reference/grid/). Composez-les lorsque vous avez besoin d'un pipeline personnalisé ; sinon, appelez `Grid::try_from_image_with_config` une fois.
 
 ## Prédicats de vacuité
 
@@ -47,7 +47,7 @@ Le pipeline dérive le seuil de fusion comme `merge_threshold_for(average_size, 
 | Fonction | Signature | Comportement |
 | :--- | :--- | :--- |
 | `collect_lines` | `(img, primary_dim, secondary_dim, is_empty_fn) -> Vec<LineInfo>` | Collecte les plages initiales (non fusionnées) d'un axe. `is_empty_fn` est appelée une fois par ligne de balayage avec `(image, line_index, secondary_dimension)`, permettant des définitions personnalisées de vide |
-| `process_dimension` | `(img, primary_dim, secondary_dim, merge_threshold_ratio, is_empty_fn) -> Result<SmallVecLine<T>, GridError>` | Pipeline complet par axe — drapeaux, encodage, fusion, conversion — pour `T: LineTrait + Send` ; échoue avec [`InvalidDimensions`](/reference/errors/) sur une dimension nulle |
+| `process_dimension` | `(img, primary_dim, secondary_dim, merge_threshold_ratio, is_empty_fn) -> Result<SmallVecLine<T>, GridError>` | Pipeline complet par axe — drapeaux, encodage, fusion, conversion — pour `T: LineTrait + Send` ; échoue avec [`InvalidDimensions`](/fr/reference/errors/) sur une dimension nulle |
 
 <Aside kind="note">
     Les prédicats intégrés `is_row_empty` / `is_column_empty` implémentent le comportement standard. Passez une
@@ -59,10 +59,10 @@ Le pipeline dérive le seuil de fusion comme `merge_threshold_for(average_size, 
 
 | Constante | Valeur | Signification |
 | :--- | :--- | :--- |
-| `DEFAULT_SMALLVEC_SIZE` | `32` | Capacité en ligne des collections `SmallVecLine` qui soutiennent [`Grid`](/reference/grid/) |
+| `DEFAULT_SMALLVEC_SIZE` | `32` | Capacité en ligne des collections `SmallVecLine` qui soutiennent [`Grid`](/fr/reference/grid/) |
 | `MIN_BLOCK_SIZE` | `3` | Alias de `MIN_THRESHOLD_BLOCK_SIZE` |
 
 ## Étapes suivantes
 
-<LinkCard title="Le pipeline d'extraction" description="Comment ces fonctions se composent de bout en bout." href="/explanation/extraction-pipeline/" />
-<LinkCard title="Binarisation" description="L'étape qui alimente ces fonctions." href="/reference/binarization/" />
+<LinkCard title="Le pipeline d'extraction" description="Comment ces fonctions se composent de bout en bout." href="/fr/explanation/extraction-pipeline/" />
+<LinkCard title="Binarisation" description="L'étape qui alimente ces fonctions." href="/fr/reference/binarization/" />

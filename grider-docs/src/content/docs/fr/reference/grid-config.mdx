@@ -16,7 +16,7 @@ import { Aside, Code, LinkCard } from '@astrojs/starlight/components';
 | `threshold_delta` | `i32` | `0` | Toute valeur | Décalage soustrait de la moyenne locale. Les valeurs positives comptent plus de pixels comme arrière-plan (permissif), les négatives plus strictes. Inutilisé par Sauvola |
 | `merge_threshold_ratio` | `f32` | `0.8` | Contraint dans `[0.0, 1.0]` ; `NaN` correspond au défaut ; doit être fini et dans les limites pour `validate()` | Les plages voisines plus courtes que `ratio × taille moyenne de plage` fusionnent |
 | `enable_parallel` | `bool` | `true` | Toute valeur | Parallélise la binarisation et le scan de vacuité sur des bandes de lignes, avec déclenchement basé sur la taille du travail pour les petites images |
-| `binarization` | [`Binarization`](/reference/binarization/) | `AdaptiveMean` | Le `k` de Sauvola doit être fini pour `validate()` | Méthode de binarisation appliquée avant la détection de lignes ; porte `#[serde(default)]` pour le JSON hérité |
+| `binarization` | [`Binarization`](/fr/reference/binarization/) | `AdaptiveMean` | Le `k` de Sauvola doit être fini pour `validate()` | Méthode de binarisation appliquée avant la détection de lignes ; porte `#[serde(default)]` pour le JSON hérité |
 
 ## Constantes
 
@@ -56,7 +56,7 @@ Chaque méthode consomme et retourne le builder ; la configuration construite pa
 
 <Code lang="rust" code={"pub fn validate(&self) -> Result<(), GridError>"} />
 
-Signale le premier problème trouvé dans les valeurs construites à la main (littéral de structure ou désérialisation) sous forme de [`GridError::InvalidConfig`](/reference/errors/) :
+Signale le premier problème trouvé dans les valeurs construites à la main (littéral de structure ou désérialisation) sous forme de [`GridError::InvalidConfig`](/fr/reference/errors/) :
 
 | Condition | Message d'erreur |
 | :--- | :--- |
@@ -78,5 +78,5 @@ Signale le premier problème trouvé dans les valeurs construites à la main (li
 
 ## Étapes suivantes
 
-<LinkCard title="Binarisation" description="Les deux algorithmes que cette configuration sélectionne." href="/reference/binarization/" />
-<LinkCard title="Configurer l'extraction" description="Recettes orientées tâches pour chaque réglage." href="/guides/configure-extraction/" />
+<LinkCard title="Binarisation" description="Les deux algorithmes que cette configuration sélectionne." href="/fr/reference/binarization/" />
+<LinkCard title="Configurer l'extraction" description="Recettes orientées tâches pour chaque réglage." href="/fr/guides/configure-extraction/" />

@@ -26,11 +26,11 @@ Renommez la sortie avec `-o`/`--output` :
 
 ## Configurer l'extraction
 
-Les drapeaux correspondent un à un aux champs de [`GridConfig`](/reference/grid-config/) :
+Les drapeaux correspondent un à un aux champs de [`GridConfig`](/fr/reference/grid-config/) :
 
 <Code lang="bash" title="Terminal" code={"# Custom configuration\ngrider tests/large.png --block-size 15 --delta 2 --merge-ratio 0.9 --no-parallel --json\n\n# Sauvola binarization for degraded documents\ngrider scan.png --binarization sauvola --sauvola-k 0.34 --json"} />
 
-`--sauvola-k` implique `--binarization sauvola`, donc la seconde commande fonctionne aussi sans le drapeau explicite `--binarization`. Le tableau complet des drapeaux, y compris les valeurs par défaut, se trouve dans la [référence CLI](/reference/cli/).
+`--sauvola-k` implique `--binarization sauvola`, donc la seconde commande fonctionne aussi sans le drapeau explicite `--binarization`. Le tableau complet des drapeaux, y compris les valeurs par défaut, se trouve dans la [référence CLI](/fr/reference/cli/).
 
 ## Obtenir une sortie lisible par machine
 
@@ -64,5 +64,5 @@ Les exécutions réussies sortent avec le code `0`.
 
 ## Étapes suivantes
 
-<LinkCard title="Référence CLI" description="Le tableau complet des drapeaux et des comportements." href="/reference/cli/" />
-<LinkCard title="Sérialiser les grilles en JSON" description="La forme JSON et les allers-retours serde dans la bibliothèque." href="/guides/serialize-grids/" />
+<LinkCard title="Référence CLI" description="Le tableau complet des drapeaux et des comportements." href="/fr/reference/cli/" />
+<LinkCard title="Sérialiser les grilles en JSON" description="La forme JSON et les allers-retours serde dans la bibliothèque." href="/fr/guides/serialize-grids/" />

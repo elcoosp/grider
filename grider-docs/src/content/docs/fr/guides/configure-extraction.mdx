@@ -6,11 +6,11 @@ type: how-to
 
 import { Aside, Code, LinkCard, Steps } from '@astrojs/starlight/components';
 
-Ce guide montre comment piloter le pipeline d'extraction avec [`GridConfig`](/reference/grid-config/) — quels réglages déplacent la détection dans quelle direction, comment les valeurs invalides sont gérées, et quand recourir à chacun.
+Ce guide montre comment piloter le pipeline d'extraction avec [`GridConfig`](/fr/reference/grid-config/) — quels réglages déplacent la détection dans quelle direction, comment les valeurs invalides sont gérées, et quand recourir à chacun.
 
 ## Prérequis
 
-- Grider ajouté à un projet Rust ([Installation](/guides/install/))
+- Grider ajouté à un projet Rust ([Installation](/fr/guides/install/))
 - Une image dont l'extraction de grille a besoin d'être ajustée
 
 ## Utiliser le builder
@@ -32,7 +32,7 @@ Utilisez ce tableau pour passer du symptôme au réglage :
 | Le contenu pâle disparaît | `threshold_delta` | Augmentez-le (les valeurs positives sont plus permissives) |
 | Exécutions monothread reproductibles | `parallel(false)` | Désactiver le parallélisme |
 
-La liste complète des champs avec types, valeurs par défaut et règles de contrainte se trouve dans la [référence `GridConfig`](/reference/grid-config/).
+La liste complète des champs avec types, valeurs par défaut et règles de contrainte se trouve dans la [référence `GridConfig`](/fr/reference/grid-config/).
 
 ## Comprendre le contrat de contrainte
 
@@ -50,7 +50,7 @@ Les valeurs qui contournent le builder — littéraux de structure ou désérial
 
 <Code lang="rust" code={"use grider::GridConfig;\n\nassert!(GridConfig::default().validate().is_ok());\nassert!(GridConfig { threshold_block_size: 0, ..GridConfig::default() }.validate().is_err());"} />
 
-`validate()` signale le premier problème qu'il trouve sous forme de [`GridError::InvalidConfig`](/reference/errors/) : une taille de bloc nulle, un ratio de fusion non fini ou hors limites, ou un `k` Sauvola non fini.
+`validate()` signale le premier problème qu'il trouve sous forme de [`GridError::InvalidConfig`](/fr/reference/errors/) : une taille de bloc nulle, un ratio de fusion non fini ou hors limites, ou un `k` Sauvola non fini.
 
 ## Vérifier vos modifications avec une superposition
 
@@ -65,5 +65,5 @@ Réglez la configuration en regardant la visualisation qu'elle produit — un ap
 
 ## Étapes suivantes
 
-<LinkCard title="Choisir une méthode de binarisation" description="Passez à Sauvola pour les documents dégradés ou inégalement éclairés." href="/guides/choose-binarization/" />
-<LinkCard title="Référence GridConfig" description="Chaque champ, constante et méthode de builder avec les valeurs par défaut." href="/reference/grid-config/" />
+<LinkCard title="Choisir une méthode de binarisation" description="Passez à Sauvola pour les documents dégradés ou inégalement éclairés." href="/fr/guides/choose-binarization/" />
+<LinkCard title="Référence GridConfig" description="Chaque champ, constante et méthode de builder avec les valeurs par défaut." href="/fr/reference/grid-config/" />

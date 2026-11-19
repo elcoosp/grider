@@ -47,7 +47,7 @@ Le module `drawing` (conditionné par la fonctionnalité `drawing` par défaut) 
 
 <Code lang="rust" code={"pub trait Drawable {\n    fn draw(&self, image: &mut RgbaImage, config: &GridDrawingConfig);\n}"} />
 
-Implémenté par `Cell`, `Row`, `Column` et [`Grid`](/reference/grid/). Le dessin est infaillible par construction : chaque bande et rectangle est découpé aux limites de l'image.
+Implémenté par `Cell`, `Row`, `Column` et [`Grid`](/fr/reference/grid/). Le dessin est infaillible par construction : chaque bande et rectangle est découpé aux limites de l'image.
 
 Sémantique du dessin :
 
@@ -60,7 +60,7 @@ Sémantique du dessin :
 
 <Code lang="rust" title="src/lib.rs" code={"pub fn save_image_with_grid(\n    image: &DynamicImage,\n    grid: &Grid,\n    output_path: &str,\n    config: &GridDrawingConfig,\n) -> Result<(), GridError>"} />
 
-Convertit l'image en `RgbaImage`, dessine la grille avec `config` et écrit le fichier. Retourne [`GridError::ImageConversionError`](/reference/errors/) lorsque la sauvegarde échoue.
+Convertit l'image en `RgbaImage`, dessine la grille avec `config` et écrit le fichier. Retourne [`GridError::ImageConversionError`](/fr/reference/errors/) lorsque la sauvegarde échoue.
 
 <Code lang="rust" code={"use grider::drawing::GridDrawingConfig;\nuse grider::{Grid, GridConfig};\nuse image::open;\n\nlet img = open(\"tests/large.png\").unwrap();\nlet grid = Grid::try_from_image_with_config(&img, GridConfig::default()).unwrap();\n\ngrider::debug::save_image_with_grid(&img, &grid, \"output_with_grid.png\", &GridDrawingConfig::default())\n    .unwrap();"} />
 
@@ -71,4 +71,4 @@ Convertit l'image en `RgbaImage`, dessine la grille avec `config` et écrit le f
 
 ## Étapes suivantes
 
-<LinkCard title="Dessiner des grilles et des cellules" description="Recettes pour les fournisseurs, l'épaisseur et le remplissage." href="/guides/draw-overlays/" />
+<LinkCard title="Dessiner des grilles et des cellules" description="Recettes pour les fournisseurs, l'épaisseur et le remplissage." href="/fr/guides/draw-overlays/" />

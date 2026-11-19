@@ -16,7 +16,7 @@ Dérive `Debug`, `Clone`, `Copy`, `Default`, `PartialEq` (et `Serialize`/`Deseri
 
 ### AdaptiveMean
 
-Le seuil de moyenne adaptative (Bradley & Roth, 2005). Un pixel est un arrière-plan lorsqu'il est au moins aussi lumineux que la moyenne de sa fenêtre moins [`threshold_delta`](/reference/grid-config/). La sortie est **identique bit pour bit** à `imageproc::contrast::adaptive_threshold`, vérifiée par des tests de propriétés.
+Le seuil de moyenne adaptative (Bradley & Roth, 2005). Un pixel est un arrière-plan lorsqu'il est au moins aussi lumineux que la moyenne de sa fenêtre moins [`threshold_delta`](/fr/reference/grid-config/). La sortie est **identique bit pour bit** à `imageproc::contrast::adaptive_threshold`, vérifiée par des tests de propriétés.
 
 ### Sauvola
 
@@ -24,7 +24,7 @@ Le seuil de Sauvola & Pietikäinen (2000) pour les documents dégradés. Le seui
 
 | Champ | Signification |
 | :--- | :--- |
-| `k` | Sensibilité au contraste local, typiquement dans `[0.1, 0.5]` ; `0.2` est un bon défaut et le repli pour les valeurs non finies. [`threshold_delta`](/reference/grid-config/) n'est pas utilisé par cette méthode |
+| `k` | Sensibilité au contraste local, typiquement dans `[0.1, 0.5]` ; `0.2` est un bon défaut et le repli pour les valeurs non finies. [`threshold_delta`](/fr/reference/grid-config/) n'est pas utilisé par cette méthode |
 
 L'écart type utilise la constante de plage dynamique `SAUVOLA_DYNAMIC_RANGE = 128.0` — pour les images en niveaux de gris 8 bits, l'écart est borné par `255 / 2`, et `128` est l'arrondi conventionnel de cette borne.
 
@@ -56,5 +56,5 @@ Le binariseur à moyenne adaptative ne matérialise jamais une image intégrale 
 
 ## Étapes suivantes
 
-<LinkCard title="Choisir une méthode de binarisation" description="Guide de décision avec les valeurs de k et les drapeaux de CLI." href="/guides/choose-binarization/" />
-<LinkCard title="Le pipeline d'extraction" description="Où se situe la binarisation dans la conception globale." href="/explanation/extraction-pipeline/" />
+<LinkCard title="Choisir une méthode de binarisation" description="Guide de décision avec les valeurs de k et les drapeaux de CLI." href="/fr/guides/choose-binarization/" />
+<LinkCard title="Le pipeline d'extraction" description="Où se situe la binarisation dans la conception globale." href="/fr/explanation/extraction-pipeline/" />

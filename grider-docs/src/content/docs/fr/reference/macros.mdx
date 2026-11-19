@@ -23,7 +23,7 @@ Crée une `Row` ou une `Column` à partir d'un tuple. Le type par défaut est `L
 
 ## make_grid
 
-Crée une [`Grid`](/reference/grid/) à partir de listes de tuples de lignes et de colonnes. Une virgule finale après chaque tuple est optionnelle.
+Crée une [`Grid`](/fr/reference/grid/) à partir de listes de tuples de lignes et de colonnes. Une virgule finale après chaque tuple est optionnelle.
 
 <Code lang="rust" code={"use grider::{make_grid, LineKind};\n\nlet grid = make_grid!(\n    rows: [\n                    (0, 10),                  // Row at y=0, height=10, LineKind::Empty\n                    (10, 20, LineKind::Full), // Row at y=10, height=20, LineKind::Full\n    ],\n    columns: [\n                    (0, 5),                   // Column at x=0, width=5, LineKind::Empty\n                    (5, 15, LineKind::Full),  // Column at x=5, width=15, LineKind::Full\n    ]\n);\n\nassert_eq!(grid.rows.len(), 2);\nassert_eq!(grid.columns.len(), 2);"} />
 
@@ -35,5 +35,5 @@ Notes :
 
 ## Étapes suivantes
 
-<LinkCard title="Lignes et cellules" description="Les types que ces macros construisent." href="/reference/lines-and-cells/" />
-<LinkCard title="Grid" description="Interrogez les grilles construites." href="/reference/grid/" />
+<LinkCard title="Lignes et cellules" description="Les types que ces macros construisent." href="/fr/reference/lines-and-cells/" />
+<LinkCard title="Grid" description="Interrogez les grilles construites." href="/fr/reference/grid/" />

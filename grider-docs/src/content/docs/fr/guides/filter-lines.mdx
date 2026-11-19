@@ -10,7 +10,7 @@ Ce guide montre comment transformer une extraction brute en sous-ensemble de lig
 
 ## Prérequis
 
-- Une [`Grid`](/reference/grid/) extraite avec `Grid::try_from_image_with_config` ou construite avec `make_grid!`
+- Une [`Grid`](/fr/reference/grid/) extraite avec `Grid::try_from_image_with_config` ou construite avec `make_grid!`
 
 ## Supprimer les lignes structurelles par taille
 
@@ -60,9 +60,9 @@ Les coordonnées correspondent directement aux lignes lorsqu'une bande commence 
 
 <Code lang="rust" code={"let cells = grid.find_cells(&[1, 2, 3], &[4, 5, 6]);\nfor cell in cells {\n    match cell {\n                    Ok(c) => println!(\"Found cell at row {}, column {}\", c.row.y, c.column.x),\n                    Err(e) => eprintln!(\"Error finding cell: {e}\"),\n    }\n}"} />
 
-`find_cells` signale une [`GridError::RowNotFound`](/reference/errors/) ou `ColumnNotFound` pour les coordonnées où aucune bande ne commence.
+`find_cells` signale une [`GridError::RowNotFound`](/fr/reference/errors/) ou `ColumnNotFound` pour les coordonnées où aucune bande ne commence.
 
 ## Étapes suivantes
 
-<LinkCard title="Référence Grid" description="Chaque méthode de Grid, y compris les accesseurs de taille et les wrappers de compatibilité." href="/reference/grid/" />
-<LinkCard title="Dessiner des grilles et des cellules" description="Visualisez le résultat filtré avec des couleurs personnalisées." href="/guides/draw-overlays/" />
+<LinkCard title="Référence Grid" description="Chaque méthode de Grid, y compris les accesseurs de taille et les wrappers de compatibilité." href="/fr/reference/grid/" />
+<LinkCard title="Dessiner des grilles et des cellules" description="Visualisez le résultat filtré avec des couleurs personnalisées." href="/fr/guides/draw-overlays/" />

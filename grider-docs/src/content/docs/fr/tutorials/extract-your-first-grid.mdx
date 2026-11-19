@@ -49,7 +49,7 @@ Un appel fait tout le pipeline — binarisation, le scan de vacuité fusionné, 
 
 <Code lang="rust" code={"let grid = Grid::try_from_image_with_config(&img, GridConfig::default())\n    .expect(\"Failed to create grid\");"} />
 
-La fonction retourne un `Result`. L'extraction depuis une image de taille nulle ou avec une configuration invalide retourne une [`GridError`](/reference/errors/).
+La fonction retourne un `Result`. L'extraction depuis une image de taille nulle ou avec une configuration invalide retourne une [`GridError`](/fr/reference/errors/).
 
 ## 5. Inspecter les lignes, colonnes et cellules
 
@@ -89,10 +89,10 @@ Ajoutez `--json` pour imprimer toute la grille en JSON au lieu d'écrire une sup
 ## Dépannage
 
 - **`Failed to open image`** — le chemin est faux ou le format n'est pas pris en charge par le crate `image`. Passez le même chemin dans `image::open` pour confirmer.
-- **Tout est une bande `Full` géante** — votre arrière-plan est plus sombre que le contenu. Baissez [`threshold_delta`](/reference/grid-config/) (les valeurs négatives rendent le seuil plus strict), ou passez à la [binarisation Sauvola](/guides/choose-binarization/) pour un éclairage inégal.
+- **Tout est une bande `Full` géante** — votre arrière-plan est plus sombre que le contenu. Baissez [`threshold_delta`](/fr/reference/grid-config/) (les valeurs négatives rendent le seuil plus strict), ou passez à la [binarisation Sauvola](/fr/guides/choose-binarization/) pour un éclairage inégal.
 - **Les lignes de contenu fines manquent** — les petites plages fusionnent dans leurs voisines lorsqu'elles sont plus courtes que `merge_threshold_ratio × moyenne`. Baissez le ratio, par exemple `.merge_threshold_ratio(0.5)`.
 
 ## Étapes suivantes
 
-<LinkCard title="Configurer l'extraction" description="Réglez chaque paramètre du pipeline de détection avec GridConfig." href="/guides/configure-extraction/" />
-<LinkCard title="Dessiner des grilles et des cellules" description="Changez les couleurs, l'épaisseur et la marge de la visualisation." href="/guides/draw-overlays/" />
+<LinkCard title="Configurer l'extraction" description="Réglez chaque paramètre du pipeline de détection avec GridConfig." href="/fr/guides/configure-extraction/" />
+<LinkCard title="Dessiner des grilles et des cellules" description="Changez les couleurs, l'épaisseur et la marge de la visualisation." href="/fr/guides/draw-overlays/" />

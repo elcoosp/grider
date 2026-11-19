@@ -28,7 +28,7 @@ Puis importez le crate dans votre code :
 
 <Code lang="rust" code={"use grider::*;"} />
 
-L'import global de style prélude expose les types principaux : [`Grid`](/reference/grid/), [`GridConfig`](/reference/grid-config/), [`Row`](/reference/lines-and-cells/), `Column`, [`Cell`](/reference/lines-and-cells/), [`LineKind`](/reference/lines-and-cells/), [`GridError`](/reference/errors/), l'enum `Binarization` et les macros `make_grid!` / `make_line!`.
+L'import global de style prélude expose les types principaux : [`Grid`](/fr/reference/grid/), [`GridConfig`](/fr/reference/grid-config/), [`Row`](/fr/reference/lines-and-cells/), `Column`, [`Cell`](/fr/reference/lines-and-cells/), [`LineKind`](/fr/reference/lines-and-cells/), [`GridError`](/fr/reference/errors/), l'enum `Binarization` et les macros `make_grid!` / `make_line!`.
 
 ## Installer le binaire CLI
 
@@ -51,12 +51,12 @@ Deux fonctionnalités sont activées par défaut ; vous n'y touchez que lorsque 
 
 | Fonctionnalité | Défaut | Objectif | Référence |
 | :--- | :--- | :--- | :--- |
-| `serde` | activée | `Serialize`/`Deserialize` pour tous les types de données, sortie JSON dans la CLI | [Drapeaux de fonctionnalité](/reference/feature-flags/) |
-| `drawing` | activée | Le dessin de grille et les helpers de superposition `debug` | [API de dessin](/reference/drawing/) |
-| `test-utils` | désactivée | Fixtures d'images partagées pour les tests et benchmarks | [Drapeaux de fonctionnalité](/reference/feature-flags/) |
+| `serde` | activée | `Serialize`/`Deserialize` pour tous les types de données, sortie JSON dans la CLI | [Drapeaux de fonctionnalité](/fr/reference/feature-flags/) |
+| `drawing` | activée | Le dessin de grille et les helpers de superposition `debug` | [API de dessin](/fr/reference/drawing/) |
+| `test-utils` | désactivée | Fixtures d'images partagées pour les tests et benchmarks | [Drapeaux de fonctionnalité](/fr/reference/feature-flags/) |
 
 <Code lang="bash" title="Terminal" code={"# Everything except serde and drawing:\ncargo add grider --no-default-features\n# Test fixtures only, for development:\ncargo add grider --features test-utils"} />
 
 ## Étapes suivantes
 
-<LinkCard title="Extraire votre première grille" description="Le tutoriel étape par étape d'un projet vide à une grille dessinée." href="/tutorials/extract-your-first-grid/" />
+<LinkCard title="Extraire votre première grille" description="Le tutoriel étape par étape d'un projet vide à une grille dessinée." href="/fr/tutorials/extract-your-first-grid/" />
