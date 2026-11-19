@@ -59,7 +59,7 @@ Passing `--sauvola-k` implies `--binarization sauvola`, so this is equivalent:
 
 The two methods segment differently on the same input — that is the point. On the repository's `tests/large.png` screenshot fixture, the adaptive mean starts with two short `Empty` rows, while Sauvola with `k = 0.34` groups the top of the page into one large `Empty` band:
 
-<Code lang="json" code={"{\n    \"rows\": [\n  { \"y\": 0, \"height\": 243, \"kind\": \"Empty\" },\n  { \"y\": 243, \"height\": 91, \"kind\": \"Empty\" },\n  { \"y\": 334, \"height\": 179, \"kind\": \"Full\" }\n    ]\n}"} />
+<Code lang="json" code={"{\n  \"rows\": [\n    { \"y\": 0, \"height\": 243, \"kind\": \"Empty\" },\n    { \"y\": 243, \"height\": 91, \"kind\": \"Empty\" },\n    { \"y\": 334, \"height\": 179, \"kind\": \"Full\" }\n  ]\n}"} />
 
 Use the overlay (`grider scan.png --binarization sauvola`) to compare candidates on your own image, then keep the setting that matches the bands you see.
 
