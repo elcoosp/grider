@@ -19,7 +19,7 @@ const results = page.locator("[class*='search-results'] a, [role='option'], dial
 const count = await results.count();
 const titles = [];
 for (let i = 0; i < Math.min(count, 5); i++) {
-  const text = (await results.nth(i).innerText()).replace(/\s+/g, ' ').trim();
+  const text = (await results.nth(i).innerText()).replaceAll(/\s+/g, ' ').trim();
   titles.push(text.slice(0, 90));
 }
 console.log(JSON.stringify({ query: 'Sauvola', resultCount: count, sample: titles }, null, 2));

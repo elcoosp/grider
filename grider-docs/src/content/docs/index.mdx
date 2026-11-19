@@ -38,16 +38,16 @@ Grider reads an image, binarizes it with an adaptive threshold, detects the runs
 ## Why Grider
 
 - **One-line extraction** — [`Grid::try_from_image_with_config`](/reference/grid/) returns every row and
-        column band of the image, tagged `Empty` or `Full`.
+  column band of the image, tagged `Empty` or `Full`.
 - **Fast by construction** — binarization runs on a streaming sliding-window integral image
-        (1.6–3.1× faster than the previous `imageproc`-based path, bit-for-bit identical output), the
-        emptiness scan is one fused cache-friendly pass, and both steps parallelize over row bands with
-        work-size gating. See [Performance](/explanation/performance/).
+  (1.6–3.1× faster than the previous `imageproc`-based path, bit-for-bit identical output), the
+  emptiness scan is one fused cache-friendly pass, and both steps parallelize over row bands with
+  work-size gating. See [Performance](/explanation/performance/).
 - **Two binarizers** — the adaptive mean threshold (Bradley & Roth) for clean input, or
-        [Sauvola](/guides/choose-binarization/) for degraded documents, both `O(width × height)` regardless
-        of the window radius.
+  [Sauvola](/guides/choose-binarization/) for degraded documents, both `O(width × height)` regardless
+  of the window radius.
 - **Ergonomic API** — builders for `GridConfig` and `GridDrawingConfig`, iterators over cells,
-        kind-based filters, in-place `retain`, serde support, and visual debug overlays.
+  kind-based filters, in-place `retain`, serde support, and visual debug overlays.
 
 ## Choose your path
 

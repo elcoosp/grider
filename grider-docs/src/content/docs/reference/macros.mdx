@@ -8,7 +8,7 @@ import { Code, LinkCard } from '@astrojs/starlight/components';
 
 The two exported macros build line primitives and whole grids from tuples, which keeps test fixtures readable. Both are available through `grider::*`.
 
-## make_line!
+## make_line
 
 Creates a `Row` or `Column` from a tuple. The kind defaults to `LineKind::Empty` when omitted.
 
@@ -21,7 +21,7 @@ Creates a `Row` or `Column` from a tuple. The kind defaults to `LineKind::Empty`
 
 <Code lang="rust" code={"use grider::*;\n\n// With LineKind::Full\nlet row = make_line!(Row, (0, 10, LineKind::Full));\nassert_eq!(row.y, 0);\nassert_eq!(row.height, 10);\nassert_eq!(row.kind, LineKind::Full);\n\n// Without LineKind (defaults to LineKind::Empty)\nlet row = make_line!(Row, (10, 20));\nassert_eq!(row.y, 10);\nassert_eq!(row.height, 20);\nassert_eq!(row.kind, LineKind::Empty);"} />
 
-## make_grid!
+## make_grid
 
 Creates a [`Grid`](/reference/grid/) from lists of row and column tuples. A trailing comma after each tuple is optional.
 
