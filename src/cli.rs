@@ -73,7 +73,7 @@ pub struct Cli {
 
 /// Entry point of the binary: initializes logging, runs the CLI, maps errors
 /// onto the process exit code.
-#[must_use]
+#[must_use = "process exit code"]
 pub fn main() -> std::process::ExitCode {
     init_tracing();
     match run_from_env() {
